@@ -1,0 +1,80 @@
+{
+    "started_at_utc":  "2026-04-28T16:52:26.8810021Z",
+    "scenario_root":  "C:\\Users\\GOEDUA~1\\AppData\\Local\\Temp\\cx-radar-qa-5ea65f320a074ff1a04be4828a5bc181",
+    "validate":  {
+                     "ProbeScriptSyntax":  "OK",
+                     "ConfigFile":  "OK",
+                     "CurlAvailable":  true,
+                     "InfluxTokenAvailable":  false,
+                     "InfluxTokenSource":  "None",
+                     "InfluxCredentialFilePath":  "C:\\Users\\GOEDUARDO\\AppData\\Local\\CX-Radar\\secrets\\influxdb-token.credential.xml",
+                     "InfluxCredentialFileExists":  false,
+                     "EnabledTargets":  5
+                 },
+    "smoke":  {
+                  "name":  "smoke",
+                  "passed":  true,
+                  "process":  {
+                                  "timed_out":  false,
+                                  "exit_code":  0,
+                                  "duration_ms":  4459.66,
+                                  "stdout":  "",
+                                  "stderr":  ""
+                              },
+                  "new_curl_process_ids":  [
+
+                                           ],
+                  "parsed_log":  {
+                                     "target_results":  [
+                                                            {
+                                                                "service":  "control",
+                                                                "endpoint_name":  "microsoft",
+                                                                "http_status":  200,
+                                                                "curl_exit_code":  0,
+                                                                "time_total_ms":  343.32
+                                                            },
+                                                            {
+                                                                "service":  "youtube",
+                                                                "endpoint_name":  "homepage",
+                                                                "http_status":  200,
+                                                                "curl_exit_code":  0,
+                                                                "time_total_ms":  643.89
+                                                            },
+                                                            {
+                                                                "service":  "netflix",
+                                                                "endpoint_name":  "homepage",
+                                                                "http_status":  200,
+                                                                "curl_exit_code":  0,
+                                                                "time_total_ms":  1605.15
+                                                            },
+                                                            {
+                                                                "service":  "disneyplus",
+                                                                "endpoint_name":  "homepage",
+                                                                "http_status":  200,
+                                                                "curl_exit_code":  0,
+                                                                "time_total_ms":  545.15
+                                                            },
+                                                            {
+                                                                "service":  "amazon",
+                                                                "endpoint_name":  "homepage",
+                                                                "http_status":  200,
+                                                                "curl_exit_code":  0,
+                                                                "time_total_ms":  184.94
+                                                            }
+                                                        ],
+                                     "summary":  {
+                                                     "success_count":  5,
+                                                     "failure_count":  0,
+                                                     "run_duration_ms":  4026.81
+                                                 },
+                                     "warning_count":  1,
+                                     "error_count":  0,
+                                     "line_count":  8
+                                 },
+                  "distinct_latency_values":  5
+              },
+    "resilience":  [
+
+                   ],
+    "overall_passed":  true
+}

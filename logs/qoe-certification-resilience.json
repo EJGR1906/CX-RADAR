@@ -1,0 +1,156 @@
+{
+    "started_at_utc":  "2026-04-28T16:55:17.4899739Z",
+    "scenario_root":  "C:\\Users\\GOEDUA~1\\AppData\\Local\\Temp\\cx-radar-qa-2491b2c5ca084426a7b9433059dbdc72",
+    "validate":  {
+                     "ProbeScriptSyntax":  "OK",
+                     "ConfigFile":  "OK",
+                     "CurlAvailable":  true,
+                     "InfluxTokenAvailable":  false,
+                     "InfluxTokenSource":  "None",
+                     "InfluxCredentialFilePath":  "C:\\Users\\GOEDUARDO\\AppData\\Local\\CX-Radar\\secrets\\influxdb-token.credential.xml",
+                     "InfluxCredentialFileExists":  false,
+                     "EnabledTargets":  5
+                 },
+    "smoke":  {
+                  "name":  "smoke",
+                  "passed":  true,
+                  "process":  {
+                                  "timed_out":  false,
+                                  "exit_code":  0,
+                                  "duration_ms":  4755.82,
+                                  "stdout":  "",
+                                  "stderr":  ""
+                              },
+                  "new_curl_process_ids":  [
+
+                                           ],
+                  "parsed_log":  {
+                                     "target_results":  [
+                                                            {
+                                                                "service":  "control",
+                                                                "endpoint_name":  "microsoft",
+                                                                "http_status":  200,
+                                                                "curl_exit_code":  0,
+                                                                "time_total_ms":  385.44
+                                                            },
+                                                            {
+                                                                "service":  "youtube",
+                                                                "endpoint_name":  "homepage",
+                                                                "http_status":  200,
+                                                                "curl_exit_code":  0,
+                                                                "time_total_ms":  758.46
+                                                            },
+                                                            {
+                                                                "service":  "netflix",
+                                                                "endpoint_name":  "homepage",
+                                                                "http_status":  200,
+                                                                "curl_exit_code":  0,
+                                                                "time_total_ms":  1574.54
+                                                            },
+                                                            {
+                                                                "service":  "disneyplus",
+                                                                "endpoint_name":  "homepage",
+                                                                "http_status":  200,
+                                                                "curl_exit_code":  0,
+                                                                "time_total_ms":  635.81
+                                                            },
+                                                            {
+                                                                "service":  "amazon",
+                                                                "endpoint_name":  "homepage",
+                                                                "http_status":  200,
+                                                                "curl_exit_code":  0,
+                                                                "time_total_ms":  207.13
+                                                            }
+                                                        ],
+                                     "summary":  {
+                                                     "success_count":  5,
+                                                     "failure_count":  0,
+                                                     "run_duration_ms":  4294.25
+                                                 },
+                                     "warning_count":  1,
+                                     "error_count":  0,
+                                     "line_count":  8
+                                 },
+                  "distinct_latency_values":  5
+              },
+    "resilience":  [
+                       {
+                           "name":  "dns_failure",
+                           "passed":  true,
+                           "process":  {
+                                           "timed_out":  false,
+                                           "exit_code":  0,
+                                           "duration_ms":  866.07,
+                                           "stdout":  "",
+                                           "stderr":  ""
+                                       },
+                           "parsed_log":  {
+                                              "target_results":  [
+
+                                                                 ],
+                                              "summary":  {
+                                                              "success_count":  0,
+                                                              "failure_count":  1,
+                                                              "run_duration_ms":  427.27
+                                                          },
+                                              "warning_count":  1,
+                                              "error_count":  1,
+                                              "line_count":  4
+                                          },
+                           "new_curl_process_ids":  [
+
+                                                    ]
+                       },
+                       {
+                           "name":  "timeout_bound",
+                           "passed":  true,
+                           "process":  {
+                                           "timed_out":  false,
+                                           "exit_code":  0,
+                                           "duration_ms":  1900.42,
+                                           "stdout":  "",
+                                           "stderr":  ""
+                                       },
+                           "parsed_log":  {
+                                              "target_results":  [
+
+                                                                 ],
+                                              "summary":  {
+                                                              "success_count":  0,
+                                                              "failure_count":  1,
+                                                              "run_duration_ms":  1451.48
+                                                          },
+                                              "warning_count":  1,
+                                              "error_count":  1,
+                                              "line_count":  4
+                                          },
+                           "new_curl_process_ids":  [
+
+                                                    ]
+                       },
+                       {
+                           "name":  "influx_outage",
+                           "passed":  true,
+                           "process":  {
+                                           "timed_out":  false,
+                                           "exit_code":  1,
+                                           "duration_ms":  3289,
+                                           "stdout":  "",
+                                           "stderr":  "Invoke-RestMethod : No es posible conectar con el servidor remoto\r\nEn C:\\Users\\GOEDUARDO\\Desktop\\CX-Radar\\scripts\\qoe-probe.ps1: 606 Carácter: 9\r\n+         Invoke-RestMethod -Uri $writeUri -Method Post -Headers @{ Aut ...\r\n+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : NotSpecified: (:) [Invoke-RestMethod], WebException\r\n    + FullyQualifiedErrorId : System.Net.WebException,Microsoft.PowerShell.Commands.InvokeRestMethodCommand"
+                                       },
+                           "parsed_log":  {
+                                              "target_results":  [
+
+                                                                 ],
+                                              "summary":  null,
+                                              "warning_count":  2,
+                                              "error_count":  2,
+                                              "line_count":  5
+                                          },
+                           "new_curl_process_ids":  [
+
+                                                    ]
+                       }
+                   ],
+    "overall_passed":  true
+}

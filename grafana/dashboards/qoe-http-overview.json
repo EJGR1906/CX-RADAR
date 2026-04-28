@@ -1,0 +1,1072 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_INFLUXDB",
+      "label": "InfluxDB",
+      "description": "InfluxDB Cloud datasource for CX-Radar",
+      "type": "datasource",
+      "pluginId": "influxdb",
+      "pluginName": "InfluxDB"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Dashboard operativo de la sonda HTTP sintetica QoE respaldado por qoe_http_check y qoe_probe_run.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "description": "Disponibilidad promedio en el rango y filtros actuales.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 95
+              },
+              {
+                "color": "green",
+                "value": 99
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> map(fn: (r) => ({ r with _value: if r._value then 100.0 else 0.0 }))\n  |> group(columns: [])\n  |> mean()",
+          "refId": "A"
+        }
+      ],
+      "title": "Disponibilidad",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "description": "Suma del ultimo failure_count de qoe_probe_run para las sondas seleccionadas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"failure_count\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> group(columns: [\"probe_id\"])\n  |> last()\n  |> group(columns: [])\n  |> sum()",
+          "refId": "A"
+        }
+      ],
+      "title": "Fallas en la ultima ejecucion",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "description": "Ultimo resultado de escritura hacia InfluxDB de las sondas seleccionadas. Verde significa que todas escribieron correctamente.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "index": 0,
+                  "text": "Escritura fallida"
+                },
+                "1": {
+                  "index": 1,
+                  "text": "Escritura OK"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"write_succeeded\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> map(fn: (r) => ({ r with _value: if r._value then 1.0 else 0.0 }))\n  |> group(columns: [\"probe_id\"])\n  |> last()\n  |> group(columns: [])\n  |> min()",
+          "refId": "A"
+        }
+      ],
+      "title": "Estado de escritura en InfluxDB",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "description": "Tendencia de disponibilidad por servicio a partir del campo booleano available.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 95
+              },
+              {
+                "color": "green",
+                "value": 99
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> map(fn: (r) => ({ r with _value: if r._value then 100.0 else 0.0 }))\n  |> group(columns: [\"service\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Disponibilidad por servicio",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "description": "Latencia end-to-end promedio por servicio a partir de time_total_ms.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1500
+              },
+              {
+                "color": "red",
+                "value": 3500
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"time_total_ms\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> group(columns: [\"service\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Latencia total por servicio",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "description": "Ultimo estado por endpoint, incluyendo IP remota y URL efectiva, para identificar que servicio esta fallando ahora.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "true": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "Disponible"
+                },
+                "false": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "Caido"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 14,
+        "x": 0,
+        "y": 12
+      },
+      "id": 6,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> filter(fn: (r) => r._field =~ /available|http_status|time_total_ms|error_class|curl_exit_code|remote_ip|effective_url/)\n  |> group(columns: [\"probe_id\", \"site\", \"environment\", \"service\", \"endpoint_name\", \"_field\"])\n  |> last()\n  |> pivot(rowKey: [\"probe_id\", \"site\", \"environment\", \"service\", \"endpoint_name\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> group(columns: [])\n  |> keep(columns: [\"probe_id\", \"site\", \"environment\", \"service\", \"endpoint_name\", \"available\", \"http_status\", \"time_total_ms\", \"remote_ip\", \"effective_url\", \"error_class\", \"curl_exit_code\"])\n  |> sort(columns: [\"service\", \"endpoint_name\"])",
+          "refId": "A"
+        }
+      ],
+      "title": "IP de consulta y estado actual",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "description": "Conteo de fallas por ejecucion desde qoe_probe_run.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": true,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 65,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "min": 0,
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 10,
+        "x": 14,
+        "y": 12
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"failure_count\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> group(columns: [\"probe_id\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Conteo de fallas de la sonda",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "description": "Tendencia de duracion de ejecucion de la sonda desde qoe_probe_run. Los picos suelen indicar endpoints lentos o problemas de conectividad local.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10000
+              },
+              {
+                "color": "red",
+                "value": 20000
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"run_duration_ms\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> group(columns: [\"probe_id\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Duracion de ejecucion de la sonda",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "description": "Variabilidad de la latencia entre muestras usando la desviacion estandar de time_starttransfer_ms. Es un proxy HTTP, no jitter de red real.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 150
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"time_starttransfer_ms\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> group(columns: [\"service\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: stddev, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Jitter proxy HTTP",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "description": "Velocidad de bajada aproximada del GET de curl calculada con size_download_bytes y time_total_ms. No equivale a una prueba de velocidad real.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "unit": "Mbps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> filter(fn: (r) => r._field =~ /size_download_bytes|time_total_ms/)\n  |> pivot(rowKey: [\"_time\", \"service\", \"endpoint_name\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({ _time: r._time, service: r.service, endpoint_name: r.endpoint_name, _field: \"approx_download_mbps\", _value: if exists r.time_total_ms and exists r.size_download_bytes and float(v: r.time_total_ms) > 0.0 then (float(v: r.size_download_bytes) * 8.0 / (float(v: r.time_total_ms) / 1000.0)) / 1000000.0 else 0.0 }))\n  |> group(columns: [\"service\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Velocidad de bajada aproximada",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_INFLUXDB}"
+      },
+      "description": "Desglose promedio de DNS, TCP, TLS, TTFB y tiempo total. Filtra por servicio para una lectura mas clara.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 38
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field =~ /time_namelookup_ms|time_connect_ms|time_appconnect_ms|time_starttransfer_ms|time_total_ms/)\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> group(columns: [\"service\", \"_field\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "refId": "A"
+        }
+      ],
+      "title": "Desglose DNS, TCP, TLS, TTFB y total",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "cx-radar",
+    "qoe",
+    "synthetic-http",
+    "influxdb"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_INFLUXDB}"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"environment\", predicate: (r) => r._measurement == \"qoe_http_check\", start: -30d)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Entorno",
+        "multi": true,
+        "name": "environment",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"environment\", predicate: (r) => r._measurement == \"qoe_http_check\", start: -30d)",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_INFLUXDB}"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"site\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/, start: -30d)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Sitio",
+        "multi": true,
+        "name": "site",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"site\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/, start: -30d)",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_INFLUXDB}"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"probe_id\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/, start: -30d)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Sonda",
+        "multi": true,
+        "name": "probe_id",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"probe_id\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/, start: -30d)",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_INFLUXDB}"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"service\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/ and r.probe_id =~ /^${probe_id:regex}$/, start: -30d)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Servicio",
+        "multi": true,
+        "name": "service",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"service\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/ and r.probe_id =~ /^${probe_id:regex}$/, start: -30d)",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_INFLUXDB}"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"endpoint_name\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/ and r.probe_id =~ /^${probe_id:regex}$/ and r.service =~ /^${service:regex}$/, start: -30d)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Endpoint",
+        "multi": true,
+        "name": "endpoint_name",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"endpoint_name\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/ and r.probe_id =~ /^${probe_id:regex}$/ and r.service =~ /^${service:regex}$/, start: -30d)",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Resumen HTTP QoE de CX-Radar",
+  "uid": "cx-radar-qoe-http-overview",
+  "version": 2,
+  "weekStart": ""
+}
