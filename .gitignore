@@ -1,0 +1,30 @@
+# OS and editor files
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/
+*.code-workspace
+
+# Temporary and backup files
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+
+# Local secrets and environment files
+.env
+.env.*
+*.credential.xml
+*.clixml
+
+# Local config overrides
+config/probe-catalog.local.json
+config/probe-catalog.override.json
+
+# Generated probe and QA outputs
+logs/*.log
+logs/*.json
+
+# Local workspace metadata
+memories/
