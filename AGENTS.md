@@ -2,17 +2,18 @@
 
 ## Scope
 
-This repository is a Windows 11 QoE monitoring project centered on the synthetic HTTP lane.
+This repository is a Windows 11 QoE monitoring project centered on the synthetic HTTP lane, with a separate throughput lane.
 
 - Runtime and ingestion flow: PowerShell probe -> InfluxDB Cloud -> Grafana Cloud.
-- Current implemented measurements: `qoe_http_check` and `qoe_probe_run`.
-- Future lanes stay separate: LibreSpeed maps to `qoe_speed_test`; WebPageTest maps to `qoe_page_audit`.
+- Current implemented measurements: `qoe_http_check`, `qoe_probe_run`, `qoe_speed_test`, and `qoe_speed_test_run`.
+- Future browser audit work stays separate under `qoe_page_audit`.
 
 Architecture details live in [docs/architecture/qoe-architecture.md](docs/architecture/qoe-architecture.md).
 
 ## Key Paths
 
 - Probe config: [config/probe-catalog.json](config/probe-catalog.json)
+- Speed-test config: [config/speed-test-catalog.json](config/speed-test-catalog.json)
 - Probe scripts: [scripts/](scripts)
 - Dashboard JSON and Flux examples: [grafana/](grafana)
 - Operations and QA runbooks: [docs/operations/task-scheduler-runbook.md](docs/operations/task-scheduler-runbook.md), [docs/qa/validation-runbook.md](docs/qa/validation-runbook.md), [docs/qa/certification-checklist.md](docs/qa/certification-checklist.md)
@@ -40,6 +41,15 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 & .\scripts\qoe-probe.ps1
+
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
+& .\scripts\validate-qoe-speed-test.ps1 | Format-List
+
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
+& .\scripts\qoe-speed-test.ps1 -SkipInfluxWrite
+
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
+& .\scripts\qoe-speed-test.ps1
 ```
 
 QA checks:
@@ -74,6 +84,12 @@ When changing probe, config, or ingestion logic, prefer this order:
 2. `qoe-probe.ps1 -SkipInfluxWrite`
 3. `qoe-probe.ps1`
 4. `run-qoe-certification.ps1`
+
+For the speed-test lane, prefer this order:
+
+1. `validate-qoe-speed-test.ps1`
+2. `qoe-speed-test.ps1 -SkipInfluxWrite`
+3. `qoe-speed-test.ps1`
 
 Use the daily log under `logs/` as the first source of truth when checking runtime behavior.
 

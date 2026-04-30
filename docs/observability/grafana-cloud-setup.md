@@ -4,6 +4,8 @@
 
 This guide implements the first Grafana Cloud layer for the current synthetic HTTP lane only.
 
+For the generic speed-test lane, use `docs/observability/grafana-speed-test-setup.md` and keep its dashboards and alerts separate from the HTTP folder.
+
 The assets added in this repo are:
 
 1. `grafana/dashboards/qoe-http-overview.json`

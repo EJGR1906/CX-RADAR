@@ -1,1072 +1,1966 @@
 {
-  "__inputs": [
+  "annotations": [
     {
-      "name": "DS_INFLUXDB",
-      "label": "InfluxDB",
-      "description": "InfluxDB Cloud datasource for CX-Radar",
-      "type": "datasource",
-      "pluginId": "influxdb",
-      "pluginName": "InfluxDB"
-    }
-  ],
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
+      "kind": "AnnotationQuery",
+      "spec": {
+        "builtIn": true,
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
-        "target": {
-          "limit": 100,
-          "matchAny": false,
-          "tags": [],
-          "type": "dashboard"
-        },
-        "type": "dashboard"
+        "query": {
+          "datasource": {
+            "name": "-- Grafana --"
+          },
+          "group": "grafana",
+          "kind": "DataQuery",
+          "spec": {
+            "limit": 100,
+            "matchAny": false,
+            "tags": [],
+            "type": "dashboard"
+          },
+          "version": "v0"
+        }
       }
-    ]
-  },
-  "description": "Dashboard operativo de la sonda HTTP sintetica QoE respaldado por qoe_http_check y qoe_probe_run.",
-  "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
-  "id": null,
-  "links": [],
-  "liveNow": false,
-  "panels": [
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_INFLUXDB}"
-      },
-      "description": "Disponibilidad promedio en el rango y filtros actuales.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 1,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 95
-              },
-              {
-                "color": "green",
-                "value": 99
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 0
-      },
-      "id": 1,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> map(fn: (r) => ({ r with _value: if r._value then 100.0 else 0.0 }))\n  |> group(columns: [])\n  |> mean()",
-          "refId": "A"
-        }
-      ],
-      "title": "Disponibilidad",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_INFLUXDB}"
-      },
-      "description": "Suma del ultimo failure_count de qoe_probe_run para las sondas seleccionadas.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 3
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 4,
-        "y": 0
-      },
-      "id": 2,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"failure_count\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> group(columns: [\"probe_id\"])\n  |> last()\n  |> group(columns: [])\n  |> sum()",
-          "refId": "A"
-        }
-      ],
-      "title": "Fallas en la ultima ejecucion",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_INFLUXDB}"
-      },
-      "description": "Ultimo resultado de escritura hacia InfluxDB de las sondas seleccionadas. Verde significa que todas escribieron correctamente.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0,
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "index": 0,
-                  "text": "Escritura fallida"
-                },
-                "1": {
-                  "index": 1,
-                  "text": "Escritura OK"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 8,
-        "y": 0
-      },
-      "id": 3,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"write_succeeded\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> map(fn: (r) => ({ r with _value: if r._value then 1.0 else 0.0 }))\n  |> group(columns: [\"probe_id\"])\n  |> last()\n  |> group(columns: [])\n  |> min()",
-          "refId": "A"
-        }
-      ],
-      "title": "Estado de escritura en InfluxDB",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_INFLUXDB}"
-      },
-      "description": "Tendencia de disponibilidad por servicio a partir del campo booleano available.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 12,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 95
-              },
-              {
-                "color": "green",
-                "value": 99
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
-      "id": 4,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull",
-            "mean"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> map(fn: (r) => ({ r with _value: if r._value then 100.0 else 0.0 }))\n  |> group(columns: [\"service\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
-          "refId": "A"
-        }
-      ],
-      "title": "Disponibilidad por servicio",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_INFLUXDB}"
-      },
-      "description": "Latencia end-to-end promedio por servicio a partir de time_total_ms.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 8,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1500
-              },
-              {
-                "color": "red",
-                "value": 3500
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 4
-      },
-      "id": 5,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull",
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"time_total_ms\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> group(columns: [\"service\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
-          "refId": "A"
-        }
-      ],
-      "title": "Latencia total por servicio",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_INFLUXDB}"
-      },
-      "description": "Ultimo estado por endpoint, incluyendo IP remota y URL efectiva, para identificar que servicio esta fallando ahora.",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [
-            {
-              "options": {
-                "true": {
-                  "color": "green",
-                  "index": 0,
-                  "text": "Disponible"
-                },
-                "false": {
-                  "color": "red",
-                  "index": 1,
-                  "text": "Caido"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 14,
-        "x": 0,
-        "y": 12
-      },
-      "id": 6,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "show": false
-        },
-        "showHeader": true
-      },
-      "targets": [
-        {
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> filter(fn: (r) => r._field =~ /available|http_status|time_total_ms|error_class|curl_exit_code|remote_ip|effective_url/)\n  |> group(columns: [\"probe_id\", \"site\", \"environment\", \"service\", \"endpoint_name\", \"_field\"])\n  |> last()\n  |> pivot(rowKey: [\"probe_id\", \"site\", \"environment\", \"service\", \"endpoint_name\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> group(columns: [])\n  |> keep(columns: [\"probe_id\", \"site\", \"environment\", \"service\", \"endpoint_name\", \"available\", \"http_status\", \"time_total_ms\", \"remote_ip\", \"effective_url\", \"error_class\", \"curl_exit_code\"])\n  |> sort(columns: [\"service\", \"endpoint_name\"])",
-          "refId": "A"
-        }
-      ],
-      "title": "IP de consulta y estado actual",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_INFLUXDB}"
-      },
-      "description": "Conteo de fallas por ejecucion desde qoe_probe_run.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": true,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "bars",
-            "fillOpacity": 65,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 4,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 0,
-          "min": 0,
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 10,
-        "x": 14,
-        "y": 12
-      },
-      "id": 7,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull",
-            "max"
-          ],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"failure_count\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> group(columns: [\"probe_id\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)",
-          "refId": "A"
-        }
-      ],
-      "title": "Conteo de fallas de la sonda",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_INFLUXDB}"
-      },
-      "description": "Tendencia de duracion de ejecucion de la sonda desde qoe_probe_run. Los picos suelen indicar endpoints lentos o problemas de conectividad local.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 10000
-              },
-              {
-                "color": "red",
-                "value": 20000
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 22
-      },
-      "id": 8,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull",
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"run_duration_ms\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> group(columns: [\"probe_id\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
-          "refId": "A"
-        }
-      ],
-      "title": "Duracion de ejecucion de la sonda",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_INFLUXDB}"
-      },
-      "description": "Variabilidad entre muestras consecutivas de time_starttransfer_ms usando cambio absoluto entre puntos. Filtra valores 0 de fallas. Es un proxy HTTP, no jitter de red real.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 8,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "red",
-                "value": 150
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 30
-      },
-      "id": 9,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull",
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"time_starttransfer_ms\")\n  |> filter(fn: (r) => r._value > 0.0)\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> group(columns: [\"service\"])\n  |> sort(columns: [\"_time\"])\n  |> difference(nonNegative: false, columns: [\"_value\"], keepFirst: false)\n  |> map(fn: (r) => ({ r with _value: if r._value < 0.0 then -1.0 * r._value else r._value }))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\", \"service\"])\n  |> group(columns: [])\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"service\"], valueColumn: \"_value\")",
-          "refId": "A"
-        }
-      ],
-      "title": "Jitter proxy HTTP",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_INFLUXDB}"
-      },
-      "description": "Velocidad de bajada aproximada del GET de curl calculada con size_download_bytes y time_total_ms. No equivale a una prueba de velocidad real.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 8,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 2,
-          "unit": "Mbps"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 30
-      },
-      "id": 10,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull",
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> filter(fn: (r) => r._field =~ /size_download_bytes|time_total_ms/)\n  |> pivot(rowKey: [\"_time\", \"service\", \"endpoint_name\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({ _time: r._time, service: r.service, endpoint_name: r.endpoint_name, _field: \"approx_download_mbps\", _value: if exists r.time_total_ms and exists r.size_download_bytes and float(v: r.time_total_ms) > 0.0 then (float(v: r.size_download_bytes) * 8.0 / (float(v: r.time_total_ms) / 1000.0)) / 1000000.0 else 0.0 }))\n  |> group(columns: [\"service\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
-          "refId": "A"
-        }
-      ],
-      "title": "Velocidad de bajada aproximada",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_INFLUXDB}"
-      },
-      "description": "Desglose promedio de DNS, TCP, TLS, TTFB y tiempo total. Filtra por servicio para una lectura mas clara.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 8,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "decimals": 0,
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 38
-      },
-      "id": 11,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull",
-            "mean"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field =~ /time_namelookup_ms|time_connect_ms|time_appconnect_ms|time_starttransfer_ms|time_total_ms/)\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> group(columns: [\"service\", \"_field\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
-          "refId": "A"
-        }
-      ],
-      "title": "Desglose DNS, TCP, TLS, TTFB y total",
-      "type": "timeseries"
     }
   ],
-  "refresh": "1m",
-  "schemaVersion": 39,
+  "cursorSync": "Off",
+  "description": "Dashboard operativo de la sonda HTTP sintetica QoE respaldado por qoe_http_check y qoe_probe_run.",
+  "editable": true,
+  "elements": {
+    "panel-10": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "lastPoints = from(bucket: v.defaultBucket)\n  |> range(start: -4h, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_speed_test\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service == \"GenericSpeedTest\")\n  |> filter(fn: (r) => r.endpoint_name == \"ookla-auto\")\n  |> filter(fn: (r) => r._field =~ /download_mbps|upload_mbps|latency_ms|server_name|server_location|server_country/)\n  |> group(columns: [\"probe_id\", \"site\", \"environment\", \"_field\"])\n  |> last()\n\npivoted = lastPoints\n  |> pivot(rowKey: [\"probe_id\", \"site\", \"environment\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({\n      probe_id: r.probe_id,\n      site: r.site,\n      environment: r.environment,\n      download_mbps: r.download_mbps,\n      upload_mbps: r.upload_mbps,\n      latency_ms: r.latency_ms,\n      server: if exists r.server_name and exists r.server_location and exists r.server_country then string(v: r.server_name) + \" / \" + string(v: r.server_location) + \" / \" + string(v: r.server_country) else if exists r.server_name and exists r.server_location then string(v: r.server_name) + \" / \" + string(v: r.server_location) else if exists r.server_name then string(v: r.server_name) else \"\"\n    }))\n  |> keep(columns: [\"probe_id\", \"site\", \"environment\", \"download_mbps\", \"upload_mbps\", \"latency_ms\", \"server\"])\n  |> sort(columns: [\"probe_id\"])\n\npivoted"
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Ultimo snapshot real del lane qoe_speed_test por sonda, con descarga, subida, latencia y servidor seleccionado por la CLI.",
+        "id": 10,
+        "links": [],
+        "title": "Snapshot real de speed test",
+        "vizConfig": {
+          "group": "table",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "custom": {
+                  "align": "center",
+                  "cellOptions": {
+                    "type": "auto"
+                  },
+                  "footer": {
+                    "reducers": []
+                  },
+                  "inspect": false
+                },
+                "decimals": 2
+              },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "probe_id"
+                  },
+                  "properties": [
+                    {
+                      "id": "displayName",
+                      "value": "Sonda"
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 180
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "site"
+                  },
+                  "properties": [
+                    {
+                      "id": "displayName",
+                      "value": "Sitio"
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 120
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "environment"
+                  },
+                  "properties": [
+                    {
+                      "id": "displayName",
+                      "value": "Entorno"
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 110
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "download_mbps"
+                  },
+                  "properties": [
+                    {
+                      "id": "displayName",
+                      "value": "Download"
+                    },
+                    {
+                      "id": "unit",
+                      "value": "Mbps"
+                    },
+                    {
+                      "id": "custom.cellOptions",
+                      "value": {
+                        "type": "color-background"
+                      }
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 110
+                    },
+                    {
+                      "id": "thresholds",
+                      "value": {
+                        "mode": "absolute",
+                        "steps": [
+                          {
+                            "color": "red",
+                            "value": 0
+                          },
+                          {
+                            "color": "yellow",
+                            "value": 50
+                          },
+                          {
+                            "color": "green",
+                            "value": 80
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "upload_mbps"
+                  },
+                  "properties": [
+                    {
+                      "id": "displayName",
+                      "value": "Upload"
+                    },
+                    {
+                      "id": "unit",
+                      "value": "Mbps"
+                    },
+                    {
+                      "id": "custom.cellOptions",
+                      "value": {
+                        "type": "color-background"
+                      }
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 110
+                    },
+                    {
+                      "id": "thresholds",
+                      "value": {
+                        "mode": "absolute",
+                        "steps": [
+                          {
+                            "color": "red",
+                            "value": 0
+                          },
+                          {
+                            "color": "yellow",
+                            "value": 30
+                          },
+                          {
+                            "color": "green",
+                            "value": 60
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "latency_ms"
+                  },
+                  "properties": [
+                    {
+                      "id": "displayName",
+                      "value": "Latencia"
+                    },
+                    {
+                      "id": "unit",
+                      "value": "ms"
+                    },
+                    {
+                      "id": "custom.cellOptions",
+                      "value": {
+                        "type": "color-background"
+                      }
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 100
+                    },
+                    {
+                      "id": "thresholds",
+                      "value": {
+                        "mode": "absolute",
+                        "steps": [
+                          {
+                            "color": "green",
+                            "value": 0
+                          },
+                          {
+                            "color": "yellow",
+                            "value": 20
+                          },
+                          {
+                            "color": "red",
+                            "value": 50
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "server"
+                  },
+                  "properties": [
+                    {
+                      "id": "displayName",
+                      "value": "Servidor"
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 320
+                    }
+                  ]
+                }
+              ]
+            },
+            "options": {
+              "cellHeight": "sm",
+              "showHeader": true
+            }
+          },
+          "version": "13.1.0-24655759693"
+        }
+      }
+    },
+    "panel-12": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "app": "grafana-assistant-app",
+                      "query": "lastData = from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field =~ /time_namelookup_ms|time_connect_ms|time_appconnect_ms|time_starttransfer_ms/)\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> filter(fn: (r) => r._field != \"time_appconnect_ms\" or r._value > 0.0)\n  |> map(fn: (r) => ({r with _field: if r._field == \"time_namelookup_ms\" then \"DNS\" else if r._field == \"time_connect_ms\" then \"TCP\" else if r._field == \"time_appconnect_ms\" then \"TLS\" else \"TTFB\"}))\n  |> group(columns: [\"service\", \"_field\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, service: r.service, fase: r._field, t: \"L\", _value: r._value}))\n\nmeanData = from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field =~ /time_namelookup_ms|time_connect_ms|time_appconnect_ms|time_starttransfer_ms/)\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> filter(fn: (r) => r._field != \"time_appconnect_ms\" or r._value > 0.0)\n  |> map(fn: (r) => ({r with _field: if r._field == \"time_namelookup_ms\" then \"DNS\" else if r._field == \"time_connect_ms\" then \"TCP\" else if r._field == \"time_appconnect_ms\" then \"TLS\" else \"TTFB\"}))\n  |> group(columns: [\"service\", \"_field\"])\n  |> mean()\n  |> map(fn: (r) => ({_time: r._time, service: r.service, fase: r._field, t: \"M\", _value: r._value}))\n\nunion(tables: [lastData, meanData])\n  |> group(columns: [])\n  |> pivot(rowKey: [\"service\", \"fase\"], columnKey: [\"t\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({\n      _time: now(),\n      _field: r.service + \" - \" + r.fase + \" (ult:\" + (if exists r.L then string(v: int(v: r.L)) else \"?\") + \"ms)\",\n      _value: (if exists r.L then r.L else 0.0) - (if exists r.M then r.M else 0.0)\n    }))\n  |> group(columns: [\"_field\"])",
+                      "range": false
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Tarjetas por servicio y fase. Valor principal = Δ (último − promedio). Verde = mejor que el promedio, azul = estable, amarillo/rojo = empeoró.",
+        "id": 12,
+        "links": [],
+        "title": "Fases: Δ último vs. promedio",
+        "vizConfig": {
+          "group": "stat",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "decimals": 0,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 50
+                    },
+                    {
+                      "color": "red",
+                      "value": 200
+                    }
+                  ]
+                },
+                "unit": "ms"
+              },
+              "overrides": []
+            },
+            "options": {
+              "colorMode": "background",
+              "graphMode": "none",
+              "justifyMode": "center",
+              "orientation": "auto",
+              "percentChangeColorMode": "standard",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showPercentChange": false,
+              "textMode": "value_and_name",
+              "wideLayout": true
+            }
+          },
+          "version": "13.1.0-24655759693"
+        }
+      }
+    },
+    "panel-17": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "app": "grafana-assistant-app",
+                      "query": "allProbes = from(bucket: v.defaultBucket)\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> group(columns: [\"probe_id\"])\n  |> last()\n  |> map(fn: (r) => ({_time: now(), _field: r.probe_id, _value: 0.0}))\n  |> group(columns: [\"_field\"])\n\nactiveProbes = from(bucket: v.defaultBucket)\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> group(columns: [\"probe_id\"])\n  |> count()\n  |> map(fn: (r) => ({_time: now(), _field: r.probe_id, _value: 1.0}))\n  |> group(columns: [\"_field\"])\n\nunion(tables: [allProbes, activeProbes])\n  |> group(columns: [\"_field\"])\n  |> max()\n  |> map(fn: (r) => ({_time: now(), _field: r._field, _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                      "range": false
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Estado actual de cada sonda. 🟢 ON = tuvo medición en los últimos 10 min. 🔴 OFF = sin actividad reciente (pero estuvo activa en las últimas 24h).",
+        "id": 17,
+        "links": [],
+        "title": "Estado de sondas",
+        "vizConfig": {
+          "group": "stat",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "decimals": 0,
+                "mappings": [
+                  {
+                    "options": {
+                      "0": {
+                        "color": "red",
+                        "index": 0,
+                        "text": "OFF"
+                      },
+                      "1": {
+                        "color": "green",
+                        "index": 1,
+                        "text": "ON"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                },
+                "unit": "short"
+              },
+              "overrides": []
+            },
+            "options": {
+              "colorMode": "background",
+              "graphMode": "none",
+              "justifyMode": "center",
+              "orientation": "auto",
+              "percentChangeColorMode": "standard",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showPercentChange": false,
+              "textMode": "value_and_name",
+              "wideLayout": true
+            }
+          },
+          "version": "13.1.0-24655759693"
+        }
+      }
+    },
+    "panel-18": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "app": "grafana-assistant-app",
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> map(fn: (r) => ({r with _value: if r._value then 100.0 else 0.0}))\n  |> group(columns: [\"probe_id\"])\n  |> mean()\n  |> map(fn: (r) => ({_time: now(), _field: r.probe_id, _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                      "range": false
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Porcentaje de checks disponibles (available=true) por sonda en el rango de tiempo seleccionado.",
+        "id": 18,
+        "links": [],
+        "title": "Disponibilidad global por sonda",
+        "vizConfig": {
+          "group": "stat",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "decimals": 1,
+                "max": 100,
+                "min": 0,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 99
+                    },
+                    {
+                      "color": "green",
+                      "value": 100
+                    }
+                  ]
+                },
+                "unit": "percent"
+              },
+              "overrides": []
+            },
+            "options": {
+              "colorMode": "background",
+              "graphMode": "area",
+              "justifyMode": "center",
+              "orientation": "auto",
+              "percentChangeColorMode": "standard",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showPercentChange": false,
+              "textMode": "value_and_name",
+              "wideLayout": true
+            }
+          },
+          "version": "13.1.0-24655759693"
+        }
+      }
+    },
+    "panel-19": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "app": "grafana-assistant-app",
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> map(fn: (r) => ({r with _value: if r._value then 1.0 else 0.0}))\n  |> group(columns: [\"probe_id\", \"service\"])\n  |> mean()\n  |> group()\n  |> map(fn: (r) => ({\n      _time: r._time,\n      \"Sonda\": r.probe_id,\n      \"Servicio\": r.service,\n      \"Disponibilidad %\": r._value * 100.0\n    }))\n  |> keep(columns: [\"Sonda\", \"Servicio\", \"Disponibilidad %\"])\n  |> sort(columns: [\"Sonda\", \"Servicio\"])",
+                      "range": false,
+                      "rest": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> map(fn: (r) => ({r with _value: if r._value then 1.0 else 0.0}))\n  |> group(columns: [\"probe_id\", \"service\"])\n  |> mean()\n  |> map(fn: (r) => ({\n      _time: r._time,\n      probe_id: r.probe_id,\n      service: r.service,\n      \"Disponibilidad %\": r._value * 100.0\n    }))\n  |> group()\n  |> sort(columns: [\"probe_id\", \"service\"])"
+                      }
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Porcentaje de disponibilidad de cada servicio en cada sonda. Detecta servicios caídos o degradados por sonda.",
+        "id": 19,
+        "links": [],
+        "title": "Disponibilidad por sonda × servicio",
+        "vizConfig": {
+          "group": "table",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "custom": {
+                  "align": "center",
+                  "cellOptions": {
+                    "type": "auto"
+                  },
+                  "footer": {
+                    "reducers": []
+                  },
+                  "inspect": false
+                },
+                "decimals": 1,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 99
+                    },
+                    {
+                      "color": "green",
+                      "value": 100
+                    }
+                  ]
+                },
+                "unit": "percent"
+              },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "Disponibilidad %"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.cellOptions",
+                      "value": {
+                        "type": "color-background"
+                      }
+                    },
+                    {
+                      "id": "unit",
+                      "value": "percent"
+                    },
+                    {
+                      "id": "decimals",
+                      "value": 1
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "Sonda"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 220
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "Servicio"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 160
+                    }
+                  ]
+                }
+              ]
+            },
+            "options": {
+              "cellHeight": "sm",
+              "showHeader": true
+            }
+          },
+          "version": "13.1.0-24655759693"
+        }
+      }
+    },
+    "panel-20": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "app": "grafana-assistant-app",
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"time_total_ms\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> group(columns: [\"probe_id\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: count, createEmpty: false)",
+                      "range": true,
+                      "rest": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> group(columns: [\"probe_id\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: count, createEmpty: true)\n  |> map(fn: (r) => ({_time: r._time, _field: r.probe_id, _value: float(v: if exists r._value then r._value else 0)}))\n  |> group(columns: [\"_field\"])"
+                      }
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Cantidad de mediciones por sonda en cada ventana. Una caída a 0 indica que la sonda dejó de medir.",
+        "id": 20,
+        "links": [],
+        "title": "Actividad de sondas en el tiempo",
+        "vizConfig": {
+          "group": "timeseries",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic",
+                  "seriesBy": "max"
+                },
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "barAlignment": 0,
+                  "barWidthFactor": 0.9,
+                  "drawStyle": "line",
+                  "fillOpacity": 50,
+                  "gradientMode": "none",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineInterpolation": "stepBefore",
+                  "lineStyle": {
+                    "fill": "solid"
+                  },
+                  "lineWidth": 2,
+                  "pointSize": 1,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "showPoints": "always",
+                  "showValues": false,
+                  "spanNulls": false,
+                  "stacking": {
+                    "group": "A",
+                    "mode": "normal"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                },
+                "unit": "short"
+              },
+              "overrides": []
+            },
+            "options": {
+              "annotations": {
+                "clustering": -1,
+                "multiLane": false
+              },
+              "legend": {
+                "calcs": [],
+                "displayMode": "list",
+                "placement": "bottom",
+                "showLegend": true
+              },
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "multi",
+                "sort": "none"
+              }
+            }
+          },
+          "version": "13.1.0-24655759693"
+        }
+      }
+    },
+    "panel-4": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> map(fn: (r) => ({ r with _value: if r._value then 100.0 else 0.0 }))\n  |> group(columns: [\"service\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Tendencia de disponibilidad por servicio a partir del campo booleano available.",
+        "id": 4,
+        "links": [],
+        "title": "Disponibilidad por servicio",
+        "vizConfig": {
+          "group": "stat",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "fixedColor": "#ad46ff",
+                  "mode": "thresholds"
+                },
+                "decimals": 0,
+                "fieldMinMax": false,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 95
+                    },
+                    {
+                      "color": "green",
+                      "value": 99
+                    }
+                  ]
+                },
+                "unit": "percent"
+              },
+              "overrides": []
+            },
+            "options": {
+              "colorMode": "background",
+              "graphMode": "area",
+              "justifyMode": "auto",
+              "orientation": "auto",
+              "percentChangeColorMode": "standard",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showPercentChange": false,
+              "textMode": "value_and_name",
+              "wideLayout": true
+            }
+          },
+          "version": "13.1.0-24655759693"
+        }
+      }
+    },
+    "panel-5": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"time_total_ms\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> group(columns: [\"service\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Latencia end-to-end promedio por servicio a partir de time_total_ms.",
+        "id": 5,
+        "links": [],
+        "title": "Latencia total por servicio",
+        "vizConfig": {
+          "group": "timeseries",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "barAlignment": 0,
+                  "barWidthFactor": 0.6,
+                  "drawStyle": "line",
+                  "fillOpacity": 15,
+                  "gradientMode": "opacity",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineInterpolation": "smooth",
+                  "lineWidth": 2,
+                  "pointSize": 4,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "showPoints": "auto",
+                  "showValues": false,
+                  "spanNulls": false,
+                  "stacking": {
+                    "group": "A",
+                    "mode": "none"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "line"
+                  }
+                },
+                "decimals": 0,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1500
+                    },
+                    {
+                      "color": "red",
+                      "value": 3500
+                    }
+                  ]
+                },
+                "unit": "ms"
+              },
+              "overrides": []
+            },
+            "options": {
+              "annotations": {
+                "clustering": -1,
+                "multiLane": false
+              },
+              "legend": {
+                "calcs": [
+                  "lastNotNull",
+                  "mean",
+                  "max"
+                ],
+                "displayMode": "table",
+                "placement": "bottom",
+                "showLegend": true
+              },
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "multi",
+                "sort": "desc"
+              }
+            }
+          },
+          "version": "13.1.0-24655759693"
+        }
+      }
+    },
+    "panel-6": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> filter(fn: (r) => r._field =~ /available|http_status|time_total_ms|error_class|curl_exit_code|remote_ip|effective_url/)\n  |> group(columns: [\"probe_id\", \"site\", \"environment\", \"service\", \"_field\"])\n  |> last()\n  |> toString()  \n  |> pivot(rowKey: [\"probe_id\", \"site\", \"environment\", \"service\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> group(columns: [])\n  |> keep(columns: [\"probe_id\", \"site\", \"environment\", \"service\", \"available\", \"http_status\", \"time_total_ms\", \"remote_ip\", \"effective_url\", \"error_class\", \"curl_exit_code\"])\n  |> sort(columns: [\"service\"])"
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Ultimo estado por endpoint, incluyendo IP remota y URL efectiva, para identificar que servicio esta fallando ahora.",
+        "id": 6,
+        "links": [],
+        "title": "IP de consulta y estado actual",
+        "vizConfig": {
+          "group": "table",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "custom": {
+                  "align": "auto",
+                  "cellOptions": {
+                    "type": "auto"
+                  },
+                  "footer": {
+                    "reducers": []
+                  },
+                  "inspect": false
+                },
+                "mappings": [
+                  {
+                    "options": {
+                      "false": {
+                        "color": "red",
+                        "index": 1,
+                        "text": "Caído"
+                      },
+                      "true": {
+                        "color": "green",
+                        "index": 0,
+                        "text": "Disponible"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "available"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.cellOptions",
+                      "value": {
+                        "type": "color-background"
+                      }
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 110
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "http_status"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.cellOptions",
+                      "value": {
+                        "type": "color-text"
+                      }
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 90
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "service"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 140
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "effective_url"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 230
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "time_total_ms"
+                  },
+                  "properties": [
+                    {
+                      "id": "displayName",
+                      "value": "Tiempo total"
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 110
+                    },
+                    {
+                      "id": "unit",
+                      "value": "ms"
+                    },
+                    {
+                      "id": "decimals",
+                      "value": 0
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "remote_ip"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 130
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "error_class"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 120
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "curl_exit_code"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 100
+                    }
+                  ]
+                }
+              ]
+            },
+            "options": {
+              "cellHeight": "sm",
+              "showHeader": true
+            }
+          },
+          "version": "13.1.0-24655759693"
+        }
+      }
+    },
+    "panel-8": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"run_duration_ms\")\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> group(columns: [\"probe_id\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)"
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Tendencia de duracion de ejecucion de la sonda desde qoe_probe_run. Los picos suelen indicar endpoints lentos o problemas de conectividad local.",
+        "id": 8,
+        "links": [],
+        "title": "Duracion de ejecucion de la sonda",
+        "vizConfig": {
+          "group": "timeseries",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "barAlignment": 0,
+                  "barWidthFactor": 0.6,
+                  "drawStyle": "line",
+                  "fillOpacity": 20,
+                  "gradientMode": "opacity",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineInterpolation": "smooth",
+                  "lineWidth": 2,
+                  "pointSize": 4,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "showPoints": "auto",
+                  "showValues": false,
+                  "spanNulls": false,
+                  "stacking": {
+                    "group": "A",
+                    "mode": "none"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "line"
+                  }
+                },
+                "decimals": 0,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 10000
+                    },
+                    {
+                      "color": "red",
+                      "value": 20000
+                    }
+                  ]
+                },
+                "unit": "ms"
+              },
+              "overrides": []
+            },
+            "options": {
+              "annotations": {
+                "clustering": -1,
+                "multiLane": false
+              },
+              "legend": {
+                "calcs": [
+                  "lastNotNull",
+                  "mean",
+                  "max"
+                ],
+                "displayMode": "table",
+                "placement": "bottom",
+                "showLegend": true
+              },
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "multi",
+                "sort": "desc"
+              }
+            }
+          },
+          "version": "13.1.0-24655759693"
+        }
+      }
+    },
+    "panel-9": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_http_check\")\n  |> filter(fn: (r) => r._field == \"time_starttransfer_ms\")\n  |> filter(fn: (r) => r._value > 0.0)\n  |> filter(fn: (r) => r.environment =~ /^${environment:regex}$/)\n  |> filter(fn: (r) => r.site =~ /^${site:regex}$/)\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> group(columns: [\"service\", \"endpoint_name\"])\n  |> sort(columns: [\"_time\"])\n  |> difference(nonNegative: false, columns: [\"_value\"], keepFirst: false)\n  |> map(fn: (r) => ({ r with _value: if r._value < 0.0 then -1.0 * r._value else r._value }))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\", \"service\"])\n  |> group(columns: [])\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"service\"], valueColumn: \"_value\")"
+                    },
+                    "version": "v0"
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Variabilidad de la latencia entre muestras usando la desviacion estandar de time_starttransfer_ms. Es un proxy HTTP, no jitter de red real.",
+        "id": 9,
+        "links": [],
+        "title": "Jitter proxy HTTP",
+        "vizConfig": {
+          "group": "timeseries",
+          "kind": "VizConfig",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "continuous-GrYlRd",
+                  "seriesBy": "last"
+                },
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "barAlignment": 0,
+                  "barWidthFactor": 0.6,
+                  "drawStyle": "bars",
+                  "fillOpacity": 70,
+                  "gradientMode": "scheme",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineInterpolation": "linear",
+                  "lineStyle": {
+                    "fill": "solid"
+                  },
+                  "lineWidth": 1,
+                  "pointSize": 5,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "showPoints": "auto",
+                  "showValues": false,
+                  "spanNulls": false,
+                  "stacking": {
+                    "group": "A",
+                    "mode": "none"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "decimals": 0,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 50
+                    },
+                    {
+                      "color": "red",
+                      "value": 150
+                    }
+                  ]
+                },
+                "unit": "ms"
+              },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "Amazon"
+                  },
+                  "properties": [
+                    {
+                      "id": "color",
+                      "value": {
+                        "fixedColor": "#F2495C",
+                        "mode": "fixed"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "options": {
+              "annotations": {
+                "clustering": -1,
+                "multiLane": false
+              },
+              "legend": {
+                "calcs": [
+                  "lastNotNull",
+                  "mean",
+                  "max"
+                ],
+                "displayMode": "table",
+                "placement": "right",
+                "showLegend": true
+              },
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "multi",
+                "sort": "desc"
+              }
+            }
+          },
+          "version": "13.1.0-24655759693"
+        }
+      }
+    }
+  },
+  "layout": {
+    "kind": "TabsLayout",
+    "spec": {
+      "tabs": [
+        {
+          "kind": "TabsLayoutTab",
+          "spec": {
+            "layout": {
+              "kind": "GridLayout",
+              "spec": {
+                "items": [
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-17"
+                      },
+                      "height": 5,
+                      "width": 12,
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-18"
+                      },
+                      "height": 5,
+                      "width": 12,
+                      "x": 12,
+                      "y": 0
+                    }
+                  },
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-19"
+                      },
+                      "height": 8,
+                      "width": 24,
+                      "x": 0,
+                      "y": 5
+                    }
+                  },
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-20"
+                      },
+                      "height": 8,
+                      "width": 24,
+                      "x": 0,
+                      "y": 13
+                    }
+                  }
+                ]
+              }
+            },
+            "title": "Resumen de Sondas"
+          }
+        },
+        {
+          "kind": "TabsLayoutTab",
+          "spec": {
+            "layout": {
+              "kind": "GridLayout",
+              "spec": {
+                "items": [
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-10"
+                      },
+                      "height": 12,
+                      "width": 24,
+                      "x": 0,
+                      "y": 0
+                    }
+                  },
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-12"
+                      },
+                      "height": 10,
+                      "width": 24,
+                      "x": 0,
+                      "y": 12
+                    }
+                  },
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-5"
+                      },
+                      "height": 8,
+                      "width": 12,
+                      "x": 0,
+                      "y": 22
+                    }
+                  },
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-9"
+                      },
+                      "height": 8,
+                      "width": 12,
+                      "x": 12,
+                      "y": 22
+                    }
+                  },
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-6"
+                      },
+                      "height": 8,
+                      "width": 12,
+                      "x": 0,
+                      "y": 30
+                    }
+                  },
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-4"
+                      },
+                      "height": 8,
+                      "width": 12,
+                      "x": 12,
+                      "y": 30
+                    }
+                  },
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-8"
+                      },
+                      "height": 8,
+                      "width": 24,
+                      "x": 0,
+                      "y": 38
+                    }
+                  }
+                ]
+              }
+            },
+            "title": "Detalle por Sonda"
+          }
+        }
+      ]
+    }
+  },
+  "links": [],
+  "liveNow": false,
+  "preload": false,
   "tags": [
     "cx-radar",
     "qoe",
     "synthetic-http",
     "influxdb"
   ],
-  "templating": {
-    "list": [
-      {
+  "timeSettings": {
+    "autoRefresh": "5m",
+    "autoRefreshIntervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "fiscalYearStartMonth": 0,
+    "from": "now-1h",
+    "hideTimepicker": false,
+    "timezone": "browser",
+    "to": "now"
+  },
+  "title": "Resumen HTTP QoE de CX-Radar",
+  "variables": [
+    {
+      "kind": "QueryVariable",
+      "spec": {
         "allValue": ".*",
+        "allowCustomValue": true,
         "current": {
-          "selected": true,
           "text": "All",
           "value": "$__all"
         },
-        "datasource": {
-          "type": "influxdb",
-          "uid": "${DS_INFLUXDB}"
-        },
         "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"environment\", predicate: (r) => r._measurement == \"qoe_http_check\", start: -30d)",
-        "hide": 0,
+        "hide": "dontHide",
         "includeAll": true,
         "label": "Entorno",
         "multi": true,
         "name": "environment",
         "options": [],
-        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"environment\", predicate: (r) => r._measurement == \"qoe_http_check\", start: -30d)",
-        "refresh": 1,
-        "sort": 1,
-        "type": "query"
-      },
-      {
+        "query": {
+          "datasource": {
+            "name": "dfkh6j26t6gw0c"
+          },
+          "group": "influxdb",
+          "kind": "DataQuery",
+          "spec": {
+            "__legacyStringValue": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"environment\", predicate: (r) => r._measurement == \"qoe_http_check\", start: -30d)"
+          },
+          "version": "v0"
+        },
+        "refresh": "onDashboardLoad",
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": "alphabeticalAsc"
+      }
+    },
+    {
+      "kind": "QueryVariable",
+      "spec": {
         "allValue": ".*",
+        "allowCustomValue": true,
         "current": {
-          "selected": true,
           "text": "All",
           "value": "$__all"
         },
-        "datasource": {
-          "type": "influxdb",
-          "uid": "${DS_INFLUXDB}"
-        },
         "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"site\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/, start: -30d)",
-        "hide": 0,
+        "hide": "dontHide",
         "includeAll": true,
         "label": "Sitio",
         "multi": true,
         "name": "site",
         "options": [],
-        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"site\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/, start: -30d)",
-        "refresh": 1,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allValue": ".*",
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
+        "query": {
+          "datasource": {
+            "name": "dfkh6j26t6gw0c"
+          },
+          "group": "influxdb",
+          "kind": "DataQuery",
+          "spec": {
+            "__legacyStringValue": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"site\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/, start: -30d)"
+          },
+          "version": "v0"
         },
-        "datasource": {
-          "type": "influxdb",
-          "uid": "${DS_INFLUXDB}"
+        "refresh": "onDashboardLoad",
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": "alphabeticalAsc"
+      }
+    },
+    {
+      "kind": "QueryVariable",
+      "spec": {
+        "allValue": ".*",
+        "allowCustomValue": true,
+        "current": {
+          "text": [
+            "eduardo-pc-trabajo"
+          ],
+          "value": [
+            "eduardo-pc-trabajo"
+          ]
         },
         "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"probe_id\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/, start: -30d)",
-        "hide": 0,
+        "hide": "dontHide",
         "includeAll": true,
         "label": "Sonda",
         "multi": true,
         "name": "probe_id",
         "options": [],
-        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"probe_id\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/, start: -30d)",
-        "refresh": 1,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allValue": ".*",
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
+        "query": {
+          "datasource": {
+            "name": "dfkh6j26t6gw0c"
+          },
+          "group": "influxdb",
+          "kind": "DataQuery",
+          "spec": {
+            "__legacyStringValue": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"probe_id\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/, start: -30d)"
+          },
+          "version": "v0"
         },
-        "datasource": {
-          "type": "influxdb",
-          "uid": "${DS_INFLUXDB}"
+        "refresh": "onDashboardLoad",
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": "alphabeticalAsc"
+      }
+    },
+    {
+      "kind": "QueryVariable",
+      "spec": {
+        "allValue": ".*",
+        "allowCustomValue": true,
+        "current": {
+          "text": [
+            "Disney+",
+            "Amazon",
+            "Microsoft",
+            "Netflix",
+            "Youtube"
+          ],
+          "value": [
+            "Disney+",
+            "Amazon",
+            "Microsoft",
+            "Netflix",
+            "Youtube"
+          ]
         },
         "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"service\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/ and r.probe_id =~ /^${probe_id:regex}$/, start: -30d)",
-        "hide": 0,
+        "hide": "dontHide",
         "includeAll": true,
         "label": "Servicio",
         "multi": true,
         "name": "service",
         "options": [],
-        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"service\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/ and r.probe_id =~ /^${probe_id:regex}$/, start: -30d)",
-        "refresh": 1,
-        "sort": 1,
-        "type": "query"
-      },
-      {
+        "query": {
+          "datasource": {
+            "name": "dfkh6j26t6gw0c"
+          },
+          "group": "influxdb",
+          "kind": "DataQuery",
+          "spec": {
+            "__legacyStringValue": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"service\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/ and r.probe_id =~ /^${probe_id:regex}$/, start: -30d)"
+          },
+          "version": "v0"
+        },
+        "refresh": "onDashboardLoad",
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": "alphabeticalAsc"
+      }
+    },
+    {
+      "kind": "QueryVariable",
+      "spec": {
         "allValue": ".*",
+        "allowCustomValue": true,
         "current": {
-          "selected": true,
           "text": "All",
           "value": "$__all"
         },
-        "datasource": {
-          "type": "influxdb",
-          "uid": "${DS_INFLUXDB}"
-        },
         "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"endpoint_name\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/ and r.probe_id =~ /^${probe_id:regex}$/ and r.service =~ /^${service:regex}$/, start: -30d)",
-        "hide": 0,
+        "hide": "dontHide",
         "includeAll": true,
         "label": "Endpoint",
         "multi": true,
         "name": "endpoint_name",
         "options": [],
-        "query": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"endpoint_name\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/ and r.probe_id =~ /^${probe_id:regex}$/ and r.service =~ /^${service:regex}$/, start: -30d)",
-        "refresh": 1,
-        "sort": 1,
-        "type": "query"
+        "query": {
+          "datasource": {
+            "name": "dfkh6j26t6gw0c"
+          },
+          "group": "influxdb",
+          "kind": "DataQuery",
+          "spec": {
+            "__legacyStringValue": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"endpoint_name\", predicate: (r) => r._measurement == \"qoe_http_check\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/ and r.probe_id =~ /^${probe_id:regex}$/ and r.service =~ /^${service:regex}$/, start: -30d)"
+          },
+          "version": "v0"
+        },
+        "refresh": "onDashboardLoad",
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": "alphabeticalAsc"
       }
-    ]
-  },
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
-  "timepicker": {},
-  "timezone": "",
-  "title": "Resumen HTTP QoE de CX-Radar",
-  "uid": "cx-radar-qoe-http-overview",
-  "version": 2,
-  "weekStart": ""
+    },
+    {
+      "datasource": {
+        "name": "grafanacloud-prom"
+      },
+      "group": "prometheus",
+      "kind": "AdhocVariable",
+      "spec": {
+        "allowCustomValue": true,
+        "baseFilters": [],
+        "defaultKeys": [],
+        "enableGroupBy": false,
+        "filters": [],
+        "hide": "dontHide",
+        "name": "filter0",
+        "skipUrlSync": false
+      }
+    }
+  ]
 }
