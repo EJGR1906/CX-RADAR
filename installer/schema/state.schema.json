@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cx-radar.local/schemas/installer-state.schema.json",
+  "title": "CX-Radar Installer State",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "hubName",
+    "site",
+    "probeId",
+    "installationId",
+    "bootstrapMode",
+    "installedVersion",
+    "updateChannel",
+    "installedAtUtc",
+    "lastUpdatedAtUtc"
+  ],
+  "properties": {
+    "hubName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "site": {
+      "type": "string",
+      "minLength": 1
+    },
+    "probeId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "installationId": {
+      "type": "string",
+      "minLength": 8
+    },
+    "bootstrapMode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "installedVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updateChannel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment": {
+      "type": "string"
+    },
+    "probeType": {
+      "type": "string"
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installRoot",
+        "currentRoot",
+        "statePath"
+      ],
+      "properties": {
+        "installRoot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "currentRoot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statePath": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "installedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lastUpdatedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

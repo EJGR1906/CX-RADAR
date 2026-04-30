@@ -1,0 +1,74 @@
+{
+  "probe": {
+    "probeId": "__PROBE_ID__",
+    "probeType": "windows-powershell",
+    "site": "__SITE__",
+    "environment": "production",
+    "probeVersion": "__PROBE_VERSION__"
+  },
+  "influx": {
+    "baseUrl": "https://us-east-1-1.aws.cloud2.influxdata.com",
+    "org": "cx-radar",
+    "bucket": "qoe_metrics",
+    "precision": "ms",
+    "writeTimeoutSeconds": 30,
+    "tokenEnvVar": "INFLUXDB_TOKEN",
+    "credentialFilePath": "%LOCALAPPDATA%\\CX-Radar\\secrets\\influxdb-token.credential.xml"
+  },
+  "probeRun": {
+    "connectTimeoutSeconds": 10,
+    "maxTimeSeconds": 30,
+    "retryCount": 1,
+    "retryDelaySeconds": 2,
+    "startJitterSecondsMax": 15,
+    "targetDelayMilliseconds": 750,
+    "followRedirects": true,
+    "verifyTls": true,
+    "userAgent": "CX-Radar-QoE-Probe/__PROBE_VERSION__",
+    "logDirectory": "logs",
+    "measurement": "qoe_http_check",
+    "probeMeasurement": "qoe_probe_run"
+  },
+  "targets": [
+    {
+      "service": "Microsoft",
+      "endpointName": "microsoft",
+      "url": "https://www.microsoft.com/",
+      "method": "GET",
+      "expectedHttpCodes": [200],
+      "enabled": true
+    },
+    {
+      "service": "Youtube",
+      "endpointName": "homepage",
+      "url": "https://www.youtube.com/",
+      "method": "GET",
+      "expectedHttpCodes": [200],
+      "enabled": true
+    },
+    {
+      "service": "Netflix",
+      "endpointName": "homepage",
+      "url": "https://www.netflix.com/",
+      "method": "GET",
+      "expectedHttpCodes": [200],
+      "enabled": true
+    },
+    {
+      "service": "Disney+",
+      "endpointName": "homepage",
+      "url": "https://www.disneyplus.com/",
+      "method": "GET",
+      "expectedHttpCodes": [200],
+      "enabled": true
+    },
+    {
+      "service": "Amazon",
+      "endpointName": "homepage",
+      "url": "https://www.amazon.com/",
+      "method": "GET",
+      "expectedHttpCodes": [200],
+      "enabled": true
+    }
+  ]
+}

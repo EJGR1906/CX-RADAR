@@ -1,0 +1,32 @@
+{
+  "payloadFiles": [
+    {
+      "source": "scripts/qoe-probe.ps1",
+      "target": "scripts/qoe-probe.ps1"
+    },
+    {
+      "source": "scripts/qoe-speed-test.ps1",
+      "target": "scripts/qoe-speed-test.ps1"
+    },
+    {
+      "source": "scripts/validate-qoe-probe.ps1",
+      "target": "scripts/validate-qoe-probe.ps1"
+    },
+    {
+      "source": "scripts/validate-qoe-speed-test.ps1",
+      "target": "scripts/validate-qoe-speed-test.ps1"
+    },
+    {
+      "source": "scripts/register-qoe-task.ps1",
+      "target": "scripts/register-qoe-task.ps1"
+    },
+    {
+      "source": "scripts/set-influx-token.ps1",
+      "target": "scripts/set-influx-token.ps1"
+    },
+    {
+      "source": "scripts/run-qoe-certification.ps1",
+      "target": "scripts/run-qoe-certification.ps1"
+    }
+  ]
+}

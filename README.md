@@ -130,3 +130,4 @@ Este proyecto es una solución de automatización operativa orientada al monitor
 - Registro de tarea programada: [docs/operations/task-scheduler-runbook.md](docs/operations/task-scheduler-runbook.md)
 - Seguridad y manejo de token: [docs/security/hardening.md](docs/security/hardening.md)
 - Configuración de observabilidad: [docs/observability/grafana-cloud-setup.md](docs/observability/grafana-cloud-setup.md)
+- Bootstrap installer en implementación: [installer/README.md](installer/README.md)

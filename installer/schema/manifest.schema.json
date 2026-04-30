@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cx-radar.local/schemas/installer-manifest.schema.json",
+  "title": "CX-Radar Installer Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "channel",
+    "version",
+    "generatedAtUtc",
+    "bootstrapMode",
+    "payload"
+  ],
+  "properties": {
+    "channel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generatedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "bootstrapMode": {
+      "type": "string",
+      "const": "payload-archive"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fileName",
+        "sha256",
+        "sizeBytes"
+      ],
+      "properties": {
+        "fileName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "probe": {
+    "probeId": "__PROBE_ID__",
+    "probeType": "windows-powershell",
+    "site": "__SITE__",
+    "environment": "production",
+    "probeVersion": "__PROBE_VERSION__"
+  },
+  "influx": {
+    "baseUrl": "https://us-east-1-1.aws.cloud2.influxdata.com",
+    "org": "cx-radar",
+    "bucket": "qoe_metrics",
+    "precision": "ms",
+    "writeTimeoutSeconds": 30,
+    "tokenEnvVar": "INFLUXDB_TOKEN",
+    "credentialFilePath": "%LOCALAPPDATA%\\CX-Radar\\secrets\\influxdb-token.credential.xml"
+  },
+  "speedTestRun": {
+    "cliCommand": "%LOCALAPPDATA%\\CX-Radar\\tools\\ookla-speedtest\\speedtest.exe",
+    "outputFormat": "json",
+    "acceptLicense": true,
+    "acceptGdpr": true,
+    "timeoutSeconds": 120,
+    "startJitterSecondsMax": 120,
+    "targetDelayMilliseconds": 0,
+    "logDirectory": "logs",
+    "measurement": "qoe_speed_test",
+    "probeMeasurement": "qoe_speed_test_run"
+  },
+  "targets": [
+    {
+      "service": "GenericSpeedTest",
+      "endpointName": "ookla-auto",
+      "provider": "ookla",
+      "serverId": "",
+      "enabled": true
+    }
+  ]
+}

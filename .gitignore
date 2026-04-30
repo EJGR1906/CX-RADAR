@@ -28,5 +28,12 @@ ookla-speedtest-1.2.0-win64/
 logs/*.log
 logs/*.json
 
+# Installer build outputs and operator bundles
+dist/installer/
+dist/operator-bundle/
+installer/app/**/bin/
+installer/app/**/obj/
+installer/assets/ookla-speedtest/
+
 # Local workspace metadata
 memories/
