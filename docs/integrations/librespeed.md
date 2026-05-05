@@ -12,7 +12,7 @@ LibreSpeed is not part of the 5-minute synthetic probe loop. Its role is to meas
 
 ## Future Integration Model
 
-If LibreSpeed results are normalized into InfluxDB later, map them to `qoe_speed_test` and keep those points separate from `qoe_http_check`.
+If LibreSpeed results are normalized into InfluxDB later, place them in a dedicated throughput measurement and keep those points separate from `qoe_http_check` and `qoe_real_metrics`.
 
 ## Decision Boundary
 

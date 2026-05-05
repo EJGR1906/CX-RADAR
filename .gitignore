@@ -23,18 +23,12 @@ config/probe-catalog.local.json
 config/probe-catalog.override.json
 
 # Generated probe and QA outputs
-logs/*.txt
-ookla-speedtest-1.2.0-win64/
-logs/*.log
-logs/*.json
+logs/
+tmp/
 bin/
 
-# Installer build outputs and operator bundles
-dist/installer/
-dist/operator-bundle/
-installer/app/**/bin/
-installer/app/**/obj/
-installer/assets/ookla-speedtest/
+# Local build outputs
+dist/
 
 # Local workspace metadata
 memories/

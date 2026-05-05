@@ -4,28 +4,22 @@
 
 CX-Radar starts with one Windows 11 probe and is designed to scale later to multiple remote probes, including mixed probe types.
 
-The platform is split into three signal lanes:
+The platform separates active probe traffic from future specialty lanes:
 
 1. Synthetic HTTP lane: frequent curl-based checks against approved service endpoints.
-2. Bandwidth lane: lower-frequency throughput and latency checks under `qoe_speed_test`.
-3. Weekly browser audit lane: deeper web performance checks using WebPageTest.
+2. Probe-scoped QoE metrics: portable throughput, latency, jitter, and responsiveness checks written under `qoe_real_metrics` by selected `qoe-probe.ps1` targets.
+3. Weekly browser audit lane: deeper web performance checks using WebPageTest or similar future tooling.
 
-These lanes must remain separate in storage, dashboards, and alerts.
+These signal families must remain separate in storage, dashboards, and alerts.
 
 ## Current Implementation
 
-The repo currently implements the synthetic HTTP lane with:
+The repo currently implements the active probe lane with:
 
 1. `config/probe-catalog.json` for probe identity, InfluxDB target, cadence parameters, and approved endpoints.
 2. `scripts/qoe-probe.ps1` for mixed `http` and portable `speedtest` target execution and InfluxDB write payload generation.
 3. `scripts/register-qoe-task.ps1` for Windows Task Scheduler registration.
 4. `scripts/validate-qoe-probe.ps1` for local readiness checks.
-
-It also includes a separate generic speed-test lane with:
-
-1. `config/speed-test-catalog.json` for probe identity, InfluxDB target, speed-test CLI settings, and approved speed-test targets.
-2. `scripts/qoe-speed-test.ps1` for CLI-based throughput measurements and InfluxDB write payload generation.
-3. `scripts/validate-qoe-speed-test.ps1` for local readiness checks.
 
 ## Measurements
 
@@ -34,9 +28,7 @@ The schema is intentionally prepared for future scale:
 1. `qoe_http_check`: per-target synthetic HTTP check results.
 2. `qoe_real_metrics`: per-target portable QoE throughput, latency, jitter, and responsiveness results.
 3. `qoe_probe_run`: one point per script run with self-health counters.
-4. `qoe_speed_test`: per-target speed-test results from the configured CLI provider.
-5. `qoe_speed_test_run`: one point per speed-test script run with self-health counters.
-6. `qoe_page_audit`: reserved for future WebPageTest summaries.
+4. `qoe_page_audit`: reserved for future WebPageTest summaries.
 
 ## Stable Tags
 
@@ -74,4 +66,4 @@ When adding more probes, only these elements should vary per host:
 
 The measurement names and field semantics should remain stable unless versioned deliberately.
 
-The throughput lane may temporarily use a third-party CLI provider when a controlled LibreSpeed backend is not available, but it should still remain separate from service reachability and browser audit measurements.
+If a dedicated throughput lane returns later, it should use its own measurement set and remain separate from service reachability and browser audit measurements.

@@ -135,7 +135,7 @@ Noise control:
 
 ## Operational Notes
 
-1. Keep the synthetic HTTP lane on its own dashboard folder. Do not mix it with future `qoe_speed_test` or `qoe_page_audit` panels.
+1. Keep the synthetic HTTP lane on its own dashboard folder. Do not mix it with future dedicated throughput or `qoe_page_audit` panels.
 2. Avoid alerting on single samples for public internet endpoints.
 3. Use the `service` and `endpoint_name` dimensions for drill-down before adding more cardinality.
 4. Do not use `remote_ip` as a grouping dimension in alerting. It is useful for inspection, not for routing.
