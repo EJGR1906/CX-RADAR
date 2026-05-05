@@ -4,7 +4,8 @@
     "probeType": "windows-powershell",
     "site": "home-office",
     "environment": "production",
-    "probeVersion": "0.1.0"
+    "probeVersion": "0.2.0",
+    "isp": "home-fiber"
   },
   "influx": {
     "baseUrl": "https://us-east-1-1.aws.cloud2.influxdata.com",
@@ -17,57 +18,75 @@
   },
   "probeRun": {
     "connectTimeoutSeconds": 10,
-    "maxTimeSeconds": 30,
+    "maxTimeSeconds": 120,
     "retryCount": 1,
     "retryDelaySeconds": 2,
     "startJitterSecondsMax": 15,
     "targetDelayMilliseconds": 750,
     "followRedirects": true,
     "verifyTls": true,
-    "userAgent": "CX-Radar-QoE-Probe/0.1.0",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "logDirectory": "logs",
     "measurement": "qoe_http_check",
-    "probeMeasurement": "qoe_probe_run"
+    "probeMeasurement": "qoe_probe_run",
+    "realMetricsMeasurement": "qoe_real_metrics",
+    "speedTestTimeoutSeconds": 300,
+    "portableTools": {
+      "nodeExe": "bin\\node\\node.exe",
+      "fastCliScript": "bin\\fast-cli\\node_modules\\fast-cli\\distribution\\cli.js",
+      "ytDlpExe": "bin\\yt-dlp.exe",
+      "puppeteerCacheDir": "bin\\puppeteer-cache",
+      "temporaryDirectory": "bin\\tmp"
+    }
   },
-  "targets": [
-    {
+"targets": [
+{
       "service": "Microsoft",
-      "endpointName": "microsoft",
-      "url": "https://www.microsoft.com/",
-      "method": "GET",
-      "expectedHttpCodes": [200],
+      "endpointName": "microsoft-100mb-test",
+      "type": "speedtest",
+      "speedTestMethod": "burst",
+      "host": "download.microsoft.com",
+      "downloadUrl": "https://download.microsoft.com/download/8/4/A/84A35BF1-DAFE-4AE8-82AF-AD2AE20B6B14/directx_Jun2010_redist.exe",
       "enabled": true
     },
     {
       "service": "Youtube",
-      "endpointName": "homepage",
-      "url": "https://www.youtube.com/",
-      "method": "GET",
-      "expectedHttpCodes": [200],
+      "endpointName": "video-4k-stress",
+      "type": "speedtest",
+      "speedTestMethod": "yt-dlp",
+      "host": "www.youtube.com",
+      "videoUrl": "https://www.youtube.com/watch?v=LXb3EKWsInQ", 
+      "format": "bestvideo+bestaudio/best",
       "enabled": true
     },
     {
       "service": "Netflix",
-      "endpointName": "homepage",
-      "url": "https://www.netflix.com/",
-      "method": "GET",
-      "expectedHttpCodes": [200],
+      "endpointName": "nflx-video-cdn",
+      "type": "speedtest",
+      "speedTestMethod": "fast-cli",
+      "host": "fast.com",
       "enabled": true
     },
-    {
+{
       "service": "Disney+",
-      "endpointName": "homepage",
-      "url": "https://www.disneyplus.com/",
-      "method": "GET",
-      "expectedHttpCodes": [200],
+      "endpointName": "disney-open-asset",
+      "type": "speedtest",
+      "speedTestMethod": "burst",
+      "host": "cnbl-cdn.bamgrid.com",
+      "downloadUrl": "https://cnbl-cdn.bamgrid.com/assets/eb4d592bb1646448b0dcf7fb5d400c52c21c72afeefd8e79411f05a88b47fb0e/original",
+      "targetTransferBytes": 8388608,
+      "maxDownloadIterations": 14,
       "enabled": true
     },
-    {
+{
       "service": "Amazon",
-      "endpointName": "homepage",
-      "url": "https://www.amazon.com/",
-      "method": "GET",
-      "expectedHttpCodes": [200],
+      "endpointName": "aws-large-asset",
+      "type": "speedtest",
+      "speedTestMethod": "burst",
+      "host": "m.media-amazon.com",
+      "downloadUrl": "https://m.media-amazon.com/images/G/01/video/METI_2026_Trailer_15s_Legends_Post_Draper_16x9_Stereo_Final_en-US_.mp4",
+      "targetTransferBytes": 8388608,
+      "maxDownloadIterations": 3,
       "enabled": true
     }
   ]

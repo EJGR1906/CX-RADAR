@@ -27,6 +27,7 @@ logs/*.txt
 ookla-speedtest-1.2.0-win64/
 logs/*.log
 logs/*.json
+bin/
 
 # Installer build outputs and operator bundles
 dist/installer/

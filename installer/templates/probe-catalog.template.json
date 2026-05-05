@@ -4,7 +4,8 @@
     "probeType": "windows-powershell",
     "site": "__SITE__",
     "environment": "production",
-    "probeVersion": "__PROBE_VERSION__"
+    "probeVersion": "__PROBE_VERSION__",
+    "isp": "home-fiber"
   },
   "influx": {
     "baseUrl": "https://us-east-1-1.aws.cloud2.influxdata.com",
@@ -27,47 +28,61 @@
     "userAgent": "CX-Radar-QoE-Probe/__PROBE_VERSION__",
     "logDirectory": "logs",
     "measurement": "qoe_http_check",
-    "probeMeasurement": "qoe_probe_run"
+    "probeMeasurement": "qoe_probe_run",
+    "realMetricsMeasurement": "qoe_real_metrics",
+    "speedTestTimeoutSeconds": 180,
+    "portableTools": {
+      "nodeExe": "bin\\node\\node.exe",
+      "fastCliScript": "bin\\fast-cli\\node_modules\\fast-cli\\distribution\\cli.js",
+      "ytDlpExe": "bin\\yt-dlp.exe",
+      "puppeteerCacheDir": "bin\\puppeteer-cache",
+      "temporaryDirectory": "bin\\tmp"
+    }
   },
   "targets": [
     {
       "service": "Microsoft",
       "endpointName": "microsoft",
-      "url": "https://www.microsoft.com/",
-      "method": "GET",
-      "expectedHttpCodes": [200],
+      "type": "speedtest",
+      "speedTestMethod": "networkquality",
+      "host": "aka.ms",
+      "downloadUrl": "https://aka.ms/vs/17/release/vc_redist.x64.exe",
       "enabled": true
     },
     {
       "service": "Youtube",
       "endpointName": "homepage",
-      "url": "https://www.youtube.com/",
-      "method": "GET",
-      "expectedHttpCodes": [200],
+      "type": "speedtest",
+      "speedTestMethod": "yt-dlp",
+      "host": "www.youtube.com",
+      "videoUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "format": "best[protocol^=https][height<=360]/best[height<=360]/best",
       "enabled": true
     },
     {
       "service": "Netflix",
       "endpointName": "homepage",
-      "url": "https://www.netflix.com/",
-      "method": "GET",
-      "expectedHttpCodes": [200],
-      "enabled": true
-    },
-    {
-      "service": "Disney+",
-      "endpointName": "homepage",
-      "url": "https://www.disneyplus.com/",
-      "method": "GET",
-      "expectedHttpCodes": [200],
+      "type": "speedtest",
+      "speedTestMethod": "fast-cli",
+      "host": "fast.com",
       "enabled": true
     },
     {
       "service": "Amazon",
       "endpointName": "homepage",
-      "url": "https://www.amazon.com/",
-      "method": "GET",
-      "expectedHttpCodes": [200],
+      "type": "speedtest",
+      "speedTestMethod": "burst",
+      "host": "www.amazon.com",
+      "downloadUrl": "https://www.amazon.com/",
+      "enabled": true
+    },
+    {
+      "service": "Disney+",
+      "endpointName": "homepage",
+      "type": "speedtest",
+      "speedTestMethod": "burst",
+      "host": "www.disneyplus.com",
+      "downloadUrl": "https://www.disneyplus.com/",
       "enabled": true
     }
   ]

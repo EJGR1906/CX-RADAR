@@ -44,6 +44,138 @@ function Get-FullPathFromBase {
     return [System.IO.Path]::GetFullPath((Join-Path -Path $BasePath -ChildPath $expandedChildPath))
 }
 
+function Get-OptionalStringValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Source,
+
+        [Parameter(Mandatory = $true)]
+        [string]$PropertyName,
+
+        [Parameter()]
+        [string]$DefaultValue = ''
+    )
+
+    if ($null -ne $Source -and $Source.PSObject.Properties.Name -contains $PropertyName -and $null -ne $Source.$PropertyName -and -not [string]::IsNullOrWhiteSpace([string]$Source.$PropertyName)) {
+        return [string]$Source.$PropertyName
+    }
+
+    return $DefaultValue
+}
+
+function Get-TargetType {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Target
+    )
+
+    return (Get-OptionalStringValue -Source $Target -PropertyName 'type' -DefaultValue 'http').ToLowerInvariant()
+}
+
+function Get-PortableToolProperty {
+    param(
+        [AllowNull()]
+        [object]$PortableToolsConfig,
+
+        [Parameter(Mandatory = $true)]
+        [string]$PropertyName,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DefaultValue
+    )
+
+    if ($null -ne $PortableToolsConfig -and $PortableToolsConfig.PSObject.Properties.Name -contains $PropertyName -and -not [string]::IsNullOrWhiteSpace([string]$PortableToolsConfig.$PropertyName)) {
+        return [string]$PortableToolsConfig.$PropertyName
+    }
+
+    return $DefaultValue
+}
+
+function Get-ProbePortableTools {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$ProbeRun,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ScriptBasePath
+    )
+
+    $repoRoot = Get-FullPathFromBase -BasePath $ScriptBasePath -ChildPath '..'
+    $portableToolsConfig = if ($ProbeRun.PSObject.Properties.Name -contains 'portableTools') { $ProbeRun.portableTools } else { $null }
+    $networkQualityDefaultPath = Join-Path -Path $env:SystemRoot -ChildPath 'System32\networkquality.exe'
+
+    return [pscustomobject]@{
+        RepoRoot = [System.IO.Path]::GetFullPath($repoRoot)
+        NodeExe = Get-FullPathFromBase -BasePath $repoRoot -ChildPath (Get-PortableToolProperty -PortableToolsConfig $portableToolsConfig -PropertyName 'nodeExe' -DefaultValue 'bin\node\node.exe')
+        FastCliScript = Get-FullPathFromBase -BasePath $repoRoot -ChildPath (Get-PortableToolProperty -PortableToolsConfig $portableToolsConfig -PropertyName 'fastCliScript' -DefaultValue 'bin\fast-cli\node_modules\fast-cli\distribution\cli.js')
+        YtDlpExe = Get-FullPathFromBase -BasePath $repoRoot -ChildPath (Get-PortableToolProperty -PortableToolsConfig $portableToolsConfig -PropertyName 'ytDlpExe' -DefaultValue 'bin\yt-dlp.exe')
+        NetworkQualityExe = Get-PortableToolProperty -PortableToolsConfig $portableToolsConfig -PropertyName 'networkQualityExe' -DefaultValue $networkQualityDefaultPath
+    }
+}
+
+function Test-CurlAvailability {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    $portableCurlPath = Get-FullPathFromBase -BasePath $RepoRoot -ChildPath 'bin\curl.exe'
+    if (Test-Path -Path $portableCurlPath -PathType Leaf) {
+        return $true
+    }
+
+    $systemCurlPath = Join-Path -Path $env:SystemRoot -ChildPath 'System32\curl.exe'
+    if (Test-Path -Path $systemCurlPath -PathType Leaf) {
+        return $true
+    }
+
+    return [bool](Get-Command -Name 'curl.exe' -ErrorAction SilentlyContinue)
+}
+
+function Test-ConfiguredPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+
+        [Parameter()]
+        [string]$CandidatePath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($CandidatePath)) {
+        return $false
+    }
+
+    if ([System.IO.Path]::IsPathRooted($CandidatePath)) {
+        return (Test-Path -Path $CandidatePath -PathType Leaf)
+    }
+
+    $resolvedPath = Get-FullPathFromBase -BasePath $RepoRoot -ChildPath $CandidatePath
+    return (Test-Path -Path $resolvedPath -PathType Leaf)
+}
+
+function Test-NetworkQualityAvailabilityForTarget {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Target,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$PortableTools
+    )
+
+    $configuredPath = Get-OptionalStringValue -Source $Target -PropertyName 'commandPath' -DefaultValue $PortableTools.NetworkQualityExe
+    return (Test-ConfiguredPath -RepoRoot $PortableTools.RepoRoot -CandidatePath $configuredPath)
+}
+
+function Test-SpeedTargetFallbackReady {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Target
+    )
+
+    $downloadUrl = Get-OptionalStringValue -Source $Target -PropertyName 'downloadUrl' -DefaultValue (Get-OptionalStringValue -Source $Target -PropertyName 'url' -DefaultValue '')
+    return -not [string]::IsNullOrWhiteSpace($downloadUrl)
+}
+
 function Test-PowerShellSyntax {
     param(
         [Parameter(Mandatory = $true)]
@@ -87,8 +219,70 @@ function Get-RequiredConfigIssues {
     }
 
     foreach ($target in $Config.targets) {
-        if ($target.enabled -and [string]::IsNullOrWhiteSpace([string]$target.url)) {
-            $issues.Add("Target '$($target.service)/$($target.endpointName)' is enabled but has no URL.")
+        if (-not $target.enabled) {
+            continue
+        }
+
+        if ([string]::IsNullOrWhiteSpace([string]$target.service)) {
+            $issues.Add('Enabled target is missing service.')
+        }
+
+        if ([string]::IsNullOrWhiteSpace([string]$target.endpointName)) {
+            $issues.Add("Target '$($target.service)' is enabled but has no endpointName.")
+        }
+
+        $targetType = Get-TargetType -Target $target
+        switch ($targetType) {
+            'http' {
+                if ([string]::IsNullOrWhiteSpace([string]$target.url)) {
+                    $issues.Add("HTTP target '$($target.service)/$($target.endpointName)' is enabled but has no URL.")
+                }
+
+                break
+            }
+            'speedtest' {
+                $speedTestMethod = (Get-OptionalStringValue -Source $target -PropertyName 'speedTestMethod' -DefaultValue '').ToLowerInvariant()
+                if ([string]::IsNullOrWhiteSpace($speedTestMethod)) {
+                    $issues.Add("Speed-test target '$($target.service)/$($target.endpointName)' is missing speedTestMethod.")
+                    break
+                }
+
+                switch ($speedTestMethod) {
+                    'fast-cli' {
+                        break
+                    }
+                    'yt-dlp' {
+                        $videoUrl = Get-OptionalStringValue -Source $target -PropertyName 'videoUrl' -DefaultValue (Get-OptionalStringValue -Source $target -PropertyName 'url' -DefaultValue '')
+                        if ([string]::IsNullOrWhiteSpace($videoUrl)) {
+                            $issues.Add("yt-dlp target '$($target.service)/$($target.endpointName)' requires videoUrl or url.")
+                        }
+
+                        break
+                    }
+                    'networkquality' {
+                        if (-not (Test-SpeedTargetFallbackReady -Target $target) -and [string]::IsNullOrWhiteSpace((Get-OptionalStringValue -Source $target -PropertyName 'commandPath' -DefaultValue ''))) {
+                            $issues.Add("networkquality target '$($target.service)/$($target.endpointName)' requires downloadUrl/url for burst fallback or an explicit commandPath.")
+                        }
+
+                        break
+                    }
+                    'burst' {
+                        if (-not (Test-SpeedTargetFallbackReady -Target $target)) {
+                            $issues.Add("Burst target '$($target.service)/$($target.endpointName)' requires downloadUrl or url.")
+                        }
+
+                        break
+                    }
+                    default {
+                        $issues.Add("Target '$($target.service)/$($target.endpointName)' uses unsupported speedTestMethod '$speedTestMethod'.")
+                    }
+                }
+
+                break
+            }
+            default {
+                $issues.Add("Target '$($target.service)/$($target.endpointName)' uses unsupported type '$targetType'.")
+            }
         }
     }
 
@@ -182,16 +376,44 @@ if ($issues.Count -gt 0) {
 }
 
 $tokenStatus = Get-InfluxTokenStatus -InfluxConfig $config.influx -ConfigDirectory $configDirectory
+$repoRoot = Get-FullPathFromBase -BasePath $scriptBasePath -ChildPath '..'
+$portableTools = Get-ProbePortableTools -ProbeRun $config.probeRun -ScriptBasePath $scriptBasePath
+$enabledTargets = @($config.targets | Where-Object { $_.enabled })
+$enabledHttpTargets = @($enabledTargets | Where-Object { (Get-TargetType -Target $_) -eq 'http' })
+$enabledSpeedTargets = @($enabledTargets | Where-Object { (Get-TargetType -Target $_) -eq 'speedtest' })
+$fastCliTargets = @($enabledSpeedTargets | Where-Object { (Get-OptionalStringValue -Source $_ -PropertyName 'speedTestMethod' -DefaultValue '').ToLowerInvariant() -eq 'fast-cli' })
+$ytDlpTargets = @($enabledSpeedTargets | Where-Object { (Get-OptionalStringValue -Source $_ -PropertyName 'speedTestMethod' -DefaultValue '').ToLowerInvariant() -eq 'yt-dlp' })
+$networkQualityTargets = @($enabledSpeedTargets | Where-Object { (Get-OptionalStringValue -Source $_ -PropertyName 'speedTestMethod' -DefaultValue '').ToLowerInvariant() -eq 'networkquality' })
+$burstTargets = @($enabledSpeedTargets | Where-Object { (Get-OptionalStringValue -Source $_ -PropertyName 'speedTestMethod' -DefaultValue '').ToLowerInvariant() -eq 'burst' })
+$curlAvailable = if ($enabledHttpTargets.Count -gt 0) { Test-CurlAvailability -RepoRoot $repoRoot } else { $true }
+$portableNodeAvailable = if ($fastCliTargets.Count -gt 0) { (Test-Path -Path $portableTools.NodeExe -PathType Leaf) } else { $true }
+$fastCliAvailable = if ($fastCliTargets.Count -gt 0) { (Test-Path -Path $portableTools.FastCliScript -PathType Leaf) } else { $true }
+$ytDlpAvailable = if ($ytDlpTargets.Count -gt 0) { (Test-Path -Path $portableTools.YtDlpExe -PathType Leaf) } else { $true }
+$networkQualityCommandAvailable = if ($networkQualityTargets.Count -gt 0) { @($networkQualityTargets | Where-Object { Test-NetworkQualityAvailabilityForTarget -Target $_ -PortableTools $portableTools }).Count -eq $networkQualityTargets.Count } else { $true }
+$networkQualityFallbackReady = if ($networkQualityTargets.Count -gt 0) { @($networkQualityTargets | Where-Object { Test-SpeedTargetFallbackReady -Target $_ }).Count -eq $networkQualityTargets.Count } else { $true }
+$burstTargetsReady = if ($burstTargets.Count -gt 0) { @($burstTargets | Where-Object { Test-SpeedTargetFallbackReady -Target $_ }).Count -eq $burstTargets.Count } else { $true }
+$probeIspConfigured = if ($enabledSpeedTargets.Count -gt 0) { -not [string]::IsNullOrWhiteSpace((Get-OptionalStringValue -Source $config.probe -PropertyName 'isp' -DefaultValue '')) } else { $true }
+$speedTestTargetsReady = ($portableNodeAvailable -and $fastCliAvailable -and $ytDlpAvailable -and ($networkQualityCommandAvailable -or $networkQualityFallbackReady) -and $burstTargetsReady)
 
 $results = [ordered]@{
     ProbeScriptSyntax = 'OK'
     ConfigFile = 'OK'
-    CurlAvailable = [bool](Get-Command -Name 'curl.exe' -ErrorAction SilentlyContinue)
+    CurlAvailable = [bool]$curlAvailable
+    PortableNodeAvailable = [bool]$portableNodeAvailable
+    FastCliAvailable = [bool]$fastCliAvailable
+    YtDlpAvailable = [bool]$ytDlpAvailable
+    NetworkQualityCommandAvailable = [bool]$networkQualityCommandAvailable
+    NetworkQualityFallbackReady = [bool]$networkQualityFallbackReady
+    BurstTargetsReady = [bool]$burstTargetsReady
+    ProbeIspConfigured = [bool]$probeIspConfigured
+    SpeedTestTargetsReady = [bool]$speedTestTargetsReady
     InfluxTokenAvailable = [bool]$tokenStatus.Available
     InfluxTokenSource = [string]$tokenStatus.Source
     InfluxCredentialFilePath = [string]$tokenStatus.CredentialFilePath
     InfluxCredentialFileExists = [bool]$tokenStatus.CredentialFileExists
-    EnabledTargets = [int](@($config.targets | Where-Object { $_.enabled }).Count)
+    EnabledTargets = [int]$enabledTargets.Count
+    EnabledHttpTargets = [int]$enabledHttpTargets.Count
+    EnabledSpeedTestTargets = [int]$enabledSpeedTargets.Count
 }
 
 [pscustomobject]$results

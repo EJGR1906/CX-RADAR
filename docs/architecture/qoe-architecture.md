@@ -17,7 +17,7 @@ These lanes must remain separate in storage, dashboards, and alerts.
 The repo currently implements the synthetic HTTP lane with:
 
 1. `config/probe-catalog.json` for probe identity, InfluxDB target, cadence parameters, and approved endpoints.
-2. `scripts/qoe-probe.ps1` for curl-based measurements and InfluxDB write payload generation.
+2. `scripts/qoe-probe.ps1` for mixed `http` and portable `speedtest` target execution and InfluxDB write payload generation.
 3. `scripts/register-qoe-task.ps1` for Windows Task Scheduler registration.
 4. `scripts/validate-qoe-probe.ps1` for local readiness checks.
 
@@ -32,10 +32,11 @@ It also includes a separate generic speed-test lane with:
 The schema is intentionally prepared for future scale:
 
 1. `qoe_http_check`: per-target synthetic HTTP check results.
-2. `qoe_probe_run`: one point per script run with self-health counters.
-3. `qoe_speed_test`: per-target speed-test results from the configured CLI provider.
-4. `qoe_speed_test_run`: one point per speed-test script run with self-health counters.
-5. `qoe_page_audit`: reserved for future WebPageTest summaries.
+2. `qoe_real_metrics`: per-target portable QoE throughput, latency, jitter, and responsiveness results.
+3. `qoe_probe_run`: one point per script run with self-health counters.
+4. `qoe_speed_test`: per-target speed-test results from the configured CLI provider.
+5. `qoe_speed_test_run`: one point per speed-test script run with self-health counters.
+6. `qoe_page_audit`: reserved for future WebPageTest summaries.
 
 ## Stable Tags
 
@@ -59,7 +60,8 @@ The current probe emits fields for:
 2. curl exit code and error class.
 3. DNS, connect, TLS, first-byte, and total latency in milliseconds.
 4. Response size, redirect count, effective URL, HTTP version, and remote IP.
-5. Probe self-health counters such as success count, failure count, target count, and run duration.
+5. QoE real-metric fields such as download speed, upload speed, latency, jitter, and responsiveness.
+6. Probe self-health counters such as success count, failure count, target count, and run duration.
 
 ## Growth Model
 
