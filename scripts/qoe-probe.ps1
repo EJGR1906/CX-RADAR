@@ -1021,6 +1021,158 @@ function Invoke-WebRequestUploadFile {
     return [double][math]::Round($stopwatch.Elapsed.TotalMilliseconds, 2)
 }
 
+function Get-UploadMeasurementMethod {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Target,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$ProbeRun
+    )
+
+    $targetUploadMethod = Get-OptionalStringValue -Source $Target -PropertyName 'uploadMeasurementMethod' -DefaultValue ''
+    if (-not [string]::IsNullOrWhiteSpace($targetUploadMethod)) {
+        return $targetUploadMethod.ToLowerInvariant()
+    }
+
+    return (Get-OptionalStringValue -Source $ProbeRun -PropertyName 'defaultUploadMeasurementMethod' -DefaultValue 'none').ToLowerInvariant()
+}
+
+function Get-UploadSupplementCacheKey {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Target,
+
+        [Parameter(Mandatory = $true)]
+        [string]$UploadMeasurementMethod
+    )
+
+    switch ($UploadMeasurementMethod) {
+        'networkquality' {
+            return 'networkquality'
+        }
+        'upload-url' {
+            $uploadUrl = Get-OptionalStringValue -Source $Target -PropertyName 'uploadUrl' -DefaultValue ''
+            if ([string]::IsNullOrWhiteSpace($uploadUrl)) {
+                return ''
+            }
+
+            return ('upload-url::{0}' -f $uploadUrl.ToLowerInvariant())
+        }
+        default {
+            return ''
+        }
+    }
+}
+
+function Invoke-UploadUrlMeasurement {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Target,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$ProbeRun,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$PortableTools
+    )
+
+    $uploadUrl = Get-OptionalStringValue -Source $Target -PropertyName 'uploadUrl' -DefaultValue ''
+    if ([string]::IsNullOrWhiteSpace($uploadUrl)) {
+        throw "Target '$($Target.service)/$($Target.endpointName)' requires uploadUrl when uploadMeasurementMethod is 'upload-url'."
+    }
+
+    $transferDirectory = New-MeasurementTemporaryDirectory -PortableTools $PortableTools -Prefix 'upload-url' -Target $Target
+
+    try {
+        $uploadFilePath = Join-Path -Path $transferDirectory -ChildPath 'upload.bin'
+        $timeoutSeconds = Get-SpeedTestTimeoutSeconds -Target $Target -ProbeRun $ProbeRun -DefaultValue 120
+        $uploadPayloadBytes = [math]::Max(1, (Get-OptionalIntValue -Source $Target -PropertyName 'uploadPayloadBytes' -DefaultValue 1048576))
+        $randomBytes = New-Object byte[] $uploadPayloadBytes
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($randomBytes)
+        [System.IO.File]::WriteAllBytes($uploadFilePath, $randomBytes)
+
+        $errorClass = ''
+        $errorDetail = ''
+        $uploadDurationMs = 0.0
+        $uploadMbps = 0.0
+
+        try {
+            $uploadMethod = Get-OptionalStringValue -Source $Target -PropertyName 'uploadMethod' -DefaultValue 'POST'
+            $uploadDurationMs = Invoke-WebRequestUploadFile -Uri $uploadUrl -InputPath $uploadFilePath -Method $uploadMethod -TimeoutSeconds $timeoutSeconds
+            $uploadMbps = Get-MbpsFromBytesAndDuration -Bytes $uploadPayloadBytes -DurationMs $uploadDurationMs
+        }
+        catch {
+            $errorClass = 'upload_error'
+            $errorDetail = [string]$_.Exception.Message
+        }
+
+        return [pscustomobject]@{
+            Tool = 'upload-url'
+            UploadMbps = [double]$uploadMbps
+            ErrorClass = [string]$errorClass
+            ErrorDetail = [string]$errorDetail
+            RunDurationMs = [double]$uploadDurationMs
+        }
+    }
+    finally {
+        Remove-PathIfExists -Path $transferDirectory
+    }
+}
+
+function Get-UploadSupplementMeasurement {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Target,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$ProbeRun,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$PortableTools,
+
+        [Parameter(Mandatory = $true)]
+        [hashtable]$UploadMeasurementCache
+    )
+
+    $uploadMeasurementMethod = Get-UploadMeasurementMethod -Target $Target -ProbeRun $ProbeRun
+    if ([string]::IsNullOrWhiteSpace($uploadMeasurementMethod) -or $uploadMeasurementMethod -eq 'none') {
+        return $null
+    }
+
+    $cacheKey = Get-UploadSupplementCacheKey -Target $Target -UploadMeasurementMethod $uploadMeasurementMethod
+    if (-not [string]::IsNullOrWhiteSpace($cacheKey) -and $UploadMeasurementCache.ContainsKey($cacheKey)) {
+        return $UploadMeasurementCache[$cacheKey]
+    }
+
+    $supplementMeasurement = switch ($uploadMeasurementMethod) {
+        'networkquality' {
+            $networkQualityMeasurement = Get-NetworkQualityMeasurement -Target $Target -ProbeRun $ProbeRun -PortableTools $PortableTools -DisableBurstFallback
+            [pscustomobject]@{
+                Tool = 'networkquality'
+                UploadMbps = [double]$networkQualityMeasurement.UploadMbps
+                ErrorClass = [string]$networkQualityMeasurement.ErrorClass
+                ErrorDetail = [string]$networkQualityMeasurement.ErrorDetail
+                RunDurationMs = [double]$networkQualityMeasurement.RunDurationMs
+            }
+            break
+        }
+        'upload-url' {
+            Invoke-UploadUrlMeasurement -Target $Target -ProbeRun $ProbeRun -PortableTools $PortableTools
+            break
+        }
+        default {
+            throw "Unsupported uploadMeasurementMethod '$uploadMeasurementMethod' for target '$($Target.service)/$($Target.endpointName)'."
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($cacheKey)) {
+        $UploadMeasurementCache[$cacheKey] = $supplementMeasurement
+    }
+
+    return $supplementMeasurement
+}
+
 function Get-YtDlpBaseArguments {
     param(
         [Parameter(Mandatory = $true)]
@@ -1039,6 +1191,15 @@ function Get-YtDlpBaseArguments {
     }
 
     return @($arguments)
+}
+
+function Test-FastCliNavigationTimeout {
+    param(
+        [Parameter()]
+        [string]$Output
+    )
+
+    return (-not [string]::IsNullOrWhiteSpace($Output) -and $Output -match 'Navigation timeout of [0-9]+ ms exceeded')
 }
 
 function Invoke-FastCliMeasurement {
@@ -1074,7 +1235,19 @@ function Invoke-FastCliMeasurement {
         }
 
         $timeoutSeconds = Get-SpeedTestTimeoutSeconds -Target $Target -ProbeRun $ProbeRun -DefaultValue 180
-        $processResult = Invoke-ExternalProcess -CommandPath $PortableTools.NodeExe -Arguments @($PortableTools.FastCliScript, '--upload', '--json') -TimeoutSeconds $timeoutSeconds -EnvironmentVariables $environmentVariables -WorkingDirectory (Split-Path -Path $PortableTools.FastCliScript -Parent)
+        $fastCliAttemptCount = [math]::Max(1, (Get-OptionalIntValue -Source $Target -PropertyName 'fastCliAttemptCount' -DefaultValue (Get-OptionalIntValue -Source $ProbeRun -PropertyName 'fastCliAttemptCount' -DefaultValue 2)))
+        $processResult = $null
+        $combinedProcessOutput = ''
+
+        for ($attempt = 1; $attempt -le $fastCliAttemptCount; $attempt++) {
+            $processResult = Invoke-ExternalProcess -CommandPath $PortableTools.NodeExe -Arguments @($PortableTools.FastCliScript, '--upload', '--json') -TimeoutSeconds $timeoutSeconds -EnvironmentVariables $environmentVariables -WorkingDirectory (Split-Path -Path $PortableTools.FastCliScript -Parent)
+            $combinedProcessOutput = if (-not [string]::IsNullOrWhiteSpace($processResult.StdErr)) { $processResult.StdErr } else { $processResult.StdOut }
+
+            $isRetryableNavigationTimeout = (-not $processResult.TimedOut) -and ($processResult.ExitCode -ne 0) -and (Test-FastCliNavigationTimeout -Output $combinedProcessOutput)
+            if (-not $isRetryableNavigationTimeout -or $attempt -eq $fastCliAttemptCount) {
+                break
+            }
+        }
 
         $errorClass = ''
         $errorDetail = ''
@@ -1085,8 +1258,13 @@ function Invoke-FastCliMeasurement {
             $errorDetail = 'fast-cli timed out.'
         }
         elseif ($processResult.ExitCode -ne 0) {
-            $errorClass = 'cli_error'
-            $errorDetail = if (-not [string]::IsNullOrWhiteSpace($processResult.StdErr)) { $processResult.StdErr } else { $processResult.StdOut }
+            $errorDetail = [string]$combinedProcessOutput
+            if (Test-FastCliNavigationTimeout -Output $errorDetail) {
+                $errorClass = 'timeout'
+            }
+            else {
+                $errorClass = 'cli_error'
+            }
         }
         else {
             $jsonPayload = Get-JsonPayloadFromText -Text $processResult.StdOut
@@ -1494,11 +1672,18 @@ function Get-NetworkQualityMeasurement {
         [pscustomobject]$ProbeRun,
 
         [Parameter(Mandatory = $true)]
-        [pscustomobject]$PortableTools
+        [pscustomobject]$PortableTools,
+
+        [Parameter()]
+        [switch]$DisableBurstFallback
     )
 
     $commandPath = Resolve-NetworkQualityExecutable -Target $Target -PortableTools $PortableTools
     if ([string]::IsNullOrWhiteSpace($commandPath)) {
+        if ($DisableBurstFallback) {
+            throw "networkquality.exe was not found for target '$($Target.service)/$($Target.endpointName)'."
+        }
+
         return Invoke-BurstTrafficMeasurement -Target $Target -ProbeRun $ProbeRun -PortableTools $PortableTools
     }
 
@@ -1610,6 +1795,9 @@ function Get-SpeedTestFailureTargetResult {
     $fields = @{
         download_speed = 0.0
         upload_speed = 0.0
+        upload_tool = 'none'
+        upload_error_class = ''
+        upload_error_detail = ''
         latency = 0.0
         jitter = 0.0
         rpm_responsiveness = 0.0
@@ -1632,6 +1820,9 @@ function Get-SpeedTestFailureTargetResult {
         available = $false
         download_mbps = 0.0
         upload_mbps = 0.0
+        upload_tool = 'none'
+        upload_error_class = ''
+        upload_error_detail = ''
         latency_ms = 0.0
         jitter_ms = 0.0
         rpm_responsiveness = 0.0
@@ -1665,7 +1856,10 @@ function Invoke-SpeedTestTarget {
         [pscustomobject]$Config,
 
         [Parameter(Mandatory = $true)]
-        [pscustomobject]$PortableTools
+        [pscustomobject]$PortableTools,
+
+        [Parameter(Mandatory = $true)]
+        [hashtable]$UploadMeasurementCache
     )
 
     $speedTestMethod = (Get-OptionalStringValue -Source $Target -PropertyName 'speedTestMethod' -DefaultValue '').ToLowerInvariant()
@@ -1691,12 +1885,57 @@ function Invoke-SpeedTestTarget {
         }
     }
 
+    $uploadTool = if ([double]$measurementResult.UploadMbps -gt 0) {
+        if ([string]$measurementResult.Tool -eq 'burst' -and -not [string]::IsNullOrWhiteSpace((Get-OptionalStringValue -Source $Target -PropertyName 'uploadUrl' -DefaultValue ''))) {
+            'upload-url'
+        }
+        else {
+            [string]$measurementResult.Tool
+        }
+    }
+    else {
+        'none'
+    }
+
+    $uploadErrorClass = ''
+    $uploadErrorDetail = ''
+
+    if ($measurementResult.Available -and [double]$measurementResult.UploadMbps -le 0) {
+        try {
+            $supplementMeasurement = Get-UploadSupplementMeasurement -Target $Target -ProbeRun $Config.probeRun -PortableTools $PortableTools -UploadMeasurementCache $UploadMeasurementCache
+            if ($null -ne $supplementMeasurement) {
+                $measurementResult.RunDurationMs = [double][math]::Round(($measurementResult.RunDurationMs + $supplementMeasurement.RunDurationMs), 2)
+                $uploadTool = [string]$supplementMeasurement.Tool
+
+                if ([double]$supplementMeasurement.UploadMbps -gt 0 -and [string]::IsNullOrWhiteSpace((ConvertTo-StringOrDefault -Value $supplementMeasurement.ErrorClass -DefaultValue ''))) {
+                    $measurementResult.UploadMbps = [double]$supplementMeasurement.UploadMbps
+                }
+                else {
+                    $uploadErrorClass = ConvertTo-StringOrDefault -Value $supplementMeasurement.ErrorClass -DefaultValue 'upload_unavailable'
+                    $uploadErrorDetail = ConvertTo-StringOrDefault -Value $supplementMeasurement.ErrorDetail -DefaultValue 'Upload supplement did not return throughput.'
+                }
+            }
+        }
+        catch {
+            $uploadTool = Get-UploadMeasurementMethod -Target $Target -ProbeRun $Config.probeRun
+            if ([string]::IsNullOrWhiteSpace($uploadTool)) {
+                $uploadTool = 'none'
+            }
+
+            $uploadErrorClass = 'upload_measurement_error'
+            $uploadErrorDetail = [string]$_.Exception.Message
+        }
+    }
+
     $isp = Get-TargetIsp -Target $Target -Probe $Config.probe
     $measurementName = Get-OptionalStringValue -Source $Config.probeRun -PropertyName 'realMetricsMeasurement' -DefaultValue 'qoe_real_metrics'
 
     $fields = @{
         download_speed = [double]$measurementResult.DownloadMbps
         upload_speed = [double]$measurementResult.UploadMbps
+        upload_tool = [string]$uploadTool
+        upload_error_class = [string]$uploadErrorClass
+        upload_error_detail = [string]$uploadErrorDetail
         latency = [double]$measurementResult.LatencyMs
         jitter = [double]$measurementResult.JitterMs
         rpm_responsiveness = [double]$measurementResult.RpmResponsiveness
@@ -1719,6 +1958,9 @@ function Invoke-SpeedTestTarget {
         available = [bool]$measurementResult.Available
         download_mbps = [double]$measurementResult.DownloadMbps
         upload_mbps = [double]$measurementResult.UploadMbps
+        upload_tool = [string]$uploadTool
+        upload_error_class = [string]$uploadErrorClass
+        upload_error_detail = [string]$uploadErrorDetail
         latency_ms = [double]$measurementResult.LatencyMs
         jitter_ms = [double]$measurementResult.JitterMs
         rpm_responsiveness = [double]$measurementResult.RpmResponsiveness
@@ -1740,7 +1982,12 @@ function Invoke-SpeedTestTarget {
         Report = $report
         Available = [bool]$measurementResult.Available
         LogMessage = if ($measurementResult.Available) {
-            "Target {0}/{1} completed with download {2} Mbps, upload {3} Mbps, latency {4} ms, jitter {5} ms, rpm {6}, tool {7}" -f $Target.service, $Target.endpointName, $measurementResult.DownloadMbps, $measurementResult.UploadMbps, $measurementResult.LatencyMs, $measurementResult.JitterMs, $measurementResult.RpmResponsiveness, $measurementResult.Tool
+            if (-not [string]::IsNullOrWhiteSpace($uploadErrorClass)) {
+                "Target {0}/{1} completed with download {2} Mbps, upload {3} Mbps via {4}, latency {5} ms, jitter {6} ms, rpm {7}, tool {8}, upload_error_class {9}: {10}" -f $Target.service, $Target.endpointName, $measurementResult.DownloadMbps, $measurementResult.UploadMbps, $uploadTool, $measurementResult.LatencyMs, $measurementResult.JitterMs, $measurementResult.RpmResponsiveness, $measurementResult.Tool, $uploadErrorClass, $uploadErrorDetail
+            }
+            else {
+                "Target {0}/{1} completed with download {2} Mbps, upload {3} Mbps via {4}, latency {5} ms, jitter {6} ms, rpm {7}, tool {8}" -f $Target.service, $Target.endpointName, $measurementResult.DownloadMbps, $measurementResult.UploadMbps, $uploadTool, $measurementResult.LatencyMs, $measurementResult.JitterMs, $measurementResult.RpmResponsiveness, $measurementResult.Tool
+            }
         }
         else {
             "Target {0}/{1} completed with error_class {2}: {3}" -f $Target.service, $Target.endpointName, (ConvertTo-StringOrDefault -Value $measurementResult.ErrorClass -DefaultValue 'unavailable'), (ConvertTo-StringOrDefault -Value $measurementResult.ErrorDetail -DefaultValue 'No additional detail was provided.')
@@ -1880,6 +2127,7 @@ $writeSucceeded = $false
 $writeUri = ''
 $fatalErrorMessage = ''
 $threw = $false
+$uploadMeasurementCache = @{}
 $portableTools = $null
 if (@($enabledTargets | Where-Object { (Get-TargetType -Target $_) -eq 'speedtest' }).Count -gt 0) {
     $portableTools = Get-PortableTools -ProbeRun $config.probeRun -ScriptBasePath $scriptBasePath
@@ -1914,7 +2162,7 @@ try {
         $targetType = Get-TargetType -Target $target
         try {
             if ($targetType -eq 'speedtest') {
-                $speedTestResult = Invoke-SpeedTestTarget -Target $target -Config $config -PortableTools $portableTools
+                $speedTestResult = Invoke-SpeedTestTarget -Target $target -Config $config -PortableTools $portableTools -UploadMeasurementCache $uploadMeasurementCache
                 if ($speedTestResult.Available) {
                     $successCount++
                 }

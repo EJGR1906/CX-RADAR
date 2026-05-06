@@ -176,6 +176,32 @@ function Test-SpeedTargetFallbackReady {
     return -not [string]::IsNullOrWhiteSpace($downloadUrl)
 }
 
+function Get-UploadMeasurementMethod {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Target,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$ProbeRun
+    )
+
+    $targetUploadMethod = Get-OptionalStringValue -Source $Target -PropertyName 'uploadMeasurementMethod' -DefaultValue ''
+    if (-not [string]::IsNullOrWhiteSpace($targetUploadMethod)) {
+        return $targetUploadMethod.ToLowerInvariant()
+    }
+
+    return (Get-OptionalStringValue -Source $ProbeRun -PropertyName 'defaultUploadMeasurementMethod' -DefaultValue 'none').ToLowerInvariant()
+}
+
+function Test-UploadUrlMeasurementReady {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Target
+    )
+
+    return -not [string]::IsNullOrWhiteSpace((Get-OptionalStringValue -Source $Target -PropertyName 'uploadUrl' -DefaultValue ''))
+}
+
 function Test-PowerShellSyntax {
     param(
         [Parameter(Mandatory = $true)]
@@ -275,6 +301,26 @@ function Get-RequiredConfigIssues {
                     }
                     default {
                         $issues.Add("Target '$($target.service)/$($target.endpointName)' uses unsupported speedTestMethod '$speedTestMethod'.")
+                    }
+                }
+
+                $uploadMeasurementMethod = Get-UploadMeasurementMethod -Target $target -ProbeRun $Config.probeRun
+                switch ($uploadMeasurementMethod) {
+                    'none' {
+                        break
+                    }
+                    'networkquality' {
+                        break
+                    }
+                    'upload-url' {
+                        if (-not (Test-UploadUrlMeasurementReady -Target $target)) {
+                            $issues.Add("Target '$($target.service)/$($target.endpointName)' requires uploadUrl when uploadMeasurementMethod is 'upload-url'.")
+                        }
+
+                        break
+                    }
+                    default {
+                        $issues.Add("Target '$($target.service)/$($target.endpointName)' uses unsupported uploadMeasurementMethod '$uploadMeasurementMethod'.")
                     }
                 }
 
@@ -385,15 +431,21 @@ $fastCliTargets = @($enabledSpeedTargets | Where-Object { (Get-OptionalStringVal
 $ytDlpTargets = @($enabledSpeedTargets | Where-Object { (Get-OptionalStringValue -Source $_ -PropertyName 'speedTestMethod' -DefaultValue '').ToLowerInvariant() -eq 'yt-dlp' })
 $networkQualityTargets = @($enabledSpeedTargets | Where-Object { (Get-OptionalStringValue -Source $_ -PropertyName 'speedTestMethod' -DefaultValue '').ToLowerInvariant() -eq 'networkquality' })
 $burstTargets = @($enabledSpeedTargets | Where-Object { (Get-OptionalStringValue -Source $_ -PropertyName 'speedTestMethod' -DefaultValue '').ToLowerInvariant() -eq 'burst' })
+$uploadMeasurementNetworkQualityTargets = @($enabledSpeedTargets | Where-Object { (Get-UploadMeasurementMethod -Target $_ -ProbeRun $config.probeRun) -eq 'networkquality' })
+$uploadMeasurementUploadUrlTargets = @($enabledSpeedTargets | Where-Object { (Get-UploadMeasurementMethod -Target $_ -ProbeRun $config.probeRun) -eq 'upload-url' })
 $curlAvailable = if ($enabledHttpTargets.Count -gt 0) { Test-CurlAvailability -RepoRoot $repoRoot } else { $true }
 $portableNodeAvailable = if ($fastCliTargets.Count -gt 0) { (Test-Path -Path $portableTools.NodeExe -PathType Leaf) } else { $true }
 $fastCliAvailable = if ($fastCliTargets.Count -gt 0) { (Test-Path -Path $portableTools.FastCliScript -PathType Leaf) } else { $true }
 $ytDlpAvailable = if ($ytDlpTargets.Count -gt 0) { (Test-Path -Path $portableTools.YtDlpExe -PathType Leaf) } else { $true }
-$networkQualityCommandAvailable = if ($networkQualityTargets.Count -gt 0) { @($networkQualityTargets | Where-Object { Test-NetworkQualityAvailabilityForTarget -Target $_ -PortableTools $portableTools }).Count -eq $networkQualityTargets.Count } else { $true }
+$allNetworkQualityTargets = @($networkQualityTargets + $uploadMeasurementNetworkQualityTargets)
+$networkQualityCommandAvailable = if ($allNetworkQualityTargets.Count -gt 0) { @($allNetworkQualityTargets | Where-Object { Test-NetworkQualityAvailabilityForTarget -Target $_ -PortableTools $portableTools }).Count -eq $allNetworkQualityTargets.Count } else { $true }
 $networkQualityFallbackReady = if ($networkQualityTargets.Count -gt 0) { @($networkQualityTargets | Where-Object { Test-SpeedTargetFallbackReady -Target $_ }).Count -eq $networkQualityTargets.Count } else { $true }
 $burstTargetsReady = if ($burstTargets.Count -gt 0) { @($burstTargets | Where-Object { Test-SpeedTargetFallbackReady -Target $_ }).Count -eq $burstTargets.Count } else { $true }
+$uploadUrlTargetsReady = if ($uploadMeasurementUploadUrlTargets.Count -gt 0) { @($uploadMeasurementUploadUrlTargets | Where-Object { Test-UploadUrlMeasurementReady -Target $_ }).Count -eq $uploadMeasurementUploadUrlTargets.Count } else { $true }
+$uploadMeasurementNetworkQualityReady = if ($uploadMeasurementNetworkQualityTargets.Count -gt 0) { $networkQualityCommandAvailable } else { $true }
+$uploadMeasurementTargetsReady = ($uploadMeasurementNetworkQualityReady -and $uploadUrlTargetsReady)
 $probeIspConfigured = if ($enabledSpeedTargets.Count -gt 0) { -not [string]::IsNullOrWhiteSpace((Get-OptionalStringValue -Source $config.probe -PropertyName 'isp' -DefaultValue '')) } else { $true }
-$speedTestTargetsReady = ($portableNodeAvailable -and $fastCliAvailable -and $ytDlpAvailable -and ($networkQualityCommandAvailable -or $networkQualityFallbackReady) -and $burstTargetsReady)
+$speedTestTargetsReady = ($portableNodeAvailable -and $fastCliAvailable -and $ytDlpAvailable -and ($networkQualityCommandAvailable -or $networkQualityFallbackReady) -and $burstTargetsReady -and $uploadUrlTargetsReady)
 
 $results = [ordered]@{
     ProbeScriptSyntax = 'OK'
@@ -405,6 +457,8 @@ $results = [ordered]@{
     NetworkQualityCommandAvailable = [bool]$networkQualityCommandAvailable
     NetworkQualityFallbackReady = [bool]$networkQualityFallbackReady
     BurstTargetsReady = [bool]$burstTargetsReady
+    UploadUrlTargetsReady = [bool]$uploadUrlTargetsReady
+    UploadMeasurementTargetsReady = [bool]$uploadMeasurementTargetsReady
     ProbeIspConfigured = [bool]$probeIspConfigured
     SpeedTestTargetsReady = [bool]$speedTestTargetsReady
     InfluxTokenAvailable = [bool]$tokenStatus.Available

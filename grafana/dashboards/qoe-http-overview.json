@@ -29,272 +29,6 @@
   "description": "Dashboard operativo de QoE real respaldado por qoe_real_metrics y qoe_probe_run.",
   "editable": true,
   "elements": {
-    "panel-10": {
-      "kind": "Panel",
-      "spec": {
-        "data": {
-          "kind": "QueryGroup",
-          "spec": {
-            "queries": [
-              {
-                "kind": "PanelQuery",
-                "spec": {
-                  "hidden": false,
-                  "query": {
-                    "datasource": {
-                      "name": "dfkh6j26t6gw0c"
-                    },
-                    "group": "influxdb",
-                    "kind": "DataQuery",
-                    "spec": {
-                      "query": "lastPoints = from(bucket: v.defaultBucket)\n  |> range(start: -6h, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_real_metrics\")\n  |> filter(fn: (r) => r.probe_id =~ /^${probe_id:regex}$/)\n  |> filter(fn: (r) => r.service =~ /^${service:regex}$/)\n  |> filter(fn: (r) => r._field =~ /download_speed|upload_speed|latency|jitter|run_duration_ms|endpoint_name/)\n  |> group(columns: [\"probe_id\", \"service\", \"_field\"])\n  |> last()\n\npivoted = lastPoints\n  |> pivot(rowKey: [\"probe_id\", \"service\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> filter(fn: (r) => r.endpoint_name =~ /^${endpoint_name:regex}$/)\n  |> rename(columns: {download_speed: \"download_mbps\", upload_speed: \"upload_mbps\", latency: \"latency_ms\", jitter: \"jitter_ms\"})\n  |> keep(columns: [\"probe_id\", \"service\", \"endpoint_name\", \"download_mbps\", \"upload_mbps\", \"latency_ms\", \"jitter_ms\", \"run_duration_ms\"])\n  |> sort(columns: [\"service\", \"probe_id\", \"endpoint_name\"])\n\npivoted"
-                    },
-                    "version": "v0"
-                  },
-                  "refId": "A"
-                }
-              }
-            ],
-            "queryOptions": {},
-            "transformations": []
-          }
-        },
-        "description": "Ultimo snapshot QoE real por servicio y endpoint, con descarga, subida, latencia, jitter y duracion de la medicion.",
-        "id": 10,
-        "links": [],
-        "title": "Snapshot QoE real por servicio",
-        "vizConfig": {
-          "group": "table",
-          "kind": "VizConfig",
-          "spec": {
-            "fieldConfig": {
-              "defaults": {
-                "custom": {
-                  "align": "center",
-                  "cellOptions": {
-                    "type": "auto"
-                  },
-                  "footer": {
-                    "reducers": []
-                  },
-                  "inspect": false
-                },
-                "decimals": 2
-              },
-              "overrides": [
-                {
-                  "matcher": {
-                    "id": "byName",
-                    "options": "probe_id"
-                  },
-                  "properties": [
-                    {
-                      "id": "displayName",
-                      "value": "Sonda"
-                    },
-                    {
-                      "id": "custom.width",
-                      "value": 180
-                    }
-                  ]
-                },
-                {
-                  "matcher": {
-                    "id": "byName",
-                    "options": "site"
-                  },
-                  "properties": [
-                    {
-                      "id": "displayName",
-                      "value": "Sitio"
-                    },
-                    {
-                      "id": "custom.width",
-                      "value": 120
-                    }
-                  ]
-                },
-                {
-                  "matcher": {
-                    "id": "byName",
-                    "options": "environment"
-                  },
-                  "properties": [
-                    {
-                      "id": "displayName",
-                      "value": "Entorno"
-                    },
-                    {
-                      "id": "custom.width",
-                      "value": 110
-                    }
-                  ]
-                },
-                {
-                  "matcher": {
-                    "id": "byName",
-                    "options": "download_mbps"
-                  },
-                  "properties": [
-                    {
-                      "id": "displayName",
-                      "value": "Download"
-                    },
-                    {
-                      "id": "unit",
-                      "value": "Mbps"
-                    },
-                    {
-                      "id": "custom.cellOptions",
-                      "value": {
-                        "type": "color-background"
-                      }
-                    },
-                    {
-                      "id": "custom.width",
-                      "value": 110
-                    },
-                    {
-                      "id": "thresholds",
-                      "value": {
-                        "mode": "absolute",
-                        "steps": [
-                          {
-                            "color": "red",
-                            "value": 0
-                          },
-                          {
-                            "color": "yellow",
-                            "value": 50
-                          },
-                          {
-                            "color": "green",
-                            "value": 80
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                },
-                {
-                  "matcher": {
-                    "id": "byName",
-                    "options": "upload_mbps"
-                  },
-                  "properties": [
-                    {
-                      "id": "displayName",
-                      "value": "Upload"
-                    },
-                    {
-                      "id": "unit",
-                      "value": "Mbps"
-                    },
-                    {
-                      "id": "custom.cellOptions",
-                      "value": {
-                        "type": "color-background"
-                      }
-                    },
-                    {
-                      "id": "custom.width",
-                      "value": 110
-                    },
-                    {
-                      "id": "thresholds",
-                      "value": {
-                        "mode": "absolute",
-                        "steps": [
-                          {
-                            "color": "red",
-                            "value": 0
-                          },
-                          {
-                            "color": "yellow",
-                            "value": 30
-                          },
-                          {
-                            "color": "green",
-                            "value": 60
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                },
-                {
-                  "matcher": {
-                    "id": "byName",
-                    "options": "latency_ms"
-                  },
-                  "properties": [
-                    {
-                      "id": "displayName",
-                      "value": "Latencia"
-                    },
-                    {
-                      "id": "unit",
-                      "value": "ms"
-                    },
-                    {
-                      "id": "custom.cellOptions",
-                      "value": {
-                        "type": "color-background"
-                      }
-                    },
-                    {
-                      "id": "custom.width",
-                      "value": 100
-                    },
-                    {
-                      "id": "thresholds",
-                      "value": {
-                        "mode": "absolute",
-                        "steps": [
-                          {
-                            "color": "green",
-                            "value": 0
-                          },
-                          {
-                            "color": "yellow",
-                            "value": 20
-                          },
-                          {
-                            "color": "red",
-                            "value": 50
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                },
-                {
-                  "matcher": {
-                    "id": "byName",
-                    "options": "server"
-                  },
-                  "properties": [
-                    {
-                      "id": "displayName",
-                      "value": "Servidor"
-                    },
-                    {
-                      "id": "custom.width",
-                      "value": 320
-                    }
-                  ]
-                }
-              ]
-            },
-            "options": {
-              "cellHeight": "sm",
-              "showHeader": true
-            }
-          },
-          "version": "13.1.0-24655759693"
-        }
-      }
-    },
     "panel-12": {
       "kind": "Panel",
       "spec": {
@@ -380,7 +114,7 @@
               "wideLayout": true
             }
           },
-          "version": "13.1.0-24655759693"
+          "version": "13.1.0-25153870157"
         }
       }
     },
@@ -482,7 +216,7 @@
               "wideLayout": true
             }
           },
-          "version": "13.1.0-24655759693"
+          "version": "13.1.0-25153870157"
         }
       }
     },
@@ -573,7 +307,7 @@
               "wideLayout": true
             }
           },
-          "version": "13.1.0-24655759693"
+          "version": "13.1.0-25153870157"
         }
       }
     },
@@ -709,7 +443,7 @@
               "showHeader": true
             }
           },
-          "version": "13.1.0-24655759693"
+          "version": "13.1.0-25153870157"
         }
       }
     },
@@ -834,7 +568,7 @@
               }
             }
           },
-          "version": "13.1.0-24655759693"
+          "version": "13.1.0-25153870157"
         }
       }
     },
@@ -923,7 +657,7 @@
               "wideLayout": true
             }
           },
-          "version": "13.1.0-24655759693"
+          "version": "13.1.0-25153870157"
         }
       }
     },
@@ -1048,7 +782,7 @@
               }
             }
           },
-          "version": "13.1.0-24655759693"
+          "version": "13.1.0-25153870157"
         }
       }
     },
@@ -1273,7 +1007,7 @@
               "showHeader": true
             }
           },
-          "version": "13.1.0-24655759693"
+          "version": "13.1.0-25153870157"
         }
       }
     },
@@ -1398,7 +1132,7 @@
               }
             }
           },
-          "version": "13.1.0-24655759693"
+          "version": "13.1.0-25153870157"
         }
       }
     },
@@ -1543,7 +1277,7 @@
               }
             }
           },
-          "version": "13.1.0-24655759693"
+          "version": "13.1.0-25153870157"
         }
       }
     }
@@ -1629,9 +1363,9 @@
                     "spec": {
                       "element": {
                         "kind": "ElementReference",
-                        "name": "panel-10"
+                        "name": "panel-4"
                       },
-                      "height": 12,
+                      "height": 7,
                       "width": 24,
                       "x": 0,
                       "y": 0
@@ -1644,10 +1378,10 @@
                         "kind": "ElementReference",
                         "name": "panel-12"
                       },
-                      "height": 10,
+                      "height": 7,
                       "width": 24,
                       "x": 0,
-                      "y": 12
+                      "y": 7
                     }
                   },
                   {
@@ -1660,7 +1394,7 @@
                       "height": 8,
                       "width": 12,
                       "x": 0,
-                      "y": 22
+                      "y": 14
                     }
                   },
                   {
@@ -1673,7 +1407,7 @@
                       "height": 8,
                       "width": 12,
                       "x": 12,
-                      "y": 22
+                      "y": 14
                     }
                   },
                   {
@@ -1686,20 +1420,7 @@
                       "height": 8,
                       "width": 12,
                       "x": 0,
-                      "y": 30
-                    }
-                  },
-                  {
-                    "kind": "GridLayoutItem",
-                    "spec": {
-                      "element": {
-                        "kind": "ElementReference",
-                        "name": "panel-4"
-                      },
-                      "height": 8,
-                      "width": 12,
-                      "x": 12,
-                      "y": 30
+                      "y": 22
                     }
                   },
                   {
@@ -1712,7 +1433,7 @@
                       "height": 8,
                       "width": 24,
                       "x": 0,
-                      "y": 38
+                      "y": 30
                     }
                   }
                 ]
@@ -1734,7 +1455,7 @@
     "influxdb"
   ],
   "timeSettings": {
-    "autoRefresh": "5m",
+    "autoRefresh": "1m",
     "autoRefreshIntervals": [
       "5s",
       "10s",
@@ -1829,11 +1550,9 @@
         "allValue": ".*",
         "allowCustomValue": true,
         "current": {
-          "text": [
-            "eduardo-pc-trabajo"
-          ],
+          "text": "All",
           "value": [
-            "eduardo-pc-trabajo"
+            "$__all"
           ]
         },
         "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"probe_id\", predicate: (r) => r._measurement == \"qoe_probe_run\" and r.environment =~ /^${environment:regex}$/ and r.site =~ /^${site:regex}$/, start: -30d)",
@@ -1867,8 +1586,20 @@
         "allValue": ".*",
         "allowCustomValue": true,
         "current": {
-          "text": "All",
-          "value": "$__all"
+          "text": [
+            "Disney+",
+            "Amazon",
+            "Microsoft",
+            "Netflix",
+            "Youtube"
+          ],
+          "value": [
+            "Disney+",
+            "Amazon",
+            "Microsoft",
+            "Netflix",
+            "Youtube"
+          ]
         },
         "definition": "import \"influxdata/influxdb/schema\"\nschema.tagValues(bucket: v.defaultBucket, tag: \"service\", predicate: (r) => r._measurement == \"qoe_real_metrics\" and r.probe_id =~ /^${probe_id:regex}$/, start: -30d)",
         "hide": "dontHide",
