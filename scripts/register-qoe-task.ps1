@@ -11,7 +11,7 @@ param(
 
     [Parameter()]
     [ValidateRange(1, 1440)]
-    [int]$IntervalMinutes = 5,
+    [int]$IntervalMinutes = 10,
 
     [Parameter()]
     [ValidateSet('RemoteSigned', 'AllSigned', 'Bypass')]

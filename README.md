@@ -1,26 +1,24 @@
 # CX-Radar
 
-## TL;DR
+## Resumen Ejecutivo
 
 CX-Radar ayuda a detectar caidas, lentitud y degradaciones de servicio antes de que el cliente final o las areas internas las escalen como incidente. Su valor principal es reducir el tiempo de reaccion, dar visibilidad temprana sobre el estado real de servicios criticos y entregar evidencia objetiva para seguimiento operativo y decisiones de negocio.
 
-La herramienta fue diseñada para Ingenieros de Operaciones en Telecomunicaciones e Ingenieros de Proyectos, y tambien resulta util para coordinadores del area, vicepresidentes y presidentes que necesitan una vista clara del estado de los servicios sin entrar en detalle tecnico. Ademas, funciona con herramientas portables dentro del propio proyecto, por lo que no requiere instalaciones complejas ni cambios globales en el equipo donde se ejecuta.
+La herramienta funciona con herramientas portables dentro del propio proyecto, por lo que no requiere instalaciones complejas ni cambios globales en el equipo donde se ejecuta.
 
 ## Descripción General
 
-CX-Radar es una sonda de monitoreo de servicios que se ejecuta en Windows 11 y permite evaluar tanto comprobaciones HTTP sintéticas como métricas de Quality of Experience / Calidad de Experiencia (QoE), es decir, indicadores que ayudan a entender como se percibe realmente un servicio desde el entorno donde opera el usuario o el equipo.
+CX-Radar es una sonda de monitoreo de servicios que se ejecuta en Windows y permite evaluar tanto comprobaciones HTTP sintéticas como métricas de Quality of Experience / Calidad de Experiencia (QoE), es decir, indicadores que ayudan a entender como se percibe realmente un servicio desde el entorno donde opera el usuario o el equipo.
 
 En la practica, esto permite responder preguntas simples pero criticas: si un servicio esta disponible, si esta respondiendo con lentitud y si esa lentitud puede convertirse en una mala experiencia para clientes o usuarios internos. El objetivo es transformar comprobaciones tecnicas en informacion clara y util para operacion, seguimiento de proyectos y visibilidad gerencial.
 
 En su estado actual, el proyecto concentra todo el flujo activo en una sola sonda PowerShell capaz de ejecutar objetivos de monitoreo web y pruebas de rendimiento desde un mismo catalogo. Las herramientas necesarias se mantienen dentro del propio proyecto, lo que simplifica la puesta en marcha y evita instalaciones invasivas en el equipo.
 
-Aunque su uso principal esta pensado para Ingenieros de Operaciones en Telecomunicaciones e Ingenieros de Proyectos, CX-Radar tambien genera informacion util para coordinadores del area y perfiles ejecutivos que necesitan una vista rapida, consistente y entendible del estado de los servicios.
-
 El proyecto se centra en una sonda principal para monitoreo de servicios, la escritura de metricas en InfluxDB Cloud y la visualizacion de resultados en dashboards de Grafana Cloud.
 
 ## Objetivos y Problema que Resuelve
 
-Este proyecto fue creado para responder una pregunta muy práctica: "¿los servicios que usamos están funcionando bien desde nuestro entorno real de trabajo?". En muchas organizaciones, los problemas de lentitud o disponibilidad se detectan tarde, de forma manual o solo cuando un usuario ya está afectado.
+Este proyecto fue creado para responder una pregunta muy práctica: "¿los servicios que usan los clientes están funcionando bien desde nuestra red?". En muchas organizaciones, los problemas de lentitud o disponibilidad se detectan tarde, de forma manual o solo cuando un usuario ya está afectado.
 
 CX-Radar reduce esa incertidumbre al automatizar mediciones frecuentes sobre endpoints aprobados. Con ello ayuda a:
 
@@ -32,7 +30,7 @@ CX-Radar reduce esa incertidumbre al automatizar mediciones frecuentes sobre end
 
 ## Tecnologías Utilizadas
 
-- Windows 11 como entorno de ejecución de la sonda.
+- Windows como entorno de ejecución de la sonda.
 - PowerShell como motor principal de automatización.
 - `curl.exe` o `Invoke-WebRequest` para la ruta HTTP, descargas por ráfagas y uploads controlados a endpoints propios.
 - Node.js portable en `./bin/node/` para ejecutar `fast-cli` sin instalación global.
@@ -50,9 +48,7 @@ CX-Radar reduce esa incertidumbre al automatizar mediciones frecuentes sobre end
 
 Antes de empezar, asegúrate de contar con lo siguiente:
 
-- Un equipo con Windows 11.
-- PowerShell disponible en el sistema.
-- Sin necesidad de permisos de administrador.
+- Un equipo con Windows.
 - Conectividad de red para descargar dependencias portables la primera vez.
 - Acceso a una cuenta de InfluxDB Cloud con permiso para escribir métricas.
 - Un token de InfluxDB Cloud para el bucket configurado.
@@ -135,7 +131,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 
 ### 8. Programar la ejecución automática
 
-- Si quieres que la sonda corra en segundo plano cada 5 minutos, registra la tarea programada.
+- Si quieres que la sonda corra en segundo plano cada 10 minutos, registra la tarea programada.
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
