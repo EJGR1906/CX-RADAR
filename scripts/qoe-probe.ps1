@@ -1051,6 +1051,10 @@ function Get-UploadSupplementCacheKey {
         'networkquality' {
             return 'networkquality'
         }
+        'curl-upload' {
+            $uploadEndpoint = Get-OptionalStringValue -Source $Target -PropertyName 'uploadEndpoint' -DefaultValue 'https://speed.cloudflare.com/__up'
+            return ('curl-upload::{0}' -f $uploadEndpoint.ToLowerInvariant())
+        }
         'upload-url' {
             $uploadUrl = Get-OptionalStringValue -Source $Target -PropertyName 'uploadUrl' -DefaultValue ''
             if ([string]::IsNullOrWhiteSpace($uploadUrl)) {
@@ -1120,6 +1124,57 @@ function Invoke-UploadUrlMeasurement {
     }
 }
 
+function Invoke-CurlUploadMeasurement {
+    param(
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$Target,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$ProbeRun,
+
+        [Parameter(Mandatory = $true)]
+        [pscustomobject]$PortableTools
+    )
+
+    $uploadEndpoint = Get-OptionalStringValue -Source $Target -PropertyName 'uploadEndpoint' -DefaultValue 'https://speed.cloudflare.com/__up'
+    $uploadPayloadBytes = [math]::Max(1, (Get-OptionalIntValue -Source $Target -PropertyName 'uploadPayloadBytes' -DefaultValue 1048576))
+    $timeoutSeconds = Get-SpeedTestTimeoutSeconds -Target $Target -ProbeRun $ProbeRun -DefaultValue 120
+
+    $transferDirectory = New-MeasurementTemporaryDirectory -PortableTools $PortableTools -Prefix 'curl-upload' -Target $Target
+
+    try {
+        $uploadFilePath = Join-Path -Path $transferDirectory -ChildPath 'upload.bin'
+        $randomBytes = New-Object byte[] $uploadPayloadBytes
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($randomBytes)
+        [System.IO.File]::WriteAllBytes($uploadFilePath, $randomBytes)
+
+        $errorClass = ''
+        $errorDetail = ''
+        $uploadDurationMs = 0.0
+        $uploadMbps = 0.0
+
+        try {
+            $uploadDurationMs = Invoke-WebRequestUploadFile -Uri $uploadEndpoint -InputPath $uploadFilePath -Method 'POST' -TimeoutSeconds $timeoutSeconds
+            $uploadMbps = Get-MbpsFromBytesAndDuration -Bytes $uploadPayloadBytes -DurationMs $uploadDurationMs
+        }
+        catch {
+            $errorClass = 'upload_error'
+            $errorDetail = [string]$_.Exception.Message
+        }
+
+        return [pscustomobject]@{
+            Tool = 'curl-upload'
+            UploadMbps = [double]$uploadMbps
+            ErrorClass = [string]$errorClass
+            ErrorDetail = [string]$errorDetail
+            RunDurationMs = [double]$uploadDurationMs
+        }
+    }
+    finally {
+        Remove-PathIfExists -Path $transferDirectory
+    }
+}
+
 function Get-UploadSupplementMeasurement {
     param(
         [Parameter(Mandatory = $true)]
@@ -1155,6 +1210,10 @@ function Get-UploadSupplementMeasurement {
                 ErrorDetail = [string]$networkQualityMeasurement.ErrorDetail
                 RunDurationMs = [double]$networkQualityMeasurement.RunDurationMs
             }
+            break
+        }
+        'curl-upload' {
+            Invoke-CurlUploadMeasurement -Target $Target -ProbeRun $ProbeRun -PortableTools $PortableTools
             break
         }
         'upload-url' {
