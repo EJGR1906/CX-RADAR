@@ -632,31 +632,58 @@ function New-MeasurementTemporaryDirectory {
     return $temporaryPath
 }
 
-function Clear-ManagedTemporaryArtifacts {
+<#
+.SYNOPSIS
+    Realiza la limpieza del entorno, eliminando archivos temporales y logs antiguos.
+#>
+function Invoke-EnvironmentGarbageCollection {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Path,
+        [string]$RepoRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string]$TemporaryDirectory,
+
+        [Parameter()]
+        [int]$LogRetentionDays = 7,
 
         [Parameter()]
         [int]$MinimumAgeMinutes = 20
     )
 
-    if (-not (Test-Path -Path $Path -PathType Container)) {
-        return 0
+    $removedCount = 0
+
+    if (Test-Path -Path $TemporaryDirectory -PathType Container) {
+        $cutoffTimeUtc = (Get-Date).ToUniversalTime().AddMinutes(-1 * [math]::Abs($MinimumAgeMinutes))
+        foreach ($pattern in @('burst-*', 'yt-dlp-*', 'fast-cli-*', 'puppeteer_dev_chrome_profile-*', '*.tmp', '*.bak')) {
+            foreach ($candidate in @(Get-ChildItem -Path $TemporaryDirectory -Filter $pattern -Force -ErrorAction SilentlyContinue)) {
+                if ($candidate.LastWriteTime.ToUniversalTime() -gt $cutoffTimeUtc) {
+                    continue
+                }
+
+                $candidatePath = $candidate.FullName
+                Remove-PathIfExists -Path $candidatePath
+                if (-not (Test-Path -Path $candidatePath)) {
+                    $removedCount++
+                }
+            }
+        }
     }
 
-    $cutoffTimeUtc = (Get-Date).ToUniversalTime().AddMinutes(-1 * [math]::Abs($MinimumAgeMinutes))
-    $removedCount = 0
-    foreach ($pattern in @('burst-*', 'yt-dlp-*', 'fast-cli-*', 'puppeteer_dev_chrome_profile-*')) {
-        foreach ($candidate in @(Get-ChildItem -Path $Path -Filter $pattern -Force -ErrorAction SilentlyContinue)) {
-            if ($candidate.LastWriteTime.ToUniversalTime() -gt $cutoffTimeUtc) {
-                continue
-            }
+    $logsPath = Join-Path -Path $RepoRoot -ChildPath 'logs'
+    if (Test-Path -Path $logsPath -PathType Container) {
+        $logCutoffTimeUtc = (Get-Date).ToUniversalTime().AddDays(-1 * [math]::Abs($LogRetentionDays))
+        foreach ($candidate in @(Get-ChildItem -Path $logsPath -Filter '*.log' -Force -ErrorAction SilentlyContinue)) {
+            if ($candidate.Name -match 'qoe-probe-\d{4}-\d{2}-\d{2}\.log' -or $candidate.Name -match 'qoe-speed-test-\d{4}-\d{2}-\d{2}\.log') {
+                if ($candidate.LastWriteTime.ToUniversalTime() -gt $logCutoffTimeUtc) {
+                    continue
+                }
 
-            $candidatePath = $candidate.FullName
-            Remove-PathIfExists -Path $candidatePath
-            if (-not (Test-Path -Path $candidatePath)) {
-                $removedCount++
+                $candidatePath = $candidate.FullName
+                Remove-PathIfExists -Path $candidatePath
+                if (-not (Test-Path -Path $candidatePath)) {
+                    $removedCount++
+                }
             }
         }
     }
@@ -2195,11 +2222,11 @@ if (@($enabledTargets | Where-Object { (Get-TargetType -Target $_) -eq 'speedtes
 try {
     Write-Log -Message "Starting QoE probe using config $resolvedConfigPath" -LogPath $logPath
 
-    if ($null -ne $portableTools) {
-        $staleTemporaryArtifactCount = Clear-ManagedTemporaryArtifacts -Path $portableTools.TemporaryDirectory
-        if ($staleTemporaryArtifactCount -gt 0) {
-            Write-Log -Message ("Removed {0} stale temporary artifact(s) from {1} before starting measurements." -f $staleTemporaryArtifactCount, $portableTools.TemporaryDirectory) -LogPath $logPath
-        }
+    $gcRepoRoot = Get-FullPathFromBase -BasePath $scriptBasePath -ChildPath '..'
+    $gcTempDir = if ($null -ne $portableTools) { $portableTools.TemporaryDirectory } else { Join-Path -Path $gcRepoRoot -ChildPath 'bin\tmp' }
+    $staleTemporaryArtifactCount = Invoke-EnvironmentGarbageCollection -RepoRoot $gcRepoRoot -TemporaryDirectory $gcTempDir
+    if ($staleTemporaryArtifactCount -gt 0) {
+        Write-Log -Message ("Environment GC removed {0} stale artifact(s) or log(s)." -f $staleTemporaryArtifactCount) -LogPath $logPath
     }
 
     if ($startJitterSecondsMax -gt 0) {

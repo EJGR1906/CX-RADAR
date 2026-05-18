@@ -84,11 +84,11 @@
                     },
                     {
                       "color": "yellow",
-                      "value": 5
+                      "value": 1
                     },
                     {
                       "color": "green",
-                      "value": 20
+                      "value": 3
                     }
                   ]
                 },
@@ -627,11 +627,11 @@
                     },
                     {
                       "color": "yellow",
-                      "value": 10
+                      "value": 2
                     },
                     {
                       "color": "green",
-                      "value": 50
+                      "value": 5
                     }
                   ]
                 },
