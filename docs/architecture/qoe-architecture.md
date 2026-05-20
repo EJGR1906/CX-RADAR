@@ -1,38 +1,38 @@
-# CX-Radar QoE Architecture
+# Arquitectura QoE de CX-Radar
 
-## Objective
+## Objetivo
 
-CX-Radar starts with one Windows 11 probe and is designed to scale later to multiple remote probes, including mixed probe types.
+CX-Radar comienza con una sola sonda Windows 11 y está diseñado para escalar más adelante a múltiples sondas remotas, incluyendo tipos mixtos de sondas.
 
-The platform separates active probe traffic from future specialty lanes:
+La plataforma separa el tráfico de la sonda activa de las futuras líneas especializadas:
 
-1. Synthetic HTTP lane: frequent curl-based checks against approved service endpoints.
-2. Probe-scoped QoE metrics: portable throughput, latency, jitter, and responsiveness checks written under `qoe_real_metrics` by selected `qoe-probe.ps1` targets.
-3. Weekly browser audit lane: deeper web performance checks using WebPageTest or similar future tooling.
+1. Canal HTTP sintético: verificaciones frecuentes con curl contra endpoints de servicio aprobados.
+2. Métricas QoE con alcance de sonda: comprobaciones portátiles de throughput, latencia, jitter y capacidad de respuesta escritas bajo `qoe_real_metrics` por los objetivos seleccionados en `qoe-probe.ps1`.
+3. Canal de auditoría de navegador semanal: comprobaciones más profundas de rendimiento web usando WebPageTest o herramientas similares futuras.
 
-These signal families must remain separate in storage, dashboards, and alerts.
+Estas familias de señales deben permanecer separadas en almacenamiento, paneles y alertas.
 
-## Current Implementation
+## Implementación actual
 
-The repo currently implements the active probe lane with:
+El repositorio implementa actualmente la línea de sonda activa con:
 
-1. `config/probe-catalog.json` for probe identity, InfluxDB target, cadence parameters, and approved endpoints.
-2. `scripts/qoe-probe.ps1` for mixed `http` and portable `speedtest` target execution and InfluxDB write payload generation.
-3. `scripts/register-qoe-task.ps1` for Windows Task Scheduler registration.
-4. `scripts/validate-qoe-probe.ps1` for local readiness checks.
+1. `config/probe-catalog.json` para identidad de la sonda, destino de InfluxDB, parámetros de cadencia y endpoints aprobados.
+2. `scripts/qoe-probe.ps1` para ejecución mixta de objetivos `http` y `speedtest` portátiles, y generación de la carga para escribir en InfluxDB.
+3. `scripts/register-qoe-task.ps1` para el registro en el Programador de tareas de Windows.
+4. `scripts/validate-qoe-probe.ps1` para comprobaciones locales de preparación.
 
-## Measurements
+## Mediciones
 
-The schema is intentionally prepared for future scale:
+El esquema está preparado intencionalmente para una escala futura:
 
-1. `qoe_http_check`: per-target synthetic HTTP check results.
-2. `qoe_real_metrics`: per-target portable QoE throughput, latency, jitter, and responsiveness results.
-3. `qoe_probe_run`: one point per script run with self-health counters.
-4. `qoe_page_audit`: reserved for future WebPageTest summaries.
+1. `qoe_http_check`: resultados de comprobaciones HTTP sintéticas por objetivo.
+2. `qoe_real_metrics`: resultados portátiles de throughput, latencia, jitter y capacidad de respuesta por objetivo.
+3. `qoe_probe_run`: un punto por ejecución del script con contadores de autocontrol.
+4. `qoe_page_audit`: reservado para futuros resúmenes de WebPageTest.
 
-## Stable Tags
+## Etiquetas estables
 
-Use only low-cardinality tags for cross-probe comparison:
+Usa únicamente etiquetas de baja cardinalidad para la comparación entre sondas:
 
 1. `probe_id`
 2. `probe_type`
@@ -42,28 +42,28 @@ Use only low-cardinality tags for cross-probe comparison:
 6. `endpoint_name`
 7. `probe_version`
 
-Do not promote URLs, remote IPs, redirect chains, or freeform errors to tags.
+No conviertas URLs, IP remotas, cadenas de redireccionamiento o errores libres en etiquetas.
 
-## Field Families
+## Familias de campos
 
-The current probe emits fields for:
+La sonda actual emite campos para:
 
-1. Availability and HTTP result.
-2. curl exit code and error class.
-3. DNS, connect, TLS, first-byte, and total latency in milliseconds.
-4. Response size, redirect count, effective URL, HTTP version, and remote IP.
-5. QoE real-metric fields such as download speed, upload speed, latency, jitter, and responsiveness.
-6. Probe self-health counters such as success count, failure count, target count, and run duration.
+1. Disponibilidad y resultado HTTP.
+2. Código de salida de curl y clase de error.
+3. Latencia DNS, de conexión, TLS, de primer byte y total en milisegundos.
+4. Tamaño de la respuesta, recuento de redirecciones, URL efectiva, versión HTTP e IP remota.
+5. Campos de métricas QoE reales como velocidad de descarga, velocidad de carga, latencia, jitter y capacidad de respuesta.
+6. Contadores de autocontrol de la sonda como recuento de aciertos, recuento de fallos, recuento de objetivos y duración de la ejecución.
 
-## Growth Model
+## Modelo de crecimiento
 
-When adding more probes, only these elements should vary per host:
+Al agregar más sondas, solo estos elementos deben variar por host:
 
-1. Probe identity values in `probe-catalog.json`.
-2. Secret retrieval method.
-3. Local scheduling or service wrapper.
-4. Site and environment tags.
+1. Valores de identidad de la sonda en `probe-catalog.json`.
+2. Método de obtención de secretos.
+3. Programación local o wrapper de servicio.
+4. Etiquetas de sitio y entorno.
 
-The measurement names and field semantics should remain stable unless versioned deliberately.
+Los nombres de las mediciones y la semántica de los campos deben permanecer estables a menos que se versionen deliberadamente.
 
-If a dedicated throughput lane returns later, it should use its own measurement set and remain separate from service reachability and browser audit measurements.
+Si más adelante vuelve una línea dedicada a throughput, debería usar su propio conjunto de mediciones y permanecer separada de las mediciones de alcance de servicio y auditoría de navegador.

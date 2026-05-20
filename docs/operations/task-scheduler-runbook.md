@@ -1,94 +1,94 @@
-# Task Scheduler Runbook
+﻿# Runbook del Programador de Tareas
 
-## Purpose
+## Propósito
 
-This runbook describes how to validate and register the Windows 11 probe so it runs every 5 minutes in the background.
+Este runbook describe cómo validar y registrar la sonda Windows 11 para que se ejecute cada 5 minutos en segundo plano.
 
-## Prerequisites
+## Prerrequisitos
 
-1. `curl.exe` available in `PATH`.
-2. PowerShell able to run local scripts with a process-scoped execution policy such as `RemoteSigned`.
-3. `config/probe-catalog.json` updated with real InfluxDB values.
-4. InfluxDB token stored with `scripts\set-influx-token.ps1`, or available temporarily through the configured environment variable.
+1. `curl.exe` disponible en `PATH`.
+2. PowerShell capaz de ejecutar scripts locales con una política de ejecución en el ámbito del proceso como `RemoteSigned`.
+3. `config/probe-catalog.json` actualizado con valores reales de InfluxDB.
+4. Token de InfluxDB almacenado con `scripts\set-influx-token.ps1`, o disponible temporalmente mediante la variable de entorno configurada.
 
-## Provision the Token
+## Provisionar el Token
 
-Preferred path:
+Ruta preferida:
 
 ```powershell
 & .\scripts\set-influx-token.ps1
 ```
 
-If you are migrating away from a user environment variable and do not need the rollback path:
+Si estás migrando desde una variable de entorno de usuario y no necesitas la ruta de reversión:
 
 ```powershell
 & .\scripts\set-influx-token.ps1 -ClearUserEnvironmentVariable
 ```
 
-## Validate Before Scheduling
+## Validar Antes de Programar
 
-Run this from PowerShell:
+Ejecuta esto desde PowerShell:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 & .\scripts\validate-qoe-probe.ps1 | Format-List
 ```
 
-The expected result today is:
+El resultado esperado hoy es:
 
 1. `ProbeScriptSyntax = OK`
 2. `ConfigFile = OK`
 3. `CurlAvailable = True`
-4. `InfluxTokenAvailable = True` once the token is configured
-5. `InfluxTokenSource = CredentialFile` after DPAPI migration
+4. `InfluxTokenAvailable = True` una vez que el token esté configurado
+5. `InfluxTokenSource = CredentialFile` después de la migración DPAPI
 
-## Dry Run Without InfluxDB Write
+## Ejecución en Seco Sin Escritura en InfluxDB
 
-Use this to test the HTTP measurement flow without sending metrics:
+Usa esto para probar el flujo de medición HTTP sin enviar métricas:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 & .\scripts\qoe-probe.ps1 -SkipInfluxWrite
 ```
 
-Logs are written to `logs\qoe-probe-YYYY-MM-DD.log`.
+Los logs se escriben en `logs\qoe-probe-YYYY-MM-DD.log`.
 
-## Register the Scheduled Task
+## Registrar la Tarea Programada
 
-Use the helper script:
+Usa el script auxiliar:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 & .\scripts\register-qoe-task.ps1
 ```
 
-By default the task name is `CX-Radar-QoE-Probe` and the interval is 5 minutes.
+Por defecto, el nombre de la tarea es `CX-Radar-QoE-Probe` y el intervalo es de 5 minutos.
 
-If you sign the scripts, prefer:
+Si firmas los scripts, prefiere:
 
 ```powershell
 & .\scripts\register-qoe-task.ps1 -ExecutionPolicy AllSigned
 ```
 
-Use `Bypass` only as an explicit exception:
+Usa `Bypass` solo como una excepción explícita:
 
 ```powershell
 & .\scripts\register-qoe-task.ps1 -ExecutionPolicy Bypass
 ```
 
-## Post-Registration Checks
+## Comprobaciones Posteriores al Registro
 
-1. Open Task Scheduler and confirm the task exists.
-2. Run the task once manually.
-3. Confirm the log file updates.
-4. Confirm metrics arrive in InfluxDB once the token is configured.
-5. Confirm the action arguments show `RemoteSigned` or `AllSigned`, not `Bypass`, unless you deliberately approved the exception.
+1. Abre el Programador de tareas y confirma que la tarea existe.
+2. Ejecuta la tarea manualmente una vez.
+3. Confirma que el archivo de log se actualiza.
+4. Confirma que las métricas llegan a InfluxDB una vez configurado el token.
+5. Confirma que los argumentos de acción muestran `RemoteSigned` o `AllSigned`, no `Bypass`, a menos que hayas aprobado explícitamente la excepción.
 
-## Recovery
+## Recuperación
 
-If the task exists but is not running correctly:
+Si la tarea existe pero no se ejecuta correctamente:
 
-1. Run `scripts\validate-qoe-probe.ps1` again.
-2. Check the daily log file in `logs\`.
-3. Confirm the configured user can decrypt the DPAPI credential file or still has the temporary environment variable.
-4. Re-register the task with the intended execution policy by rerunning `register-qoe-task.ps1`.
+1. Ejecuta `scripts\validate-qoe-probe.ps1` de nuevo.
+2. Revisa el archivo de log diario en `logs\`.
+3. Confirma que el usuario configurado puede descifrar el archivo de credenciales DPAPI o aún tiene la variable de entorno temporal.
+4. Registra nuevamente la tarea con la política de ejecución prevista volviendo a ejecutar `register-qoe-task.ps1`.

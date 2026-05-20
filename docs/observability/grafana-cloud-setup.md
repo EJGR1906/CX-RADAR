@@ -1,176 +1,176 @@
-# Grafana Cloud Setup For CX-Radar
+﻿# Configuración de Grafana Cloud para CX-Radar
 
-## Scope
+## Alcance
 
-This guide implements the first Grafana Cloud layer for the current synthetic HTTP lane only.
+Esta guía implementa la primera capa de Grafana Cloud para la línea sintética HTTP actual únicamente.
 
-For the generic speed-test lane, use `docs/observability/grafana-speed-test-setup.md` and keep its dashboards and alerts separate from the HTTP folder.
+Para la línea genérica de pruebas de velocidad, usa `docs/observability/grafana-speed-test-setup.md` y mantiene sus dashboards y alertas separados de la carpeta HTTP.
 
-The assets added in this repo are:
+Los activos agregados en este repositorio son:
 
-1. `grafana/dashboards/qoe-national-global.json` — Vista Global Nacional (multi-probe national view with geomap)
-2. `grafana/dashboards/qoe-probe-detail.json` — Detalle por Sonda (per-probe drilldown with full metrics)
+1. `grafana/dashboards/qoe-national-global.json` — Vista Global Nacional (vista nacional multi-sonda con geomapa)
+2. `grafana/dashboards/qoe-probe-detail.json` — Detalle por Sonda (drilldown por sonda con métricas completas)
 3. `grafana/queries/qoe-http-flux-examples.md`
 
-They are aligned to these current measurements:
+Están alineados con estas mediciones actuales:
 
 1. `qoe_http_check`
 2. `qoe_real_metrics`
 3. `qoe_probe_run`
 
-## Connect InfluxDB Cloud To Grafana Cloud
+## Conectar InfluxDB Cloud a Grafana Cloud
 
-1. Open Grafana Cloud.
-2. Go to Connections, then Data sources.
-3. Choose Add data source.
-4. Select InfluxDB.
-5. In Query language, choose `Flux`.
-6. In URL, use the base URL from `config/probe-catalog.json`, currently `https://us-east-1-1.aws.cloud2.influxdata.com`.
-7. Set Organization to your real Influx organization name.
-8. Set Default bucket to `qoe_metrics`, or your final bucket if you renamed it.
-9. Paste an InfluxDB API token with read access to the bucket.
-10. Click Save & test.
+1. Abre Grafana Cloud.
+2. Ve a Connections y luego a Data sources.
+3. Elige Add data source.
+4. Selecciona InfluxDB.
+5. En Query language, elige `Flux`.
+6. En URL, usa la URL base de `config/probe-catalog.json`, actualmente `https://us-east-1-1.aws.cloud2.influxdata.com`.
+7. Configura Organization con el nombre real de tu organización de Influx.
+8. Configura Default bucket a `qoe_metrics`, o a tu bucket final si lo renombraste.
+9. Pega un token de API de InfluxDB con acceso de lectura al bucket.
+10. Haz clic en Save & test.
 
-Recommended Grafana data source defaults:
+Valores predeterminados recomendados para la fuente de datos de Grafana:
 
 1. Min time interval: `5m`
 2. HTTP method: `POST`
 3. Custom timeout: `30s`
 
-## Import The Dashboards
+## Importar los paneles
 
-Two dashboards are provided. Import them in order:
+Se proporcionan dos dashboards. Implóralos en orden:
 
 ### 1. Vista Global Nacional (`qoe-national-global.json`)
 
-1. In Grafana Cloud, go to Dashboards.
-2. Click New, then Import.
-3. Upload `grafana/dashboards/qoe-national-global.json`.
-4. Select your InfluxDB Cloud data source when prompted.
-5. Import.
+1. En Grafana Cloud, ve a Dashboards.
+2. Haz clic en New y luego en Import.
+3. Sube `grafana/dashboards/qoe-national-global.json`.
+4. Selecciona tu fuente de datos de InfluxDB Cloud cuando se te solicite.
+5. Importa.
 
-This dashboard answers national-level questions:
+Este dashboard responde preguntas a nivel nacional:
 
-1. What is the current health of each probe across Venezuela?
-2. Are there regional patterns in latency or availability?
-3. Where are the probes physically located (geomap view)?
+1. ¿Cuál es la salud actual de cada sonda en Venezuela?
+2. ¿Hay patrones regionales en latencia o disponibilidad?
+3. ¿Dónde están ubicadas físicamente las sondas (vista geomapa)?
 
 ### 2. Detalle por Sonda (`qoe-probe-detail.json`)
 
-1. In Grafana Cloud, go to Dashboards.
-2. Click New, then Import.
-3. Upload `grafana/dashboards/qoe-probe-detail.json`.
-4. Select your InfluxDB Cloud data source when prompted.
-5. Import.
+1. En Grafana Cloud, ve a Dashboards.
+2. Haz clic en New y luego en Import.
+3. Sube `grafana/dashboards/qoe-probe-detail.json`.
+4. Selecciona tu fuente de datos de InfluxDB Cloud cuando se te solicite.
+5. Importa.
 
-This dashboard answers per-probe drilldown questions:
+Este dashboard responde preguntas de drilldown por sonda:
 
-1. Are endpoints reachable now from this probe?
-2. Are services slower than normal?
-3. Is the problem specific to one service, one endpoint, or one probe?
-4. Is the probe itself healthy and still writing to InfluxDB?
+1. ¿Están los endpoints alcanzables ahora desde esta sonda?
+2. ¿Los servicios están más lentos de lo normal?
+3. ¿El problema es específico de un servicio, un endpoint o una sonda?
+4. ¿La sonda misma está sana y sigue escribiendo en InfluxDB?
 
-> **Note:** The `Sonda` variable in this dashboard lets you switch between probes. The Vista Global Nacional dashboard intentionally has no probe filter — it always shows all probes.
+> **Nota:** La variable `Sonda` en este dashboard te permite cambiar entre sondas. El dashboard Vista Global Nacional intencionalmente no tiene filtro de sonda; siempre muestra todas las sondas.
 
-## Dashboard Structure
+## Estructura del dashboard
 
 ### Vista Global Nacional (`qoe-national-global.json`)
 
-1. **Mapa de Sondas** (geomap): probe locations color-coded by current availability state.
-2. **Disponibilidad por Sonda** (bar gauge): availability % per probe.
-3. **Latencia por Sonda** (bar gauge): mean latency per probe.
-4. **Velocidad de Descarga por Sonda** (bar gauge): mean download speed per probe.
-5. **Velocidad de Subida por Sonda** (bar gauge): mean upload speed per probe.
-6. **Estado por Sonda** (state timeline): per-probe availability over time.
-7. **Latencia a lo largo del tiempo** (time series): latency trend per probe.
-8. **Tabla Nacional de QoE** (table): latest snapshot of all probes with full metrics.
+1. **Mapa de Sondas** (geomap): ubicaciones de las sondas codificadas por color según el estado actual de disponibilidad.
+2. **Disponibilidad por Sonda** (bar gauge): % de disponibilidad por sonda.
+3. **Latencia por Sonda** (bar gauge): latencia media por sonda.
+4. **Velocidad de Descarga por Sonda** (bar gauge): velocidad media de descarga por sonda.
+5. **Velocidad de Subida por Sonda** (bar gauge): velocidad media de subida por sonda.
+6. **Estado por Sonda** (state timeline): disponibilidad por sonda a lo largo del tiempo.
+7. **Latencia a lo largo del tiempo** (time series): tendencia de latencia por sonda.
+8. **Tabla Nacional de QoE** (table): captura más reciente de todas las sondas con métricas completas.
 
 ### Detalle por Sonda (`qoe-probe-detail.json`)
 
-Filtered by the `Sonda` (`probe_id`) variable.
+Filtrado por la variable `Sonda` (`probe_id`).
 
-1. **Disponibilidad** (stat): current availability % for the selected probe.
-2. **Últimas Fallas** (stat): latest failure count from `qoe_probe_run`.
-3. **Estado de Escritura Influx** (stat): latest `write_succeeded` state.
-4. **Disponibilidad por Servicio** (time series): availability trend grouped by service.
-5. **Latencia Total por Servicio** (time series): mean latency per service.
-6. **Velocidad de Descarga** (time series): download Mbps per service over time.
-7. **Velocidad de Subida** (time series): upload Mbps per service over time.
-8. **Snapshot de Endpoints** (table): latest per-endpoint reading with full fields.
-9. **Fallas por Ciclo** (time series): failure count per probe run.
-10. **Duración de Ciclo** (time series): run duration trend from `qoe_probe_run`.
-11. **RPM Promedio** (bar gauge): requests per minute per service.
-12. **Disponibilidad por Servicio (barra)** (bar gauge): current availability % per service.
-13. **Timeline de Estado** (state timeline): per-service availability over time.
+1. **Disponibilidad** (stat): % de disponibilidad actual para la sonda seleccionada.
+2. **Últimas Fallas** (stat): recuento de fallas más reciente de `qoe_probe_run`.
+3. **Estado de Escritura Influx** (stat): estado más reciente de `write_succeeded`.
+4. **Disponibilidad por Servicio** (time series): tendencia de disponibilidad agrupada por servicio.
+5. **Latencia Total por Servicio** (time series): latencia media por servicio.
+6. **Velocidad de Descarga** (time series): Mbps de descarga por servicio a lo largo del tiempo.
+7. **Velocidad de Subida** (time series): Mbps de subida por servicio a lo largo del tiempo.
+8. **Snapshot de Endpoints** (table): lectura más reciente por endpoint con campos completos.
+9. **Fallas por Ciclo** (time series): recuento de fallas por ejecución de sonda.
+10. **Duración de Ciclo** (time series): tendencia de duración de ejecución de `qoe_probe_run`.
+11. **RPM Promedio** (bar gauge): solicitudes por minuto por servicio.
+12. **Disponibilidad por Servicio (barra)** (bar gauge): % de disponibilidad actual por servicio.
+13. **Timeline de Estado** (state timeline): disponibilidad por servicio a lo largo del tiempo.
 
-## Templating And Filtering
+## Plantillas y filtrado
 
-The **Vista Global** dashboard has no template variables — it always shows all probes.
+El dashboard **Vista Global** no tiene variables de plantilla; siempre muestra todas las sondas.
 
-The **Detalle por Sonda** dashboard includes:
+El dashboard **Detalle por Sonda** incluye:
 
-1. `probe_id` — selects a single probe; populated from `qoe_probe_run`.
+1. `probe_id` — selecciona una sola sonda; poblado desde `qoe_probe_run`.
 
-Multi-dimensional filtering is achieved by using Flux's `filter()` inside queries rather than Grafana variables to avoid cardinality issues.
+El filtrado multidimensional se logra usando `filter()` de Flux dentro de las consultas en lugar de variables de Grafana para evitar problemas de cardinalidad.
 
-## Recommended Alerts
+## Alertas recomendadas
 
-Create these alerts in Grafana Cloud from the Flux queries in `grafana/queries/qoe-http-flux-examples.md`.
+Crea estas alertas en Grafana Cloud a partir de las consultas Flux en `grafana/queries/qoe-http-flux-examples.md`.
 
-### Alert 1: Sustained endpoint slowdown
+### Alerta 1: Lentitud sostenida de endpoint
 
-Intent: detect meaningful latency degradation before outright failures.
+Objetivo: detectar una degradación significativa de latencia antes de fallos totales.
 
 1. Query: `Alert Query: Sustained Slowdown`
-2. Group by: `probe_id`, `service`, `endpoint_name`
-3. Condition: mean `time_total_ms > 2500`
+2. Agrupar por: `probe_id`, `service`, `endpoint_name`
+3. Condición: mean `time_total_ms > 2500`
 4. For: `15m`
 5. Evaluate every: `5m`
 
-Noise control:
+Control de ruido:
 
-1. Use `for 15m` so one slow response does not page.
-2. Start at `2500 ms` for public streaming homepages, then tighten after you have baseline data.
+1. Usa `for 15m` para que una respuesta lenta no genere un paging inmediato.
+2. Empieza en `2500 ms` para páginas de inicio de streaming público, luego ajusta tras tener datos de línea base.
 
-### Alert 2: Endpoint reachability degradation
+### Alerta 2: Degradación de alcanzabilidad de endpoint
 
-Intent: catch partial or full availability loss without waiting for a complete outage.
+Objetivo: detectar pérdida parcial o total de disponibilidad sin esperar un corte completo.
 
 1. Query: `Alert Query: Reachability Failure Ratio`
-2. Group by: `probe_id`, `service`, `endpoint_name`
-3. Condition: mean `available < 0.8`
+2. Agrupar por: `probe_id`, `service`, `endpoint_name`
+3. Condición: mean `available < 0.8`
 4. For: `15m`
 5. Evaluate every: `5m`
 
-Interpretation:
+Interpretación:
 
-1. `1.0` means fully healthy in the window.
-2. `0.8` means 20 percent of checks failed in the alert window.
+1. `1.0` significa totalmente sano en la ventana.
+2. `0.8` significa que el 20 por ciento de las comprobaciones fallaron en la ventana de alerta.
 
-### Alert 3: Probe write failure
+### Alerta 3: Falla de escritura de la sonda
 
-Intent: separate ingest failure from service degradation.
+Objetivo: separar la falla de ingestión de la degradación del servicio.
 
 1. Query: `Alert Query: Probe Write Failure`
-2. Group by: `probe_id`
-3. Condition: last `write_succeeded < 1`
+2. Agrupar por: `probe_id`
+3. Condición: last `write_succeeded < 1`
 4. For: `10m`
 5. Evaluate every: `5m`
 
-Noise control:
+Control de ruido:
 
-1. Route this alert differently from endpoint alerts because it is an observability pipeline problem.
-2. If you later run multiple probes, keep the alert grouped per probe so one host does not mask another.
+1. Enruta esta alerta de forma diferente a las alertas de endpoint porque es un problema de pipeline de observabilidad.
+2. Si más adelante ejecutas múltiples sondas, mantén la alerta agrupada por sonda para que un host no enmascare a otro.
 
-## Operational Notes
+## Notas operativas
 
-1. Keep the synthetic HTTP lane on its own dashboard folder. Do not mix it with future dedicated throughput or `qoe_page_audit` panels.
-2. Avoid alerting on single samples for public internet endpoints.
-3. Use the `service` and `endpoint_name` dimensions for drill-down before adding more cardinality.
-4. Do not use `remote_ip` as a grouping dimension in alerting. It is useful for inspection, not for routing.
+1. Mantén la línea HTTP sintética en su propia carpeta de dashboards. No la mezcles con futuros paneles dedicados de throughput o `qoe_page_audit`.
+2. Evita alertar sobre muestras individuales para endpoints de internet público.
+3. Usa las dimensiones `service` y `endpoint_name` para el drill-down antes de agregar más cardinalidad.
+4. No uses `remote_ip` como dimensión de agrupación en alertas. Es útil para inspección, no para enrutamiento.
 
-## Current Gaps
+## Brechas actuales
 
-1. The repo does not yet include exported Grafana alert-rule JSON because Grafana Cloud rule payloads vary by stack version and contact-point layout.
-2. There is not yet real Influx data in the bucket, so panel thresholds are starting values rather than baseline-derived values.
-3. The current probe covers only one endpoint per service. Multi-endpoint service dashboards may need additional rows later.
+1. El repositorio aún no incluye JSON exportado de reglas de alerta de Grafana porque los payloads de reglas de Grafana Cloud varían según la versión de stack y la disposición de contact points.
+2. Todavía no hay datos reales de Influx en el bucket, por lo que los umbrales de los paneles son valores iniciales en lugar de valores derivados de la línea base.
+3. La sonda actual cubre solo un endpoint por servicio. Los dashboards de servicios con múltiples endpoints pueden necesitar filas adicionales más adelante.

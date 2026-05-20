@@ -1,67 +1,67 @@
-# Hardening Notes
+﻿# Notas de Endurecimiento
 
-## Secret Handling
+## Manejo de secretos
 
-The probe now supports two token sources, in this order:
+La sonda ahora admite dos fuentes de token, en este orden:
 
-1. A user-scoped DPAPI protected credential file referenced by `influx.credentialFilePath`
-2. The user or process environment variable named by `influx.tokenEnvVar`
+1. Un archivo de credenciales protegido por DPAPI en el ámbito de usuario referenciado por `influx.credentialFilePath`
+2. La variable de entorno de usuario o de proceso nombrada por `influx.tokenEnvVar`
 
-Do not store the token directly in:
+No almacenes el token directamente en:
 
 1. `qoe-probe.ps1`
 2. `probe-catalog.json`
-3. Task arguments
-4. Plaintext log files
+3. Argumentos de tareas
+4. Archivos de log en texto plano
 
-Recommended production path:
+Ruta recomendada para producción:
 
-1. Store the token with `scripts\set-influx-token.ps1` so the value is encrypted with the current Windows user context via DPAPI.
-2. Keep the secret file outside the repo, under `%LOCALAPPDATA%\CX-Radar\secrets\`.
-3. Remove the user environment variable after migration unless a temporary rollback path is required.
+1. Almacena el token con `scripts\set-influx-token.ps1` para que el valor se cifre con el contexto de usuario de Windows actual mediante DPAPI.
+2. Mantén el archivo secreto fuera del repositorio, bajo `%LOCALAPPDATA%\CX-Radar\secrets\`.
+3. Elimina la variable de entorno de usuario después de la migración a menos que se requiera una ruta de reversión temporal.
 
-Example:
+Ejemplo:
 
 ```powershell
 & .\scripts\set-influx-token.ps1
 & .\scripts\set-influx-token.ps1 -ClearUserEnvironmentVariable
 ```
 
-Credential Manager remains a valid future option, but it would require an extra module or a dedicated native API wrapper. The current repo defaults to DPAPI because it is Windows-native and works without adding new dependencies.
+Credential Manager sigue siendo una opción válida para el futuro, pero requeriría un módulo adicional o un wrapper de API nativo dedicado. El repositorio actual predetermina DPAPI porque es nativo de Windows y funciona sin añadir dependencias nuevas.
 
-## PowerShell Execution Policy
+## Política de ejecución de PowerShell
 
-Use the narrowest workable option in this order:
+Usa la opción más estricta posible en este orden:
 
-1. `AllSigned` if you are prepared to sign the probe and helper scripts.
-2. `RemoteSigned` for local unsigned scripts on this monitored PC.
-3. `Bypass` only as an explicit per-task fallback if a local control blocks the safer options and the exception is documented.
+1. `AllSigned` si estás preparado para firmar la sonda y los scripts auxiliares.
+2. `RemoteSigned` para scripts locales no firmados en este equipo supervisado.
+3. `Bypass` solo como un fallback explícito por tarea si un control local bloquea las opciones más seguras y la excepción está documentada.
 
-The scheduled-task helper now defaults to `-ExecutionPolicy RemoteSigned`, which is process-scoped for that task invocation and avoids weakening the whole host.
+El helper de tarea programada ahora predetermina `-ExecutionPolicy RemoteSigned`, que está en el ámbito del proceso para esa invocación de tarea y evita debilitar todo el host.
 
-## Least Privilege
+## Principio de menor privilegio
 
-The task is registered with limited run level. Avoid administrator context unless a future dependency requires it and the requirement is explicitly documented.
+La tarea se registra con un nivel de ejecución limitado. Evita el contexto de administrador a menos que una dependencia futura lo requiera y el requisito esté documentado explícitamente.
 
-The scheduled task also uses `RunOnlyIfNetworkAvailable` so the probe does not keep generating local failures while the workstation is offline.
+La tarea programada también usa `RunOnlyIfNetworkAvailable` para que la sonda no siga generando fallas locales mientras la estación de trabajo está desconectada.
 
-## Rate and Reputation Safety
+## Seguridad de tasa y reputación
 
-Five GET requests every 5 minutes from one host is still low-volume, but predictable timing and zero spacing make synthetic traffic easier to fingerprint.
+Cinco solicitudes GET cada 5 minutos desde un host siguen siendo de bajo volumen, pero el tiempo predecible y la falta de separación hacen que el tráfico sintético sea más fácil de identificar.
 
-The current config adds two guardrails by default:
+La configuración actual agrega dos guardarraíles por defecto:
 
-1. `startJitterSecondsMax = 15` adds a small random delay at the beginning of each run.
-2. `targetDelayMilliseconds = 750` spaces requests so the host does not burst all targets back-to-back.
+1. `startJitterSecondsMax = 15` añade una pequeña demora aleatoria al inicio de cada ejecución.
+2. `targetDelayMilliseconds = 750` separa las solicitudes para que el host no dispare todos los targets de forma consecutiva.
 
-Operational guardrails:
+Guardarraíles operativos:
 
-1. Keep one request per target per cycle.
-2. Avoid sub-minute schedules for public streaming endpoints.
-3. Keep the user agent stable and truthful.
-4. Stagger multiple probes instead of launching them on the same wall-clock second.
-5. Treat HTTP `403`, `429`, or repeated TLS resets as a signal to back off and review the cadence.
+1. Mantén una solicitud por target por ciclo.
+2. Evita programaciones de menos de un minuto para endpoints de streaming público.
+3. Mantén el user agent estable y veraz.
+4. Escalona múltiples sondas en lugar de lanzarlas en el mismo segundo del reloj.
+5. Trata HTTP `403`, `429` o reinicios TLS repetidos como una señal para reducir la frecuencia y revisar la cadencia.
 
-## Logging
+## Registro de logs
 
-The logs intentionally record outcomes and timing, but they should never record tokens, authorization headers, or verbose HTTP traces with secrets.
+Los logs registran intencionalmente resultados y tiempos, pero nunca deben registrar tokens, encabezados de autorización ni trazas HTTP detalladas con secretos.

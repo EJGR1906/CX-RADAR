@@ -1,46 +1,46 @@
-# QA Certification Checklist
+﻿# Lista de Verificación de Certificación de QA
 
-## Scope
+## Alcance
 
-This checklist is the minimum release gate for the synthetic HTTP MVP.
+Esta lista de verificación es la puerta de lanzamiento mínima para el MVP de HTTP sintético.
 
-Use `scripts\run-qoe-certification.ps1` for repeatable smoke and resilience checks before treating this checklist as passed.
+Usa `scripts\run-qoe-certification.ps1` para comprobaciones repetibles de smoke y resiliencia antes de considerar esta lista como aprobada.
 
-## Functional
+## Funcional
 
-1. `validate-qoe-probe.ps1` returns `ProbeScriptSyntax = OK`.
-2. `run-qoe-certification.ps1` returns `smoke.passed = True`.
-3. The probe completes one dry run with `-SkipInfluxWrite` without terminating in error.
-4. The daily log contains one entry per enabled target plus one final run summary.
-5. The probe writes to InfluxDB successfully once the token is configured.
+1. `validate-qoe-probe.ps1` devuelve `ProbeScriptSyntax = OK`.
+2. `run-qoe-certification.ps1` devuelve `smoke.passed = True`.
+3. La sonda completa una ejecución en seco con `-SkipInfluxWrite` sin terminar con error.
+4. El log diario contiene una entrada por target habilitado más un resumen final de ejecución.
+5. La sonda escribe en InfluxDB correctamente una vez configurado el token.
 
-## Resilience
+## Resiliencia
 
-1. No internet: the script exits cleanly and logs failure states instead of hanging.
-2. DNS failure: curl errors are captured and mapped to `error_class`.
-3. TLS failure: curl errors are captured and mapped to `error_class`.
-4. `run-qoe-certification.ps1 -RunResilienceChecks` returns passing results for `dns_failure`, `timeout_bound`, and `influx_outage`.
-5. InfluxDB unavailable: the script fails loudly and predictably.
-6. Timeout path: each target is bounded by `connectTimeoutSeconds` and `maxTimeSeconds`.
+1. Sin internet: el script sale limpiamente y registra estados de fallo en lugar de quedarse colgado.
+2. Fallo DNS: los errores de curl se capturan y se mapean a `error_class`.
+3. Fallo TLS: los errores de curl se capturan y se mapean a `error_class`.
+4. `run-qoe-certification.ps1 -RunResilienceChecks` devuelve resultados pasados para `dns_failure`, `timeout_bound` e `influx_outage`.
+5. InfluxDB no disponible: el script falla de forma ruidosa y predecible.
+6. Ruta de timeout: cada target está acotado por `connectTimeoutSeconds` y `maxTimeSeconds`.
 
-## Workstation Impact
+## Impacto en el puesto de trabajo
 
-1. `run-qoe-certification.ps1` reports no `new_curl_process_ids` after a smoke run.
-2. Repeated scheduled runs do not create sustained CPU or RAM growth.
-3. Logs rotate naturally by date and do not explode in size during normal use.
+1. `run-qoe-certification.ps1` informa que no hay `new_curl_process_ids` después de una ejecución de smoke.
+2. Las ejecuciones programadas repetidas no generan crecimiento sostenido de CPU o RAM.
+3. Los logs rotan de forma natural por fecha y no explotan en tamaño durante el uso normal.
 
-## Data Trust
+## Confianza en los datos
 
-1. The measured milliseconds are non-zero and plausible for real destinations.
-2. Different services produce different latency profiles.
-3. Failures are represented as failure points, not silent gaps.
+1. Los milisegundos medidos no son cero y son plausibles para destinos reales.
+2. Servicios distintos generan perfiles de latencia diferentes.
+3. Las fallas se representan como puntos de fallo, no como brechas silenciosas.
 
-## Release Gate
+## Puerta de lanzamiento
 
-The MVP is not ready for production until:
+El MVP no está listo para producción hasta que:
 
-1. Token handling is configured.
-2. One successful InfluxDB write is observed.
-3. One successful dashboard query is observed.
-4. At least one soak period is completed after scheduling.
-5. The QA runbook in `docs\qa\validation-runbook.md` has been executed and attached to the release evidence.
+1. El manejo del token esté configurado.
+2. Se observe una escritura exitosa en InfluxDB.
+3. Se observe una consulta exitosa en un dashboard.
+4. Se complete al menos un periodo de soak después de programar.
+5. El runbook de QA en `docs\qa\validation-runbook.md` se haya ejecutado y adjuntado como evidencia de lanzamiento.

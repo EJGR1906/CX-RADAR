@@ -1,26 +1,26 @@
-# QoE Validation Runbook
+﻿# Runbook de Validación QoE
 
-## Summary
+## Resumen
 
-This runbook is the executable QA path for the current synthetic HTTP probe on Windows 11.
+Este runbook es la ruta de QA ejecutable para la sonda HTTP sintética actual en Windows 11.
 
-It splits validation into four layers:
+Divide la validación en cuatro capas:
 
-1. Fast smoke checks for syntax, dry-run behavior, log completeness, and stray `curl.exe` processes.
-2. Automated resilience checks for DNS failure, timeout bounds, and InfluxDB outage behavior.
-3. Manual soak checks for CPU, RAM, process growth, and log growth over time.
-4. Data-trust checks to confirm the reported milliseconds reflect network behavior rather than local script overhead.
+1. Comprobaciones de smoke rápidas para sintaxis, comportamiento de ejecución en seco, completitud de logs y procesos `curl.exe` huérfanos.
+2. Comprobaciones de resiliencia automatizadas para fallo DNS, límites de timeout y comportamiento ante una caída de InfluxDB.
+3. Comprobaciones de soak manuales para CPU, RAM, crecimiento de procesos y crecimiento de logs a lo largo del tiempo.
+4. Comprobaciones de confianza de datos para confirmar que los milisegundos reportados reflejan el comportamiento de la red y no la sobrecarga del script local.
 
-## Fast Smoke Validation
+## Validación de Smoke Rápida
 
-Run this before every release or configuration change:
+Ejecuta esto antes de cada lanzamiento o cambio de configuración:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 & .\scripts\run-qoe-certification.ps1 -OutputPath .\logs\qoe-certification-smoke.json
 ```
 
-Pass criteria:
+Criterios de aprobación:
 
 1. `overall_passed = true`
 2. `smoke.passed = true`
@@ -28,135 +28,135 @@ Pass criteria:
 4. `validate.ConfigFile = OK`
 5. `smoke.process.timed_out = false`
 6. `smoke.process.exit_code = 0`
-7. `smoke.new_curl_process_ids` is empty
+7. `smoke.new_curl_process_ids` está vacío
 8. `smoke.parsed_log.summary.failure_count = 0`
 9. `smoke.distinct_latency_values >= 2`
 
-## Automated Resilience Validation
+## Validación de Resiliencia Automatizada
 
-Run this when changing timeouts, target handling, Influx write logic, or error handling:
+Ejecuta esto al cambiar timeouts, manejo de targets, lógica de escritura a Influx o manejo de errores:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 & .\scripts\run-qoe-certification.ps1 -RunResilienceChecks -OutputPath .\logs\qoe-certification-resilience.json
 ```
 
-The harness currently exercises:
+El arnés actualmente ejecuta:
 
-1. `dns_failure`: invalid `.invalid` hostname, `SkipInfluxWrite = true`
-2. `timeout_bound`: unroutable IP with reduced timeouts, `SkipInfluxWrite = true`
-3. `influx_outage`: dummy token plus `baseUrl = http://127.0.0.1:1`, `SkipInfluxWrite = false`
+1. `dns_failure`: hostname inválido `.invalid`, `SkipInfluxWrite = true`
+2. `timeout_bound`: IP no enrutable con timeouts reducidos, `SkipInfluxWrite = true`
+3. `influx_outage`: token ficticio más `baseUrl = http://127.0.0.1:1`, `SkipInfluxWrite = false`
 
-Pass criteria:
+Criterios de aprobación:
 
 1. `dns_failure.passed = true`
 2. `timeout_bound.passed = true`
 3. `influx_outage.passed = true`
-4. No scenario leaves `new_curl_process_ids`
-5. No scenario sets `process.timed_out = true`
+4. Ningún escenario deja `new_curl_process_ids`
+5. Ningún escenario establece `process.timed_out = true`
 
-Interpretation:
+Interpretación:
 
-1. DNS and timeout scenarios should finish with `exit_code = 0` because the probe records failure points but still completes the run.
-2. The Influx outage scenario should finish with `exit_code != 0` because ingest failure is expected to fail loudly.
+1. Los escenarios de DNS y timeout deben terminar con `exit_code = 0` porque la sonda registra puntos de fallo pero aún completa la ejecución.
+2. El escenario de caída de Influx debe terminar con `exit_code != 0` porque se espera que la falla de ingestión falle de forma ruidosa.
 
-## Manual TLS Validation
+## Validación Manual de TLS
 
-TLS failure depends on a live remote endpoint, so it stays opt-in:
+El fallo de TLS depende de un endpoint remoto en vivo, por lo que se mantiene opt-in:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 & .\scripts\run-qoe-certification.ps1 -RunResilienceChecks -IncludeTlsScenario -OutputPath .\logs\qoe-certification-tls.json
 ```
 
-Pass criteria:
+Criterios de aprobación:
 
 1. `tls_failure.passed = true`
-2. The scenario does not time out
-3. No stray `curl.exe` process remains
+2. El escenario no se agota por timeout
+3. No queda ningún proceso `curl.exe` huérfano
 
-If the endpoint is unreachable for reasons unrelated to TLS, mark the result inconclusive instead of treating it as a regression.
+Si el endpoint es inaccesible por razones no relacionadas con TLS, marca el resultado como inconcluso en lugar de tratarlo como una regresión.
 
-## Soak Test Plan
+## Plan de Soak
 
-The repo does not automate multi-day soak runs yet. Run these checks on a normal work PC after registering the scheduled task.
+El repositorio aún no automatiza ejecuciones de soak de varios días. Ejecuta estas comprobaciones en un PC normal después de registrar la tarea programada.
 
-### 24-hour soak
+### Soak de 24 horas
 
-Objective: detect obvious leaks or noisy failure patterns.
+Objetivo: detectar fugas obvias o patrones de fallo ruidosos.
 
-Method:
+Método:
 
-1. Register the scheduled task at the normal 5-minute interval.
-2. Record baseline values for `powershell.exe` working set, handle count, and process count before the soak.
-3. Record the same values again after 24 hours.
-4. Inspect `logs\qoe-probe-YYYY-MM-DD.log` for repeated stack traces or runaway growth.
+1. Registra la tarea programada con el intervalo normal de 5 minutos.
+2. Registra los valores base de working set de `powershell.exe`, recuento de handles y recuento de procesos antes del soak.
+3. Registra los mismos valores nuevamente después de 24 horas.
+4. Inspecciona `logs\qoe-probe-YYYY-MM-DD.log` en busca de rastros de pila repetidos o crecimiento descontrolado.
 
-Pass thresholds:
+Umbrales de aprobación:
 
-1. No persistent orphan `curl.exe` processes
-2. No monotonic growth in probe-related PowerShell process count
-3. No sustained handle growth trend greater than 20 percent over baseline for the long-lived scheduling host process
-4. No log growth pattern that suggests repeated retries or repeated stack traces every cycle
+1. No hay procesos persistentes `curl.exe` huérfanos
+2. No hay crecimiento monótono en el recuento de procesos de PowerShell relacionados con la sonda
+3. No hay una tendencia sostenida de crecimiento de handles mayor al 20 por ciento sobre la línea base para el proceso host de programación de larga duración
+4. No hay un patrón de crecimiento de logs que sugiera reintentos repetidos o rastros de pila repetidos en cada ciclo
 
-### 72-hour soak
+### Soak de 72 horas
 
-Objective: catch slow regressions that do not appear in one day.
+Objetivo: detectar regresiones lentas que no aparecen en un día.
 
-Method:
+Método:
 
-1. Keep the same schedule and target set.
-2. Collect CPU, working set, and handle snapshots at least every 12 hours.
-3. Verify that daily log rollover still happens and old files remain bounded.
+1. Mantén el mismo horario y conjunto de targets.
+2. Recolecta instantáneas de CPU, working set y handles al menos cada 12 horas.
+3. Verifica que la rotación diaria de logs siga ocurriendo y que los archivos antiguos se mantengan acotados.
 
-Pass thresholds:
+Umbrales de aprobación:
 
-1. Average CPU impact remains operationally negligible on a normal work PC outside the active few seconds of each run.
-2. Working set does not show sustained upward drift attributable to probe execution.
-3. Handle count and process count remain stable over the 72-hour window.
+1. El impacto promedio de CPU permanece operacionalmente despreciable en un PC normal fuera de los pocos segundos activos de cada ejecución.
+2. El working set no muestra una deriva sostenida hacia arriba atribuible a la ejecución de la sonda.
+3. El recuento de handles y procesos permanece estable durante la ventana de 72 horas.
 
-## Data-Trust Validation
+## Validación de Confianza de Datos
 
-Run these checks after a successful smoke run and after the first real Influx write.
+Ejecuta estas comprobaciones después de una ejecución de smoke exitosa y después de la primera escritura real a Influx.
 
-### Local plausibility
+### Plausibilidad local
 
-Use the smoke JSON output.
+Usa la salida JSON de smoke.
 
-Pass criteria:
+Criterios de aprobación:
 
-1. `smoke.parsed_log.target_results` contains non-zero `time_total_ms` values.
-2. Distinct services show different latency values.
-3. The per-run `run_duration_ms` is larger than the slowest single target but not wildly larger than the sum of target timings plus pacing.
+1. `smoke.parsed_log.target_results` contiene valores `time_total_ms` distintos de cero.
+2. Servicios distintos muestran valores de latencia diferentes.
+3. El `run_duration_ms` por ejecución es mayor que el target más lento, pero no es exageradamente mayor que la suma de los tiempos de los targets más el pacing.
 
-### Influx consistency
+### Consistencia en Influx
 
-After a real write succeeds:
+Después de que una escritura real tenga éxito:
 
-1. Query `qoe_http_check` for the last run in Grafana or Influx Data Explorer.
-2. Compare at least one endpoint's `time_total_ms` with the same endpoint in the daily log.
-3. Compare `qoe_probe_run.failure_count` with the run summary in the same log window.
+1. Consulta `qoe_http_check` para la última ejecución en Grafana o Influx Data Explorer.
+2. Compara el `time_total_ms` de al menos un endpoint con el mismo endpoint en el log diario.
+3. Compara `qoe_probe_run.failure_count` con el resumen de la ejecución en la misma ventana de logs.
 
-Pass criteria:
+Criterios de aprobación:
 
-1. Influx values match the log values within normal rounding differences.
-2. Failures appear as explicit failure points rather than silent data gaps.
+1. Los valores en Influx coinciden con los valores del log dentro de diferencias normales por redondeo.
+2. Las fallas aparecen como puntos de fallo explícitos en lugar de brechas silenciosas de datos.
 
-## Production Readiness Checklist
+## Lista de Verificación de Preparación para Producción
 
-The probe is ready to move beyond MVP validation only when all of the following are true:
+La sonda está lista para avanzar más allá de la validación MVP solo cuando todo lo siguiente sea verdadero:
 
-1. `run-qoe-certification.ps1` smoke output passes.
-2. `run-qoe-certification.ps1 -RunResilienceChecks` passes.
-3. DPAPI token storage or another approved secret path is configured.
-4. At least one real InfluxDB write succeeds on Windows PowerShell 5.1.
-5. At least one Grafana dashboard query succeeds against `qoe_http_check`.
-6. A 24-hour soak completes without stray processes or sustained resource drift.
-7. A 72-hour soak is scheduled or completed before wider rollout.
+1. La salida de smoke de `run-qoe-certification.ps1` pasa.
+2. `run-qoe-certification.ps1 -RunResilienceChecks` pasa.
+3. El almacenamiento de token DPAPI u otra ruta de secretos aprobada está configurado.
+4. Al menos una escritura real a InfluxDB tiene éxito en Windows PowerShell 5.1.
+5. Al menos una consulta de dashboard de Grafana tiene éxito contra `qoe_http_check`.
+6. Un soak de 24 horas se completa sin procesos huérfanos ni deriva sostenida de recursos.
+7. Un soak de 72 horas está programado o completado antes del despliegue más amplio.
 
-## Remaining Risks And Recommended Changes
+## Riesgos Restantes y Cambios Recomendados
 
-1. TLS failure remains environment-dependent and may need a controlled internal endpoint for deterministic execution.
-2. The current harness validates bounded runtime and loud ingest failure, but it does not yet collect workstation perf counters automatically.
-3. If you scale to multiple probes, add fleet staggering validation so simultaneous task starts do not create synthetic bursts.
-4. If you want repeatable long-run evidence in CI-like form, the next useful addition is a small soak collector that records working set, handle count, and child-process counts to JSON on each sample.
+1. El fallo de TLS sigue dependiendo del entorno y puede necesitar un endpoint interno controlado para una ejecución determinista.
+2. El arnés actual valida tiempo de ejecución acotado y falla de ingestión ruidosa, pero todavía no recopila automáticamente contadores de rendimiento de la estación de trabajo.
+3. Si escalas a múltiples sondas, agrega validación de escalonamiento de la flota para que los inicios simultáneos de tareas no creen ráfagas sintéticas.
+4. Si quieres evidencia repetible de larga duración en forma similar a CI, la siguiente adición útil es un pequeño colector de soak que registre working set, recuento de handles y recuento de procesos secundarios en JSON en cada muestra.
