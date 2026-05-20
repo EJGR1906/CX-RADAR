@@ -8,13 +8,15 @@ For the generic speed-test lane, use `docs/observability/grafana-speed-test-setu
 
 The assets added in this repo are:
 
-1. `grafana/dashboards/qoe-http-overview.json`
-2. `grafana/queries/qoe-http-flux-examples.md`
+1. `grafana/dashboards/qoe-national-global.json` — Vista Global Nacional (multi-probe national view with geomap)
+2. `grafana/dashboards/qoe-probe-detail.json` — Detalle por Sonda (per-probe drilldown with full metrics)
+3. `grafana/queries/qoe-http-flux-examples.md`
 
 They are aligned to these current measurements:
 
 1. `qoe_http_check`
-2. `qoe_probe_run`
+2. `qoe_real_metrics`
+3. `qoe_probe_run`
 
 ## Connect InfluxDB Cloud To Grafana Cloud
 
@@ -35,54 +37,81 @@ Recommended Grafana data source defaults:
 2. HTTP method: `POST`
 3. Custom timeout: `30s`
 
-## Import The Dashboard
+## Import The Dashboards
+
+Two dashboards are provided. Import them in order:
+
+### 1. Vista Global Nacional (`qoe-national-global.json`)
 
 1. In Grafana Cloud, go to Dashboards.
 2. Click New, then Import.
-3. Upload `grafana/dashboards/qoe-http-overview.json`.
-4. Map the `DS_INFLUXDB` input to your InfluxDB Cloud data source.
-5. Import the dashboard.
+3. Upload `grafana/dashboards/qoe-national-global.json`.
+4. Select your InfluxDB Cloud data source when prompted.
+5. Import.
 
-The dashboard is built around four operator questions:
+This dashboard answers national-level questions:
 
-1. Are endpoints reachable now?
+1. What is the current health of each probe across Venezuela?
+2. Are there regional patterns in latency or availability?
+3. Where are the probes physically located (geomap view)?
+
+### 2. Detalle por Sonda (`qoe-probe-detail.json`)
+
+1. In Grafana Cloud, go to Dashboards.
+2. Click New, then Import.
+3. Upload `grafana/dashboards/qoe-probe-detail.json`.
+4. Select your InfluxDB Cloud data source when prompted.
+5. Import.
+
+This dashboard answers per-probe drilldown questions:
+
+1. Are endpoints reachable now from this probe?
 2. Are services slower than normal?
 3. Is the problem specific to one service, one endpoint, or one probe?
 4. Is the probe itself healthy and still writing to InfluxDB?
 
+> **Note:** The `Sonda` variable in this dashboard lets you switch between probes. The Vista Global Nacional dashboard intentionally has no probe filter — it always shows all probes.
+
 ## Dashboard Structure
 
-### Summary row
+### Vista Global Nacional (`qoe-national-global.json`)
 
-1. `Availability`: current availability percentage over the selected time range.
-2. `Last Run Failures`: sum of latest `failure_count` values from `qoe_probe_run`.
-3. `Influx Write State`: latest `write_succeeded` state across selected probes.
+1. **Mapa de Sondas** (geomap): probe locations color-coded by current availability state.
+2. **Disponibilidad por Sonda** (bar gauge): availability % per probe.
+3. **Latencia por Sonda** (bar gauge): mean latency per probe.
+4. **Velocidad de Descarga por Sonda** (bar gauge): mean download speed per probe.
+5. **Velocidad de Subida por Sonda** (bar gauge): mean upload speed per probe.
+6. **Estado por Sonda** (state timeline): per-probe availability over time.
+7. **Latencia a lo largo del tiempo** (time series): latency trend per probe.
+8. **Tabla Nacional de QoE** (table): latest snapshot of all probes with full metrics.
 
-### Service health row
+### Detalle por Sonda (`qoe-probe-detail.json`)
 
-1. `Availability by Service`: percentage trend from boolean `available`.
-2. `Total Latency by Service`: mean `time_total_ms` trend grouped by `service`.
+Filtered by the `Sonda` (`probe_id`) variable.
 
-### Drill-down row
-
-1. `Latest Endpoint Snapshot`: table with `available`, `http_status`, `time_total_ms`, `error_class`, `curl_exit_code`, and `remote_ip`.
-2. `Probe Failure Count`: failures per run from `qoe_probe_run`.
-
-### Probe health row
-
-1. `Probe Run Duration`: mean `run_duration_ms` trend from `qoe_probe_run`.
+1. **Disponibilidad** (stat): current availability % for the selected probe.
+2. **Últimas Fallas** (stat): latest failure count from `qoe_probe_run`.
+3. **Estado de Escritura Influx** (stat): latest `write_succeeded` state.
+4. **Disponibilidad por Servicio** (time series): availability trend grouped by service.
+5. **Latencia Total por Servicio** (time series): mean latency per service.
+6. **Velocidad de Descarga** (time series): download Mbps per service over time.
+7. **Velocidad de Subida** (time series): upload Mbps per service over time.
+8. **Snapshot de Endpoints** (table): latest per-endpoint reading with full fields.
+9. **Fallas por Ciclo** (time series): failure count per probe run.
+10. **Duración de Ciclo** (time series): run duration trend from `qoe_probe_run`.
+11. **RPM Promedio** (bar gauge): requests per minute per service.
+12. **Disponibilidad por Servicio (barra)** (bar gauge): current availability % per service.
+13. **Timeline de Estado** (state timeline): per-service availability over time.
 
 ## Templating And Filtering
 
-The dashboard includes these variables:
+The **Vista Global** dashboard has no template variables — it always shows all probes.
 
-1. `environment`
-2. `site`
-3. `probe_id`
-4. `service`
-5. `endpoint_name`
+The **Detalle por Sonda** dashboard includes:
 
-All of them default to `All` and use regex-compatible filtering so the same dashboard scales from one probe to many probes.
+1. `probe_id` — selects a single probe; populated from `qoe_probe_run`.
+
+Multi-dimensional filtering is achieved by using Flux's `filter()` inside queries rather than Grafana variables to avoid cardinality issues.
 
 ## Recommended Alerts
 

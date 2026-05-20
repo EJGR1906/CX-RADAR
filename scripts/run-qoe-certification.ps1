@@ -135,6 +135,7 @@ function ConvertFrom-ProbeLog {
     $normalizedLines = @($Lines | ForEach-Object { [string]$_ })
 
     foreach ($line in $normalizedLines) {
+        # HTTP check target: "Target svc/ep completed with HTTP 200, curl exit 0, total 123.4 ms"
         if ($line -match 'Target (?<service>[^/]+)/(?<endpoint>[^ ]+) completed with HTTP (?<http>\d+), curl exit (?<exit>-?\d+), total (?<total>[\d\.,]+) ms') {
             $targetResults += [pscustomobject]@{
                 service = [string]$matches.service
@@ -142,6 +143,30 @@ function ConvertFrom-ProbeLog {
                 http_status = [int]$matches.http
                 curl_exit_code = [int]$matches.exit
                 time_total_ms = ConvertTo-InvariantDouble -Value ([string]$matches.total)
+            }
+            continue
+        }
+
+        # Speedtest target success: "Target svc/ep completed with download … latency 37,3 ms …"
+        if ($line -match 'Target (?<service>[^/]+)/(?<endpoint>[^ ]+) completed with download [\d\.,]+ Mbps.*latency (?<latency>[\d\.,]+) ms') {
+            $targetResults += [pscustomobject]@{
+                service = [string]$matches.service
+                endpoint_name = [string]$matches.endpoint
+                http_status = 0
+                curl_exit_code = 0
+                time_total_ms = ConvertTo-InvariantDouble -Value ([string]$matches.latency)
+            }
+            continue
+        }
+
+        # Speedtest target failure: "Target svc/ep completed with error_class …"
+        if ($line -match 'Target (?<service>[^/]+)/(?<endpoint>[^ ]+) completed with error_class') {
+            $targetResults += [pscustomobject]@{
+                service = [string]$matches.service
+                endpoint_name = [string]$matches.endpoint
+                http_status = 0
+                curl_exit_code = -1
+                time_total_ms = 0.0
             }
             continue
         }
@@ -457,142 +482,162 @@ $resolvedConfigPath = [System.IO.Path]::GetFullPath((Resolve-Path -Path $ConfigP
 
 $baseConfig = Get-Content -Path $resolvedConfigPath -Raw | ConvertFrom-Json
 $enabledTargets = @($baseConfig.targets | Where-Object { $_.enabled })
+
+# Smoke test only uses burst-method targets. yt-dlp and fast-cli launch external tools
+# with their own internal timeouts that cannot be overridden by probeRun.maxTimeSeconds,
+# so they will always exhaust the MaxProbeRuntimeSeconds ceiling on a smoke run.
+$smokeTargets = @($enabledTargets | Where-Object {
+    -not ($_.PSObject.Properties.Name -contains 'speedTestMethod') -or
+    [string]$_.speedTestMethod -eq 'burst' -or
+    [string]$_.type -eq 'http'
+})
+if ($smokeTargets.Count -eq 0) {
+    $smokeTargets = @($enabledTargets | Select-Object -First 1)
+}
+
 $scenarioRoot = Join-Path -Path $env:TEMP -ChildPath ('cx-radar-qa-{0}' -f ([guid]::NewGuid().ToString('N')))
 New-Item -Path $scenarioRoot -ItemType Directory -Force | Out-Null
 
-$validateResult = & $resolvedValidateScriptPath -ProbeScriptPath $resolvedProbeScriptPath -ConfigPath $resolvedConfigPath
+try {
+    $validateResult = & $resolvedValidateScriptPath -ProbeScriptPath $resolvedProbeScriptPath -ConfigPath $resolvedConfigPath
 
-$smokeConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'smoke' -Targets $enabledTargets -ProbeRunOverrides @{
-    connectTimeoutSeconds = 5
-    maxTimeSeconds = 20
-}
-$smokeConfig = Get-Content -Path $smokeConfigPath -Raw | ConvertFrom-Json
-$smokeResult = Invoke-SmokeCertification -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $smokeConfigPath -ScenarioConfig $smokeConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds
-
-$resilienceResults = @()
-
-if ($RunResilienceChecks) {
-    $dnsConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'dns-failure' -Targets @([
-        pscustomobject]@{
-            service = 'qa'
-            endpointName = 'dns-failure'
-            url = 'https://cx-radar-probe-test.invalid/'
-            method = 'GET'
-            expectedHttpCodes = @(200)
-            enabled = $true
-        }
-    ) -ProbeRunOverrides @{
-        connectTimeoutSeconds = 2
-        maxTimeSeconds = 6
+    $smokeConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'smoke' -Targets $smokeTargets -ProbeRunOverrides @{
+        connectTimeoutSeconds = 5
+        maxTimeSeconds = 20
     }
-    $dnsConfig = Get-Content -Path $dnsConfigPath -Raw | ConvertFrom-Json
-    $resilienceResults += (Invoke-ResilienceScenario -Name 'dns_failure' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $dnsConfigPath -ScenarioConfig $dnsConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
-        param($ScenarioResult)
-        return (
-            -not $ScenarioResult.process.timed_out -and
-            $ScenarioResult.process.exit_code -eq 0 -and
-            $ScenarioResult.new_curl_process_ids.Count -eq 0 -and
-            (Get-ParsedLogFailureCount -ParsedLog $ScenarioResult.parsed_log) -ge 1
-        )
-    })
+    $smokeConfig = Get-Content -Path $smokeConfigPath -Raw | ConvertFrom-Json
+    $smokeResult = Invoke-SmokeCertification -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $smokeConfigPath -ScenarioConfig $smokeConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds
 
-    $timeoutConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'timeout' -Targets @([
-        pscustomobject]@{
-            service = 'qa'
-            endpointName = 'timeout'
-            url = 'http://10.255.255.1/'
-            method = 'GET'
-            expectedHttpCodes = @(200)
-            enabled = $true
-        }
-    ) -ProbeRunOverrides @{
-        connectTimeoutSeconds = 1
-        maxTimeSeconds = 4
-    }
-    $timeoutConfig = Get-Content -Path $timeoutConfigPath -Raw | ConvertFrom-Json
-    $resilienceResults += (Invoke-ResilienceScenario -Name 'timeout_bound' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $timeoutConfigPath -ScenarioConfig $timeoutConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
-        param($ScenarioResult)
-        return (
-            -not $ScenarioResult.process.timed_out -and
-            $ScenarioResult.process.duration_ms -le 15000 -and
-            $ScenarioResult.new_curl_process_ids.Count -eq 0 -and
-            (Get-ParsedLogFailureCount -ParsedLog $ScenarioResult.parsed_log) -ge 1
-        )
-    })
+    $resilienceResults = @()
 
-    $influxOutageConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'influx-outage' -Targets @([
-        pscustomobject]@{
-            service = 'qa'
-            endpointName = 'influx-outage'
-            url = 'https://cx-radar-probe-test.invalid/'
-            method = 'GET'
-            expectedHttpCodes = @(200)
-            enabled = $true
-        }
-    ) -ProbeRunOverrides @{
-        connectTimeoutSeconds = 2
-        maxTimeSeconds = 6
-    } -InfluxOverrides @{
-        baseUrl = 'http://127.0.0.1:1'
-    }
-    $influxOutageConfig = Get-Content -Path $influxOutageConfigPath -Raw | ConvertFrom-Json
-    $dummyTokenName = [string]$influxOutageConfig.influx.tokenEnvVar
-    $resilienceResults += (Invoke-ResilienceScenario -Name 'influx_outage' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $influxOutageConfigPath -ScenarioConfig $influxOutageConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $false -EnvironmentOverrides @{ $dummyTokenName = 'dummy-token' } -PassCondition {
-        param($ScenarioResult)
-        return (
-            -not $ScenarioResult.process.timed_out -and
-            $ScenarioResult.process.exit_code -ne 0 -and
-            $ScenarioResult.new_curl_process_ids.Count -eq 0 -and
-            $ScenarioResult.parsed_log.error_count -ge 1
-        )
-    })
-
-    if ($IncludeTlsScenario) {
-        $tlsConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'tls-failure' -Targets @([
+    if ($RunResilienceChecks) {
+        $dnsConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'dns-failure' -Targets @([
             pscustomobject]@{
                 service = 'qa'
-                endpointName = 'tls-failure'
-                url = 'https://expired.badssl.com/'
+                endpointName = 'dns-failure'
+                url = 'https://cx-radar-probe-test.invalid/'
                 method = 'GET'
                 expectedHttpCodes = @(200)
                 enabled = $true
             }
         ) -ProbeRunOverrides @{
-            connectTimeoutSeconds = 5
-            maxTimeSeconds = 15
+            connectTimeoutSeconds = 2
+            maxTimeSeconds = 6
         }
-        $tlsConfig = Get-Content -Path $tlsConfigPath -Raw | ConvertFrom-Json
-        $resilienceResults += (Invoke-ResilienceScenario -Name 'tls_failure' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $tlsConfigPath -ScenarioConfig $tlsConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
+        $dnsConfig = Get-Content -Path $dnsConfigPath -Raw | ConvertFrom-Json
+        $resilienceResults += (Invoke-ResilienceScenario -Name 'dns_failure' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $dnsConfigPath -ScenarioConfig $dnsConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
             param($ScenarioResult)
             return (
                 -not $ScenarioResult.process.timed_out -and
+                $ScenarioResult.process.exit_code -eq 0 -and
                 $ScenarioResult.new_curl_process_ids.Count -eq 0 -and
                 (Get-ParsedLogFailureCount -ParsedLog $ScenarioResult.parsed_log) -ge 1
             )
         })
+
+        $timeoutConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'timeout' -Targets @([
+            pscustomobject]@{
+                service = 'qa'
+                endpointName = 'timeout'
+                url = 'http://10.255.255.1/'
+                method = 'GET'
+                expectedHttpCodes = @(200)
+                enabled = $true
+            }
+        ) -ProbeRunOverrides @{
+            connectTimeoutSeconds = 1
+            maxTimeSeconds = 4
+        }
+        $timeoutConfig = Get-Content -Path $timeoutConfigPath -Raw | ConvertFrom-Json
+        $resilienceResults += (Invoke-ResilienceScenario -Name 'timeout_bound' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $timeoutConfigPath -ScenarioConfig $timeoutConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
+            param($ScenarioResult)
+            return (
+                -not $ScenarioResult.process.timed_out -and
+                $ScenarioResult.process.duration_ms -le 15000 -and
+                $ScenarioResult.new_curl_process_ids.Count -eq 0 -and
+                (Get-ParsedLogFailureCount -ParsedLog $ScenarioResult.parsed_log) -ge 1
+            )
+        })
+
+        $influxOutageConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'influx-outage' -Targets @([
+            pscustomobject]@{
+                service = 'qa'
+                endpointName = 'influx-outage'
+                url = 'https://cx-radar-probe-test.invalid/'
+                method = 'GET'
+                expectedHttpCodes = @(200)
+                enabled = $true
+            }
+        ) -ProbeRunOverrides @{
+            connectTimeoutSeconds = 2
+            maxTimeSeconds = 6
+        } -InfluxOverrides @{
+            baseUrl = 'http://127.0.0.1:1'
+        }
+        $influxOutageConfig = Get-Content -Path $influxOutageConfigPath -Raw | ConvertFrom-Json
+        $dummyTokenName = [string]$influxOutageConfig.influx.tokenEnvVar
+        $resilienceResults += (Invoke-ResilienceScenario -Name 'influx_outage' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $influxOutageConfigPath -ScenarioConfig $influxOutageConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $false -EnvironmentOverrides @{ $dummyTokenName = 'dummy-token' } -PassCondition {
+            param($ScenarioResult)
+            return (
+                -not $ScenarioResult.process.timed_out -and
+                $ScenarioResult.process.exit_code -ne 0 -and
+                $ScenarioResult.new_curl_process_ids.Count -eq 0 -and
+                $ScenarioResult.parsed_log.error_count -ge 1
+            )
+        })
+
+        if ($IncludeTlsScenario) {
+            $tlsConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'tls-failure' -Targets @([
+                pscustomobject]@{
+                    service = 'qa'
+                    endpointName = 'tls-failure'
+                    url = 'https://expired.badssl.com/'
+                    method = 'GET'
+                    expectedHttpCodes = @(200)
+                    enabled = $true
+                }
+            ) -ProbeRunOverrides @{
+                connectTimeoutSeconds = 5
+                maxTimeSeconds = 15
+            }
+            $tlsConfig = Get-Content -Path $tlsConfigPath -Raw | ConvertFrom-Json
+            $resilienceResults += (Invoke-ResilienceScenario -Name 'tls_failure' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $tlsConfigPath -ScenarioConfig $tlsConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
+                param($ScenarioResult)
+                return (
+                    -not $ScenarioResult.process.timed_out -and
+                    $ScenarioResult.new_curl_process_ids.Count -eq 0 -and
+                    (Get-ParsedLogFailureCount -ParsedLog $ScenarioResult.parsed_log) -ge 1
+                )
+            })
+        }
+    }
+
+    $failedResilienceResults = @($resilienceResults | Where-Object { -not $_.passed })
+
+    $summary = [pscustomobject]@{
+        started_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+        scenario_root = $scenarioRoot
+        validate = $validateResult
+        smoke = $smokeResult
+        resilience = @($resilienceResults)
+        overall_passed = [bool](
+            $validateResult.ProbeScriptSyntax -eq 'OK' -and
+            $validateResult.ConfigFile -eq 'OK' -and
+            $validateResult.CurlAvailable -and
+            $smokeResult.passed -and
+            ($failedResilienceResults.Count -eq 0)
+        )
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+        $resolvedOutputPath = Get-FullPathFromBase -BasePath $scriptBasePath -ChildPath $OutputPath
+        Write-JsonFile -Path $resolvedOutputPath -Value $summary
+    }
+
+    [pscustomobject]$summary
+}
+finally {
+    if (Test-Path -Path $scenarioRoot -PathType Container) {
+        Remove-Item -Path $scenarioRoot -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
     }
 }
-
-$failedResilienceResults = @($resilienceResults | Where-Object { -not $_.passed })
-
-$summary = [pscustomobject]@{
-    started_at_utc = (Get-Date).ToUniversalTime().ToString('o')
-    scenario_root = $scenarioRoot
-    validate = $validateResult
-    smoke = $smokeResult
-    resilience = @($resilienceResults)
-    overall_passed = [bool](
-        $validateResult.ProbeScriptSyntax -eq 'OK' -and
-        $validateResult.ConfigFile -eq 'OK' -and
-        $validateResult.CurlAvailable -and
-        $smokeResult.passed -and
-        ($failedResilienceResults.Count -eq 0)
-    )
-}
-
-if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
-    $resolvedOutputPath = Get-FullPathFromBase -BasePath $scriptBasePath -ChildPath $OutputPath
-    Write-JsonFile -Path $resolvedOutputPath -Value $summary
-}
-
-[pscustomobject]$summary

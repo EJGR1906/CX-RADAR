@@ -165,7 +165,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 
 - **Logs locales:** Revisa la carpeta `logs/` donde se genera un archivo diario con el detalle de cada medición.
 - **InfluxDB Cloud:** Verifica que las métricas aparezcan en tu bucket configurado.
-- **Grafana Cloud:** Importa el dashboard incluido en `grafana/dashboards/qoe-http-overview.json` para ver gráficas interactivas de disponibilidad, latencia y velocidad por servicio.
+- **Grafana Cloud:** Importa los dashboards incluidos en `grafana/dashboards/qoe-national-global.json` (Vista Global Nacional) y `grafana/dashboards/qoe-probe-detail.json` (Detalle por Sonda) para ver gráficas interactivas de disponibilidad, latencia y velocidad por servicio.
 
 ---
 

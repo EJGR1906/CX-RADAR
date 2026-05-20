@@ -1670,7 +1670,16 @@ function Invoke-BurstTrafficMeasurement {
 
                 $downloadAttemptCount++
                 $downloadFilePath = Join-Path -Path $transferDirectory -ChildPath ('download-{0}.bin' -f $downloadAttemptCount)
-                $attemptDurationMs = Invoke-WebRequestToFile -Uri $downloadUrl -OutputPath $downloadFilePath -TimeoutSeconds $remainingSeconds -UserAgent $userAgent
+
+                $headers = @{}
+                if ($targetTransferBytes -gt 0) {
+                    $bytesToRequest = $targetTransferBytes - $downloadBytes
+                    if ($bytesToRequest -gt 0) {
+                        $headers['Range'] = 'bytes=0-{0}' -f [int64]($bytesToRequest - 1)
+                    }
+                }
+
+                $attemptDurationMs = Invoke-WebRequestToFile -Uri $downloadUrl -OutputPath $downloadFilePath -TimeoutSeconds $remainingSeconds -UserAgent $userAgent -Headers $headers
                 $attemptBytes = if (Test-Path -Path $downloadFilePath -PathType Leaf) { [double](Get-Item -Path $downloadFilePath).Length } else { 0.0 }
 
                 $downloadDurationMs += $attemptDurationMs
@@ -2440,7 +2449,26 @@ try {
         $writeUri = "{0}/api/v2/write?org={1}&bucket={2}&precision={3}" -f $config.influx.baseUrl.TrimEnd('/'), [System.Uri]::EscapeDataString([string]$config.influx.org), [System.Uri]::EscapeDataString([string]$config.influx.bucket), [System.Uri]::EscapeDataString([string]$config.influx.precision)
         $payload = ($lines -join "`n")
 
-        Invoke-RestMethod -Uri $writeUri -Method Post -Headers @{ Authorization = "Token $tokenValue" } -Body $payload -ContentType 'text/plain; charset=utf-8' -TimeoutSec $influxWriteTimeoutSeconds | Out-Null
+        try {
+            Invoke-RestMethod -Uri $writeUri -Method Post -Headers @{ Authorization = "Token $tokenValue" } -Body $payload -ContentType 'text/plain; charset=utf-8' -TimeoutSec $influxWriteTimeoutSeconds | Out-Null
+        }
+        catch [System.Net.WebException] {
+            $webEx = $_.Exception
+            $response = $webEx.Response
+            if ($null -ne $response) {
+                $stream = $response.GetResponseStream()
+                if ($null -ne $stream) {
+                    $reader = New-Object System.IO.StreamReader($stream)
+                    $responseBody = $reader.ReadToEnd()
+                    $reader.Close()
+                    $stream.Close()
+                    if (-not [string]::IsNullOrWhiteSpace($responseBody)) {
+                        throw (New-Object System.Net.WebException("InfluxDB write failed. Response body: $responseBody", $webEx))
+                    }
+                }
+            }
+            throw
+        }
         $probeFields.write_succeeded = $true
         $writeSucceeded = $true
         Write-Log -Message ("Wrote {0} measurement lines to InfluxDB." -f $lines.Count) -LogPath $logPath
@@ -2463,7 +2491,26 @@ try {
     if (-not $SkipInfluxWrite -and $probeFields.write_succeeded) {
         $writeUri = "{0}/api/v2/write?org={1}&bucket={2}&precision={3}" -f $config.influx.baseUrl.TrimEnd('/'), [System.Uri]::EscapeDataString([string]$config.influx.org), [System.Uri]::EscapeDataString([string]$config.influx.bucket), [System.Uri]::EscapeDataString([string]$config.influx.precision)
         $probeOnlyPayload = $lines[-1]
-        Invoke-RestMethod -Uri $writeUri -Method Post -Headers @{ Authorization = "Token $tokenValue" } -Body $probeOnlyPayload -ContentType 'text/plain; charset=utf-8' -TimeoutSec $influxWriteTimeoutSeconds | Out-Null
+        try {
+            Invoke-RestMethod -Uri $writeUri -Method Post -Headers @{ Authorization = "Token $tokenValue" } -Body $probeOnlyPayload -ContentType 'text/plain; charset=utf-8' -TimeoutSec $influxWriteTimeoutSeconds | Out-Null
+        }
+        catch [System.Net.WebException] {
+            $webEx = $_.Exception
+            $response = $webEx.Response
+            if ($null -ne $response) {
+                $stream = $response.GetResponseStream()
+                if ($null -ne $stream) {
+                    $reader = New-Object System.IO.StreamReader($stream)
+                    $responseBody = $reader.ReadToEnd()
+                    $reader.Close()
+                    $stream.Close()
+                    if (-not [string]::IsNullOrWhiteSpace($responseBody)) {
+                        throw (New-Object System.Net.WebException("InfluxDB write failed. Response body: $responseBody", $webEx))
+                    }
+                }
+            }
+            throw
+        }
     }
 
     Write-Log -Message ("QoE probe finished. Success={0}, Failure={1}, Duration={2} ms" -f $successCount, $failureCount, [math]::Round(((Get-Date) - $scriptStart).TotalMilliseconds, 2)) -LogPath $logPath

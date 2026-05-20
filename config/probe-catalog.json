@@ -45,9 +45,11 @@
       "endpointName": "microsoft-100mb-test",
       "type": "speedtest",
       "speedTestMethod": "burst",
-        "uploadMeasurementMethod": "curl-upload",
+      "uploadMeasurementMethod": "curl-upload",
       "host": "download.microsoft.com",
       "downloadUrl": "https://download.microsoft.com/download/8/4/A/84A35BF1-DAFE-4AE8-82AF-AD2AE20B6B14/directx_Jun2010_redist.exe",
+      "targetTransferBytes": 8388608,
+      "maxDownloadIterations": 4,
       "enabled": true
     },
     {

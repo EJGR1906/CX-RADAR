@@ -279,12 +279,15 @@ New-DirectoryIfMissing -Path $downloadsDirectory
 $nodeZipFileName = [System.IO.Path]::GetFileName(([System.Uri]$NodeZipUrl).AbsolutePath)
 $nodeZipPath = Join-Path -Path $downloadsDirectory -ChildPath $nodeZipFileName
 
-if ($Force -or -not (Test-Path -Path $nodeZipPath -PathType Leaf)) {
-    Invoke-FileDownload -Uri $NodeZipUrl -OutputPath $nodeZipPath
+if ($Force -or -not (Test-PortableNodeRuntime -NodeRoot $nodeRoot)) {
+    if (-not (Test-Path -Path $nodeZipPath -PathType Leaf)) {
+        Invoke-FileDownload -Uri $NodeZipUrl -OutputPath $nodeZipPath
+    }
+    Expand-ArchiveFlat -ZipPath $nodeZipPath -DestinationPath $nodeRoot
 }
 
-if ($Force -or -not (Test-PortableNodeRuntime -NodeRoot $nodeRoot)) {
-    Expand-ArchiveFlat -ZipPath $nodeZipPath -DestinationPath $nodeRoot
+if (Test-Path -Path $nodeZipPath -PathType Leaf) {
+    Remove-Item -Path $nodeZipPath -Force -ErrorAction SilentlyContinue
 }
 
 if ($Force -or -not (Test-Path -Path $ytDlpPath -PathType Leaf)) {
