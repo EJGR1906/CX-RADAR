@@ -30,7 +30,7 @@
     "measurement": "qoe_http_check",
     "probeMeasurement": "qoe_probe_run",
     "realMetricsMeasurement": "qoe_real_metrics",
-    "speedTestTimeoutSeconds": 300,
+    "speedTestTimeoutSeconds": 420,
     "portableTools": {
       "nodeExe": "bin\\node\\node.exe",
       "fastCliScript": "bin\\fast-cli\\node_modules\\fast-cli\\distribution\\cli.js",

@@ -1301,9 +1301,9 @@ function Patch-FastCliTimeout {
     $apiJsPath = Join-Path -Path (Split-Path -Path $FastCliScriptPath -Parent) -ChildPath 'api.js'
     if (Test-Path -Path $apiJsPath -PathType Leaf) {
         $content = Get-Content -Path $apiJsPath -Raw
-        if ($content -match 'timeoutMs\s*=\s*90000') {
-            Write-Verbose "Patching fast-cli timeout from 90s to 240s in $apiJsPath"
-            $content = $content -replace 'timeoutMs\s*=\s*90000', 'timeoutMs = 240000'
+        if ($content -match 'timeoutMs\s*=\s*(90000|240000|390000)') {
+            Write-Verbose "Patching fast-cli timeout to 390s in $apiJsPath"
+            $content = $content -replace 'timeoutMs\s*=\s*(90000|240000|390000)', 'timeoutMs = 390000'
             Set-Content -Path $apiJsPath -Value $content -Force
         }
     }
