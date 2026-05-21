@@ -2,6 +2,20 @@
 
 All notable changes to CX-Radar are documented here.
 
+## [Unreleased] — 2026-05-21
+
+### Mejoras de Confiabilidad
+
+#### Parche de Timeout en Fast-Cli (`scripts/setup-portable.ps1`, `scripts/qoe-probe.ps1`)
+- **Problema:** `fast-cli` tiene un timeout interno de 90 segundos hardcoded. En conexiones lentas o congestionadas, la ejecución combinada de subida y bajada de Netflix supera este límite, haciendo que el test falle y devuelva `0 Mbps`.
+- **Solución:** Se añadió la rutina `Patch-FastCliTimeout` para incrementar automáticamente el timeout interno de `fast-cli` a 240 segundos (4 minutos) durante la instalación y el inicio de la sonda.
+
+#### Eliminación de Overrides de Directorio Temporal para Puppeteer (`scripts/qoe-probe.ps1`)
+- **Problema:** Sobrescribir `TEMP` y `TMP` hacia la carpeta del repositorio (`bin/tmp`) provocaba conflictos de bloqueo de archivos y perfiles colgados de Chromium en Windows debido a indexadores o antivirus activos en la carpeta de trabajo.
+- **Solución:** Se eliminaron las variables `TEMP`, `TMP` y `PUPPETEER_TMP_DIR` del entorno de ejecución de `fast-cli` para delegar la creación de perfiles al directorio temporal estándar del usuario en Windows (`AppData/Local/Temp`).
+
+---
+
 ## [Unreleased] — 2026-05-20
 
 ### Optimizaciones de Rendimiento

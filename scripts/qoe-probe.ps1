@@ -1288,6 +1288,27 @@ function Test-FastCliNavigationTimeout {
     return (-not [string]::IsNullOrWhiteSpace($Output) -and $Output -match 'Navigation timeout of [0-9]+ ms exceeded')
 }
 
+function Patch-FastCliTimeout {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FastCliScriptPath
+    )
+
+    if (-not (Test-Path -Path $FastCliScriptPath -PathType Leaf)) {
+        return
+    }
+
+    $apiJsPath = Join-Path -Path (Split-Path -Path $FastCliScriptPath -Parent) -ChildPath 'api.js'
+    if (Test-Path -Path $apiJsPath -PathType Leaf) {
+        $content = Get-Content -Path $apiJsPath -Raw
+        if ($content -match 'timeoutMs\s*=\s*90000') {
+            Write-Verbose "Patching fast-cli timeout from 90s to 240s in $apiJsPath"
+            $content = $content -replace 'timeoutMs\s*=\s*90000', 'timeoutMs = 240000'
+            Set-Content -Path $apiJsPath -Value $content -Force
+        }
+    }
+}
+
 function Invoke-FastCliMeasurement {
     param(
         [Parameter(Mandatory = $true)]
@@ -1310,14 +1331,11 @@ function Invoke-FastCliMeasurement {
 
     Ensure-DirectoryExists -Path $PortableTools.PuppeteerCacheDir
 
-    $temporaryDirectory = New-MeasurementTemporaryDirectory -PortableTools $PortableTools -Prefix 'fast-cli' -Target $Target
+    Patch-FastCliTimeout -FastCliScriptPath $PortableTools.FastCliScript
 
     try {
         $environmentVariables = @{
             PUPPETEER_CACHE_DIR = $PortableTools.PuppeteerCacheDir
-            PUPPETEER_TMP_DIR = $temporaryDirectory
-            TEMP = $temporaryDirectory
-            TMP = $temporaryDirectory
         }
 
         $timeoutSeconds = Get-SpeedTestTimeoutSeconds -Target $Target -ProbeRun $ProbeRun -DefaultValue 180
@@ -1391,7 +1409,12 @@ function Invoke-FastCliMeasurement {
         }
     }
     finally {
-        Remove-PathIfExists -Path $temporaryDirectory
+        if ($null -ne $PortableTools -and -not [string]::IsNullOrWhiteSpace($PortableTools.PuppeteerCacheDir)) {
+            $puppeteerCachePath = $PortableTools.PuppeteerCacheDir
+            Get-Process -Name 'chrome', 'chrome-headless-shell' -ErrorAction SilentlyContinue |
+                Where-Object { $null -ne $_.Path -and $_.Path.StartsWith($puppeteerCachePath, [System.StringComparison]::OrdinalIgnoreCase) } |
+                Stop-Process -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 

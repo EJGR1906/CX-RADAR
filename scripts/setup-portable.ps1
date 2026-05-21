@@ -150,6 +150,28 @@ function Get-FastCliScriptPath {
     return (Join-Path -Path $FastCliRoot -ChildPath 'node_modules\fast-cli\distribution\cli.js')
 }
 
+function Patch-FastCliTimeout {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FastCliScriptPath
+    )
+
+    if (-not (Test-Path -Path $FastCliScriptPath -PathType Leaf)) {
+        return
+    }
+
+    $apiJsPath = Join-Path -Path (Split-Path -Path $FastCliScriptPath -Parent) -ChildPath 'api.js'
+    if (Test-Path -Path $apiJsPath -PathType Leaf) {
+        $content = Get-Content -Path $apiJsPath -Raw
+        if ($content -match 'timeoutMs\s*=\s*90000') {
+            Write-Verbose "Patching fast-cli timeout from 90s to 240s in $apiJsPath"
+            $content = $content -replace 'timeoutMs\s*=\s*90000', 'timeoutMs = 240000'
+            Set-Content -Path $apiJsPath -Value $content -Force
+        }
+    }
+}
+
+
 function Test-FastCliInstallation {
     param(
         [Parameter(Mandatory = $true)]
@@ -247,8 +269,11 @@ function Install-FastCli {
         }
 
         $fastCliScript = Get-FastCliScriptPath -FastCliRoot $FastCliRoot
-        if ((Test-Path -Path $fastCliScript -PathType Leaf) -and (Test-FastCliInstallation -NodeRoot $NodeRoot -FastCliRoot $FastCliRoot)) {
-            return $fastCliScript
+        if (Test-Path -Path $fastCliScript -PathType Leaf) {
+            Patch-FastCliTimeout -FastCliScriptPath $fastCliScript
+            if (Test-FastCliInstallation -NodeRoot $NodeRoot -FastCliRoot $FastCliRoot) {
+                return $fastCliScript
+            }
         }
     }
 
@@ -302,6 +327,8 @@ if ($Force -and (Test-Path -Path $fastCliRoot -PathType Container)) {
 if ($Force -or -not (Test-FastCliInstallation -NodeRoot $nodeRoot -FastCliRoot $fastCliRoot)) {
     $fastCliScript = Install-FastCli -NodeRoot $nodeRoot -FastCliRoot $fastCliRoot -FastCliVersion $FastCliVersion -PuppeteerCacheDir $puppeteerCacheDir -NpmCacheDir $npmCacheDirectory -TemporaryDirectory $temporaryDirectory
 }
+
+Patch-FastCliTimeout -FastCliScriptPath $fastCliScript
 
 [pscustomobject]@{
     BinRoot = [string]$resolvedBinRoot

@@ -207,6 +207,10 @@ No necesitas intervenir manualmente para mantener limpio el entorno.
 **¿Necesito instalar algo en mi sistema?**
 No. Todas las herramientas se descargan dentro del proyecto en la carpeta `bin/`. Tu sistema no se modifica.
 
+**¿Por qué los perfiles temporales de fast-cli/Chromium se guardan en la carpeta temporal del usuario?**
+Para prevenir conflictos de bloqueo de archivos en Windows. Si los perfiles de Chromium de Puppeteer se guardaran en la carpeta del repositorio (`bin/tmp`), los antivirus locales, indexadores de búsqueda o software de desarrollo (como VS Code) mantendrían archivos abiertos, provocando fallas e impidiendo que las pruebas completen su ejecución. Usar el directorio temporal estándar del usuario (`AppData/Local/Temp`) asegura un aislamiento óptimo y libre de bloqueos.
+
+
 **¿Consume muchos recursos?**
 No. La sonda se ejecuta unos pocos minutos cada 10 minutos, usa poca memoria y no deja procesos corriendo en segundo plano fuera de su ventana de ejecución.
 
