@@ -1301,9 +1301,28 @@ function Patch-FastCliTimeout {
     $apiJsPath = Join-Path -Path (Split-Path -Path $FastCliScriptPath -Parent) -ChildPath 'api.js'
     if (Test-Path -Path $apiJsPath -PathType Leaf) {
         $content = Get-Content -Path $apiJsPath -Raw
+        $modified = $false
+
         if ($content -match 'timeoutMs\s*=\s*(90000|240000|390000)') {
             Write-Verbose "Patching fast-cli timeout to 390s in $apiJsPath"
             $content = $content -replace 'timeoutMs\s*=\s*(90000|240000|390000)', 'timeoutMs = 390000'
+            $modified = $true
+        }
+
+        if ($content -notlike '*AutomationControlled*') {
+            Write-Verbose "Patching fast-cli to disable automation detection in $apiJsPath"
+            $content = $content -replace "'--ignore-certificate-errors'", "'--ignore-certificate-errors', '--disable-blink-features=AutomationControlled'"
+            $modified = $true
+        }
+
+        if ($content -notlike '*setUserAgent*') {
+            Write-Verbose "Patching fast-cli to use a real User Agent in $apiJsPath"
+            $userAgentStr = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+            $content = $content -replace 'const page = await browser.newPage\(\);', "const page = await browser.newPage();`n    await page.setUserAgent('$userAgentStr');"
+            $modified = $true
+        }
+
+        if ($modified) {
             Set-Content -Path $apiJsPath -Value $content -Force
         }
     }
