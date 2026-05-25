@@ -189,6 +189,41 @@ CX-Radar/
 └── tmp/                  ← Archivos temporales (se limpian automáticamente)
 ```
 
+## Referencia de Parámetros de los Scripts
+
+Para usuarios avanzados y tareas de automatización, los scripts de PowerShell admiten los siguientes parámetros de línea de comandos:
+
+### 1. `qoe-probe.ps1` (Script Principal)
+Ejecuta las mediciones y las escribe en InfluxDB.
+- **`-ConfigPath <string>`**: Ruta personalizada al archivo de configuración de la sonda (por defecto: `config/probe-catalog.json`).
+- **`-RunReportPath <string>`**: Ruta donde guardar un reporte JSON estructurado con los resultados completos de la ejecución. Útil para integraciones de control de calidad o automatización.
+- **`-SkipInfluxWrite`**: Interruptor (Switch) para ejecutar la sonda sin enviar las métricas a InfluxDB (modo ejecución en seco).
+
+### 2. `validate-qoe-probe.ps1` (Script de Validación)
+Verifica la sintaxis, dependencias, rutas y credenciales necesarias.
+- **`-ProbeScriptPath <string>`**: Ruta al script de la sonda a validar (por defecto: `scripts/qoe-probe.ps1`).
+- **`-ConfigPath <string>`**: Ruta al archivo de configuración de catálogo a validar (por defecto: `config/probe-catalog.json`).
+
+### 3. `register-qoe-task.ps1` (Registro de Tarea)
+Registra la sonda en el Programador de Tareas de Windows.
+- **`-TaskName <string>`**: Nombre de la tarea programada (por defecto: `CX-Radar-QoE-Probe`).
+- **`-ScriptPath <string>`**: Ruta al script de la sonda (por defecto: `scripts/qoe-probe.ps1`).
+- **`-ConfigPath <string>`**: Ruta al catálogo de configuración (por defecto: `config/probe-catalog.json`).
+- **`-IntervalMinutes <int>`**: Intervalo de ejecución en minutos (por defecto: `10`).
+- **`-ExecutionPolicy <string>`**: Política de ejecución a configurar en la tarea (`RemoteSigned`, `AllSigned`, o `Bypass`; por defecto: `RemoteSigned`).
+- **`-RunAsCurrentUser`**: Interruptor (Switch) para forzar el registro de la tarea bajo la sesión interactiva del usuario actual (útil si se deniega el acceso sin privilegios elevados).
+- **`-TaskDescription <string>`**: Descripción personalizada de la tarea.
+
+### 4. `run-qoe-certification.ps1` (Script de Certificación de QA)
+Ejecuta suites de prueba (smoke y resiliencia) para certificar el estado de la sonda.
+- **`-ProbeScriptPath <string>`**: Ruta al script de la sonda a testear (por defecto: `scripts/qoe-probe.ps1`).
+- **`-ValidateScriptPath <string>`**: Ruta al script de validación a testear (por defecto: `scripts/validate-qoe-probe.ps1`).
+- **`-ConfigPath <string>`**: Ruta al catálogo de configuración (por defecto: `config/probe-catalog.json`).
+- **`-OutputPath <string>`**: Ruta donde exportar los resultados detallados en formato JSON.
+- **`-MaxProbeRuntimeSeconds <int>`**: Tiempo máximo de ejecución permitido para la sonda durante los tests (por defecto: `120`).
+- **`-RunResilienceChecks`**: Interruptor (Switch) para ejecutar pruebas adicionales de resiliencia (falla DNS, caída de InfluxDB y timeout).
+- **`-IncludeTlsScenario`**: Interruptor (Switch) para incluir el escenario de fallo TLS (requiere conexión a internet activa para badssl.com).
+
 ---
 
 ## Mantenimiento automático

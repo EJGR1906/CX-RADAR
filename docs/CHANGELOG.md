@@ -2,6 +2,16 @@
 
 All notable changes to CX-Radar are documented here.
 
+## [Unreleased] — 2026-05-22
+
+### Mejoras de Confiabilidad
+
+#### Evasión de Bloqueos en Fast-Cli (Netflix) y Ajuste de Timeout (`scripts/setup-portable.ps1`, `scripts/qoe-probe.ps1`)
+- **Problema:** Netflix / Fast.com bloquea o ralentiza con throttling de red las ejecuciones de Puppeteer/Chromium automatizadas bajo configuraciones por defecto, resultando en timeouts constantes (incluso superando los 4 minutos).
+- **Solución:** Se actualizó `Patch-FastCliTimeout` para inyectar en `api.js` de `fast-cli` el flag de inicio de Chromium `--disable-blink-features=AutomationControlled` y definir un `User-Agent` de navegador real de Windows (`Chrome/124.0.0.0`). Adicionalmente, se incrementó el parche del timeout interno de `fast-cli` de 240 a 390 segundos para tolerar mejor conexiones degradadas. Esto redujo el tiempo del test exitoso de Netflix a ~3 segundos.
+
+---
+
 ## [Unreleased] — 2026-05-21
 
 ### Mejoras de Confiabilidad
