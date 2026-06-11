@@ -1,0 +1,16 @@
+- MVP implemented with PowerShell scripts under scripts/ and JSON config under config/.
+- Primary probe script: scripts/qoe-probe.ps1.
+- Local validation command: Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force; & .\scripts\validate-qoe-probe.ps1 | Format-List
+- Dry run command without InfluxDB writes: Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force; & .\scripts\qoe-probe.ps1 -SkipInfluxWrite
+- Scheduled task helper: scripts/register-qoe-task.ps1.
+- Token bootstrap helper: scripts/set-influx-token.ps1.
+- QA certification harness: scripts/run-qoe-certification.ps1.
+- Grafana dashboard pack: grafana/dashboards/qoe-http-overview.json.
+- Flux query library: grafana/queries/qoe-http-flux-examples.md.
+- Daily logs written under logs/qoe-probe-YYYY-MM-DD.log.
+- Preferred token source is a DPAPI-protected credential file at %LOCALAPPDATA%\CX-Radar\secrets\influxdb-token.credential.xml, with INFLUXDB_TOKEN as fallback.
+- Probe config adds default start jitter and per-target pacing to reduce fixed-schedule burst patterns.
+- InfluxDB writes now use TimeoutSec for Windows PowerShell 5.1 compatibility, configured by influx.writeTimeoutSeconds.
+- Grafana Cloud setup guide: docs/observability/grafana-cloud-setup.md.
+- QA validation runbook: docs/qa/validation-runbook.md.
+- Current docs live under docs/architecture, docs/operations, docs/security, docs/qa, docs/observability, and docs/integrations.
