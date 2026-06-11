@@ -1,0 +1,990 @@
+{
+  "annotations": [
+    {
+      "kind": "AnnotationQuery",
+      "spec": {
+        "builtIn": true,
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "query": {
+          "datasource": {
+            "name": "-- Grafana --"
+          },
+          "group": "grafana",
+          "kind": "DataQuery",
+          "spec": {
+            "limit": 100,
+            "matchAny": false,
+            "tags": [],
+            "type": "dashboard"
+          },
+          "version": "v0"
+        }
+      }
+    }
+  ],
+  "cursorSync": "Crosshair",
+  "description": "Vista Global (nacional) de QoE para CX-Radar con mapa de ubicaciones de sondas en Venezuela.",
+  "editable": true,
+  "elements": {
+    "global-kpi-probes": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "refId": "A",
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"run_duration_ms\")\n  |> group(columns: [\"probe_id\"])\n  |> last()\n  |> group()\n  |> count()\n  |> map(fn: (r) => ({_time: now(), _field: \"Sondas Activas\", _value: float(v: r._value)}))\n  |> group(columns: [\"_field\"])",
+                      "range": false
+                    },
+                    "version": "v0"
+                  }
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Cantidad de sondas que reportaron en los ultimos 10 minutos.",
+        "id": 101,
+        "links": [],
+        "title": "Sondas Activas",
+        "vizConfig": {
+          "group": "stat",
+          "kind": "VizConfig",
+          "version": "13.1.0-25153870157",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "decimals": 0,
+                "unit": "short",
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1
+                    },
+                    {
+                      "color": "green",
+                      "value": 2
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "colorMode": "background",
+              "graphMode": "none",
+              "justifyMode": "center",
+              "orientation": "auto",
+              "percentChangeColorMode": "standard",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showPercentChange": false,
+              "textMode": "value_and_name",
+              "wideLayout": true
+            }
+          }
+        }
+      }
+    },
+    "global-kpi-services": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "refId": "A",
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"qoe_real_metrics\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> map(fn: (r) => ({r with _value: if r._value then 1.0 else 0.0}))\n  |> group(columns: [\"service\"])\n  |> mean()\n  |> map(fn: (r) => ({r with _value: if r._value >= 0.95 then 1.0 else 0.0}))\n  |> group()\n  |> sum()\n  |> map(fn: (r) => ({_time: now(), _field: \"Servicios OK\", _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                      "range": false
+                    },
+                    "version": "v0"
+                  }
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Servicios con disponibilidad >= 95% en los ultimos 30 minutos.",
+        "id": 102,
+        "links": [],
+        "title": "Servicios OK",
+        "vizConfig": {
+          "group": "stat",
+          "kind": "VizConfig",
+          "version": "13.1.0-25153870157",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "decimals": 0,
+                "unit": "short",
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 4
+                    },
+                    {
+                      "color": "green",
+                      "value": 5
+                    }
+                  ]
+                },
+                "max": 5,
+                "min": 0
+              },
+              "overrides": []
+            },
+            "options": {
+              "colorMode": "background",
+              "graphMode": "none",
+              "justifyMode": "center",
+              "orientation": "auto",
+              "percentChangeColorMode": "standard",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showPercentChange": false,
+              "textMode": "value_and_name",
+              "wideLayout": true
+            }
+          }
+        }
+      }
+    },
+    "global-kpi-avail": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "refId": "A",
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"qoe_real_metrics\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> map(fn: (r) => ({r with _value: if r._value then 100.0 else 0.0}))\n  |> group()\n  |> mean()\n  |> map(fn: (r) => ({_time: now(), _field: \"Disponibilidad\", _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                      "range": false
+                    },
+                    "version": "v0"
+                  }
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Promedio nacional de disponibilidad de todos los servicios y sondas en los ultimos 30 minutos. Verde >= 99%, Amarillo >= 95%, Rojo < 95%.",
+        "id": 103,
+        "links": [],
+        "title": "Disponibilidad Nacional",
+        "vizConfig": {
+          "group": "stat",
+          "kind": "VizConfig",
+          "version": "13.1.0-25153870157",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "decimals": 1,
+                "unit": "percent",
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 95
+                    },
+                    {
+                      "color": "green",
+                      "value": 99
+                    }
+                  ]
+                },
+                "max": 100,
+                "min": 0
+              },
+              "overrides": []
+            },
+            "options": {
+              "colorMode": "background",
+              "graphMode": "none",
+              "justifyMode": "center",
+              "orientation": "auto",
+              "percentChangeColorMode": "standard",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showPercentChange": false,
+              "textMode": "value_and_name",
+              "wideLayout": true
+            }
+          }
+        }
+      }
+    },
+    "global-kpi-latency": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "refId": "A",
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"qoe_real_metrics\")\n  |> filter(fn: (r) => r._field == \"latency\")\n  |> group()\n  |> mean()\n  |> map(fn: (r) => ({_time: now(), _field: \"Latencia Media\", _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                      "range": false
+                    },
+                    "version": "v0"
+                  }
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Latencia promedio nacional de todas las sondas y servicios en los ultimos 30 minutos.",
+        "id": 104,
+        "links": [],
+        "title": "Latencia Media Nacional",
+        "vizConfig": {
+          "group": "stat",
+          "kind": "VizConfig",
+          "version": "13.1.0-25153870157",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "decimals": 0,
+                "unit": "ms",
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 80
+                    },
+                    {
+                      "color": "red",
+                      "value": 200
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "colorMode": "background",
+              "graphMode": "none",
+              "justifyMode": "center",
+              "orientation": "auto",
+              "percentChangeColorMode": "standard",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showPercentChange": false,
+              "textMode": "value_and_name",
+              "wideLayout": true
+            }
+          }
+        }
+      }
+    },
+    "global-kpi-failures": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "refId": "A",
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"failure_count\")\n  |> group(columns: [\"probe_id\"])\n  |> last()\n  |> group()\n  |> sum()\n  |> map(fn: (r) => ({_time: now(), _field: \"Fallas\", _value: float(v: r._value)}))\n  |> group(columns: [\"_field\"])",
+                      "range": false
+                    },
+                    "version": "v0"
+                  }
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Suma de fallas reportadas por todas las sondas en los ultimos 30 minutos. Verde = 0, Amarillo >= 1, Rojo >= 3.",
+        "id": 105,
+        "links": [],
+        "title": "Fallas Recientes",
+        "vizConfig": {
+          "group": "stat",
+          "kind": "VizConfig",
+          "version": "13.1.0-25153870157",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "decimals": 0,
+                "unit": "short",
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 3
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "colorMode": "background",
+              "graphMode": "none",
+              "justifyMode": "center",
+              "orientation": "auto",
+              "percentChangeColorMode": "standard",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showPercentChange": false,
+              "textMode": "value_and_name",
+              "wideLayout": true
+            }
+          }
+        }
+      }
+    },
+    "global-avail-bar": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "refId": "A",
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m)\n  |> filter(fn: (r) => r._measurement == \"qoe_real_metrics\")\n  |> filter(fn: (r) => r._field == \"available\")\n  |> map(fn: (r) => ({r with _value: if r._value then 100.0 else 0.0}))\n  |> group(columns: [\"service\"])\n  |> mean()\n  |> map(fn: (r) => ({_time: now(), _field: r.service, _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                      "range": false
+                    },
+                    "version": "v0"
+                  }
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Porcentaje de mediciones exitosas por servicio, consolidado de todas las sondas.",
+        "id": 106,
+        "links": [],
+        "title": "Disponibilidad por Servicio (ultimos 30m)",
+        "vizConfig": {
+          "group": "bargauge",
+          "kind": "VizConfig",
+          "version": "13.1.0-25153870157",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "decimals": 1,
+                "max": 100,
+                "min": 0,
+                "unit": "percent",
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 95
+                    },
+                    {
+                      "color": "green",
+                      "value": 99
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "displayMode": "lcd",
+              "minVizHeight": 16,
+              "minVizWidth": 8,
+              "namePlacement": "auto",
+              "orientation": "horizontal",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showUnfilled": true,
+              "sizing": "auto",
+              "valueMode": "color"
+            }
+          }
+        }
+      }
+    },
+    "global-probe-table": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "refId": "A",
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "allProbes = from(bucket: v.defaultBucket)\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"run_duration_ms\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 0.0, dur: r._value}))\n\nactiveProbes = from(bucket: v.defaultBucket)\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"run_duration_ms\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0, dur: r._value}))\n\nunion(tables: [allProbes, activeProbes])\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> sort(columns: [\"_value\"], desc: true)\n  |> first()\n  |> map(fn: (r) => ({\n      \"Sonda\": r.probe_id,\n      \"Sitio\": r.site,\n      \"Estado\": if r._value == 1.0 then \"Activa\" else \"Inactiva\",\n      \"Ultimo Reporte\": string(v: r._time),\n      \"Duracion ms\": r.dur\n    }))\n  |> group()\n  |> sort(columns: [\"Sitio\", \"Sonda\"])",
+                      "range": false
+                    },
+                    "version": "v0"
+                  }
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Estado actual de cada sonda. Activa = reporto en los ultimos 10 minutos. Ordenable y filtrable para 50+ sondas.",
+        "id": 109,
+        "links": [],
+        "title": "Estado de Sondas QoE",
+        "vizConfig": {
+          "group": "table",
+          "kind": "VizConfig",
+          "version": "13.1.0-25153870157",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "custom": {
+                  "align": "center",
+                  "cellOptions": {
+                    "type": "auto"
+                  },
+                  "footer": {
+                    "reducers": []
+                  },
+                  "inspect": false
+                },
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              },
+              "overrides": [
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "Estado"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.cellOptions",
+                      "value": {
+                        "type": "color-background"
+                      }
+                    },
+                    {
+                      "id": "mappings",
+                      "value": [
+                        {
+                          "type": "value",
+                          "options": {
+                            "Activa": {
+                              "color": "green",
+                              "index": 0,
+                              "text": "Activa"
+                            },
+                            "Inactiva": {
+                              "color": "red",
+                              "index": 1,
+                              "text": "Inactiva"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "custom.width",
+                      "value": 100
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "Sonda"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 200
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "Sitio"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.width",
+                      "value": 140
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "Duracion ms"
+                  },
+                  "properties": [
+                    {
+                      "id": "unit",
+                      "value": "ms"
+                    },
+                    {
+                      "id": "decimals",
+                      "value": 0
+                    }
+                  ]
+                }
+              ]
+            },
+            "options": {
+              "cellHeight": "sm",
+              "showHeader": true,
+              "sortBy": [
+                {
+                  "displayName": "Sitio"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "global-map": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "refId": "A",
+                  "query": {
+                    "datasource": {
+                      "name": "dfkh6j26t6gw0c"
+                    },
+                    "group": "influxdb",
+                    "kind": "DataQuery",
+                    "spec": {
+                      "query": "allProbes = from(bucket: v.defaultBucket)\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"run_duration_ms\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 0.0, dur: r._value}))\n\nactiveProbes = from(bucket: v.defaultBucket)\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\")\n  |> filter(fn: (r) => r._field == \"run_duration_ms\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0, dur: r._value}))\n\nunion(tables: [allProbes, activeProbes])\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> sort(columns: [\"_value\"], desc: true)\n  |> first()\n  |> map(fn: (r) => ({\n      _time: r._time,\n      \"Sonda\": r.probe_id,\n      \"Sitio\": r.site,\n      \"EstadoVal\": r._value,\n      \"Estado\": if r._value == 1.0 then \"Activa\" else \"Inactiva\",\n      latitude: if r.probe_id =~ /(?i)barquisimeto/ or r.site =~ /(?i)barquisimeto/ or r.probe_id =~ /(?i)lara/ or r.site =~ /(?i)lara/ or r.probe_id == \"eduardo-pc-trabajo\" or r.site == \"home-office\" then 10.067781458959754\n           else if r.probe_id =~ /(?i)maracaibo/ or r.site =~ /(?i)maracaibo/ or r.probe_id =~ /(?i)zulia/ or r.site =~ /(?i)zulia/ then 10.6427\n           else if r.probe_id =~ /(?i)valencia/ or r.site =~ /(?i)valencia/ or r.probe_id =~ /(?i)carabobo/ or r.site =~ /(?i)carabobo/ then 10.1620\n           else if r.probe_id =~ /(?i)caracas/ or r.site =~ /(?i)caracas/ then 10.4806\n           else 10.067781458959754,\n      longitude: if r.probe_id =~ /(?i)barquisimeto/ or r.site =~ /(?i)barquisimeto/ or r.probe_id =~ /(?i)lara/ or r.site =~ /(?i)lara/ or r.probe_id == \"eduardo-pc-trabajo\" or r.site == \"home-office\" then -69.28425410793854\n           else if r.probe_id =~ /(?i)maracaibo/ or r.site =~ /(?i)maracaibo/ or r.probe_id =~ /(?i)zulia/ or r.site =~ /(?i)zulia/ then -71.6125\n           else if r.probe_id =~ /(?i)valencia/ or r.site =~ /(?i)valencia/ or r.probe_id =~ /(?i)carabobo/ or r.site =~ /(?i)carabobo/ then -68.0077\n           else if r.probe_id =~ /(?i)caracas/ or r.site =~ /(?i)caracas/ then -66.9036\n           else -69.28425410793854\n    }))\n  |> group()",
+                      "range": false
+                    },
+                    "version": "v0"
+                  }
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "Ubicacion geografica y estado de actividad de las sondas QoE activas (verde) e inactivas (rojo).",
+        "id": 110,
+        "links": [],
+        "title": "Mapa de Sondas QoE (Venezuela)",
+        "vizConfig": {
+          "group": "geomap",
+          "kind": "VizConfig",
+          "version": "13.1.0-25153870157",
+          "spec": {
+            "options": {
+              "basemap": {
+                "config": {
+                  "theme": "dark"
+                },
+                "name": "CartoDB Dark Matter",
+                "type": "carto"
+              },
+              "view": {
+                "id": "coords",
+                "lat": 8.5,
+                "lon": -66,
+                "zoom": 6
+              },
+              "layers": [
+                {
+                  "type": "markers",
+                  "name": "Sondas QoE",
+                  "config": {
+                    "style": {
+                      "size": {
+                        "fixed": 12
+                      },
+                      "color": {
+                        "field": "EstadoVal",
+                        "fixed": "green"
+                      },
+                      "symbol": {
+                        "fixed": "circle"
+                      }
+                    },
+                    "showLegend": true,
+                    "tooltip": true
+                  },
+                  "location": {
+                    "mode": "coords",
+                    "latitude": "latitude",
+                    "longitude": "longitude"
+                  }
+                }
+              ],
+              "controls": {
+                "showZoom": true,
+                "showAttribution": true,
+                "showScale": false,
+                "showDebug": false
+              }
+            },
+            "fieldConfig": {
+              "defaults": {
+                "custom": {},
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            }
+          }
+        }
+      }
+    }
+  },
+  "layout": {
+    "kind": "GridLayout",
+    "spec": {
+      "items": [
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "global-kpi-probes"
+            },
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 4
+          }
+        },
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "global-kpi-services"
+            },
+            "x": 5,
+            "y": 0,
+            "width": 5,
+            "height": 4
+          }
+        },
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "global-kpi-avail"
+            },
+            "x": 10,
+            "y": 0,
+            "width": 5,
+            "height": 4
+          }
+        },
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "global-kpi-latency"
+            },
+            "x": 15,
+            "y": 0,
+            "width": 5,
+            "height": 4
+          }
+        },
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "global-kpi-failures"
+            },
+            "x": 20,
+            "y": 0,
+            "width": 4,
+            "height": 4
+          }
+        },
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "global-avail-bar"
+            },
+            "x": 0,
+            "y": 4,
+            "width": 24,
+            "height": 6
+          }
+        },
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "global-map"
+            },
+            "x": 0,
+            "y": 10,
+            "width": 24,
+            "height": 10
+          }
+        },
+        {
+          "kind": "GridLayoutItem",
+          "spec": {
+            "element": {
+              "kind": "ElementReference",
+              "name": "global-probe-table"
+            },
+            "x": 0,
+            "y": 20,
+            "width": 24,
+            "height": 8
+          }
+        }
+      ]
+    }
+  },
+  "links": [],
+  "liveNow": false,
+  "preload": false,
+  "tags": [
+    "cx-radar",
+    "qoe",
+    "real-metrics",
+    "influxdb"
+  ],
+  "timeSettings": {
+    "autoRefresh": "1m",
+    "autoRefreshIntervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "fiscalYearStartMonth": 0,
+    "from": "now-1h",
+    "hideTimepicker": false,
+    "timezone": "browser",
+    "to": "now"
+  },
+  "title": "CX-Radar — Vista Global Nacional",
+  "variables": []
+}

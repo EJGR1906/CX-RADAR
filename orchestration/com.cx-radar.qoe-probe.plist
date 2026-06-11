@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cx-radar.qoe-probe</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/absolute/path/to/CX-RADAR/scripts/qoe_probe.py</string>
+        <string>--config-path</string>
+        <string>/absolute/path/to/CX-RADAR/config/probe-catalog.json</string>
+    </array>
+    <key>StartInterval</key>
+    <!-- 10 minutes = 600 seconds -->
+    <integer>600</integer>
+    <key>WorkingDirectory</key>
+    <string>/absolute/path/to/CX-RADAR</string>
+    <key>StandardOutPath</key>
+    <string>/absolute/path/to/CX-RADAR/logs/launchd-com.cx-radar.qoe-probe-stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/absolute/path/to/CX-RADAR/logs/launchd-com.cx-radar.qoe-probe-stderr.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>INFLUXDB_TOKEN</key>
+        <string>your-influx-token-here</string>
+    </dict>
+</dict>
+</plist>

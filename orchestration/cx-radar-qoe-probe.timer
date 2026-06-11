@@ -1,0 +1,14 @@
+[Unit]
+Description=Run CX-Radar QoE Monitoring Probe every 10 minutes
+Requires=cx-radar-qoe-probe.service
+
+[Timer]
+# Run every 10 minutes (e.g. 10:00, 10:10, 10:20, etc.)
+OnCalendar=*:0/10
+# Random delay of 15 seconds to prevent traffic bursts at exactly the same second
+RandomizedDelaySec=15
+# Resume schedule if the machine was off during a scheduled run
+Persistent=true
+
+[Install]
+WantedBy=timers.target
