@@ -1442,17 +1442,16 @@ function Resolve-YtDlpDirectHost {
         [Parameter(Mandatory = $true)]
         [pscustomobject]$Target,
 
-        [Parameter(Mandatory = $true)]
-        [pscustomobject]$PortableTools
+        [Parameter()]
+        [string]$DirectUrl = ''
     )
 
-    $directUrl = Resolve-YtDlpDirectUrl -Target $Target -PortableTools $PortableTools
-    if ([string]::IsNullOrWhiteSpace($directUrl)) {
+    if ([string]::IsNullOrWhiteSpace($DirectUrl)) {
         return (Get-TargetHost -Target $Target)
     }
 
     try {
-        return ([System.Uri]$directUrl).Host
+        return ([System.Uri]$DirectUrl).Host
     }
     catch {
         return (Get-TargetHost -Target $Target)
@@ -1520,7 +1519,7 @@ function Invoke-YtDlpMeasurement {
     try {
         $timeoutSeconds = Get-SpeedTestTimeoutSeconds -Target $Target -ProbeRun $ProbeRun -DefaultValue 180
         $directMediaUrl = Resolve-YtDlpDirectUrl -Target $Target -PortableTools $PortableTools
-        $sourceHost = Resolve-YtDlpDirectHost -Target $Target -PortableTools $PortableTools
+        $sourceHost = Resolve-YtDlpDirectHost -Target $Target -DirectUrl $directMediaUrl
         $pingStats = Get-PingBurstStats -HostName $sourceHost
 
         $errorClass = ''
