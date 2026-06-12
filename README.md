@@ -204,6 +204,7 @@ CX-Radar/
 │   ├── qoe_probe.py            ← Script principal de la sonda (Python)
 │   ├── validate_qoe_probe.py  ← Validación del entorno (Python)
 │   ├── register_qoe_task.py   ← Registro de tarea programada (Python)
+│   ├── update_qoe_probe.py    ← Actualización automática de la sonda (Python)
 │   ├── set_influx_token.py      ← Guardado seguro del token (Python)
 │   ├── setup_portable.py      ← Descarga de herramientas portables (Python)
 │   └── run_qoe_certification.py ← Script de Certificación de QA (Python)
@@ -240,6 +241,15 @@ Ejecuta suites de prueba (smoke y resiliencia) para certificar el estado de la s
 - **`--max-probe-runtime-seconds <int>`**: Tiempo máximo de ejecución permitido para la sonda durante los tests (por defecto: `120`).
 - **`--run-resilience-checks`**: Flag para ejecutar pruebas adicionales de resiliencia (falla DNS, caída de InfluxDB, timeout, etc.).
 - **`--include-tls-scenario`**: Flag para incluir el escenario de fallo TLS (requiere conexión activa a badssl.com).
+
+### 5. `update_qoe_probe.py` (Actualización Automática de la Sonda)
+Compara hashes SHA-256 locales con el repositorio remoto de GitHub y descarga actualizaciones de forma atómica y segura para los archivos principales de la sonda.
+- **`--config-path <string>`**: Ruta al catálogo de configuración para leer la directiva de verificación TLS (por defecto: `config/probe-catalog.json`).
+- **`--no-verify-ssl`**: Ignora errores de certificados SSL/TLS al descargar (útil en Windows Server 2012 heredados).
+- **`--register`**: Registra el script de actualización automática en el planificador de tareas nativo del sistema para ejecutarse diariamente (por defecto a las `08:00`).
+- **`--run-as-current-user`**: (Windows) Registra la tarea programada utilizando el inicio de sesión interactivo del usuario actual.
+- **`--task-name <string>`**: Nombre personalizado de la tarea programada (por defecto: `CX-Radar-QoE-Updater`).
+- **`--time <HH:MM>`**: Hora específica para la ejecución de la tarea diaria (por defecto: `08:00`).
 
 ---
 

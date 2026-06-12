@@ -56,42 +56,50 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 
 Los logs se escriben en `logs\qoe-probe-YYYY-MM-DD.log`.
 
-## Registrar la Tarea Programada
+## Registrar la Tarea Programada (Python 3)
 
-Usa el script auxiliar:
+Para programar la ejecución recurrente de la sonda (por defecto cada 10 minutos):
 
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
-& .\scripts\register-qoe-task.ps1
+```bash
+python scripts/register_qoe_task.py
 ```
 
-Por defecto, el nombre de la tarea es `CX-Radar-QoE-Probe` y el intervalo es de 5 minutos.
+En equipos de escritorio de Windows o servidores personales donde prefieras ejecutarlo bajo la sesión interactiva del usuario actual, usa:
 
-Si firmas los scripts, prefiere:
-
-```powershell
-& .\scripts\register-qoe-task.ps1 -ExecutionPolicy AllSigned
+```bash
+python scripts/register_qoe_task.py --run-as-current-user
 ```
 
-Usa `Bypass` solo como una excepción explícita:
+*(En Linux se utilizará Systemd/Cron, y en macOS LaunchAgents).*
 
-```powershell
-& .\scripts\register-qoe-task.ps1 -ExecutionPolicy Bypass
+## Registrar la Tarea de Actualización Automática (Python 3)
+
+Para programar la tarea diaria de actualización automática a las 8:00 AM (la cual verifica hashes SHA-256 contra GitHub para actualizar sólo cuando existan cambios):
+
+```bash
+python scripts/update_qoe_probe.py --register
 ```
+
+Si ejecutas sobre Windows Server 2012 R2 o sistemas con certificados obsoletos y necesitas omitir la verificación SSL, o si quieres usar inicio de sesión interactivo, utiliza:
+
+```bash
+python scripts/update_qoe_probe.py --register --run-as-current-user --no-verify-ssl
+```
+
+---
 
 ## Comprobaciones Posteriores al Registro
 
-1. Abre el Programador de tareas y confirma que la tarea existe.
-2. Ejecuta la tarea manualmente una vez.
-3. Confirma que el archivo de log se actualiza.
-4. Confirma que las métricas llegan a InfluxDB una vez configurado el token.
-5. Confirma que los argumentos de acción muestran `RemoteSigned` o `AllSigned`, no `Bypass`, a menos que hayas aprobado explícitamente la excepción.
+1. Abre el Programador de tareas y confirma que las tareas `CX-Radar-QoE-Probe` y `CX-Radar-QoE-Updater` existen.
+2. Ejecuta las tareas manualmente una vez para validar que inicien.
+3. Confirma que el archivo de log se actualiza en `logs/`.
+4. Confirma que las métricas llegan a InfluxDB una vez ejecutada la sonda principal.
 
 ## Recuperación
 
-Si la tarea existe pero no se ejecuta correctamente:
+Si alguna tarea existe pero no se ejecuta correctamente:
 
-1. Ejecuta `scripts\validate-qoe-probe.ps1` de nuevo.
-2. Revisa el archivo de log diario en `logs\`.
-3. Confirma que el usuario configurado puede descifrar el archivo de credenciales DPAPI o aún tiene la variable de entorno temporal.
-4. Registra nuevamente la tarea con la política de ejecución prevista volviendo a ejecutar `register-qoe-task.ps1`.
+1. Ejecuta `python scripts/validate_qoe_probe.py` de nuevo.
+2. Revisa el archivo de log diario en `logs/`.
+3. Confirma que las credenciales del token estén presentes en tu archivo `.env` local.
+4. Vuelve a registrar las tareas ejecutando de nuevo los scripts de registro con la configuración adecuada.

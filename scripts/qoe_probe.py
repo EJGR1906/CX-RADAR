@@ -189,18 +189,31 @@ def build_influx_line(measurement: str, tags: Dict[str, Any], fields: Dict[str, 
             continue
         tag_pairs.append(f"{escape_tag(k)}={escape_tag(str(v))}")
 
+    # Set of fields that must always be represented as floats in Line Protocol (to avoid schema conflicts)
+    float_fields = {
+        "download_speed", "upload_speed", "latency", "jitter", "rpm_responsiveness",
+        "time_namelookup_ms", "time_connect_ms", "time_appconnect_ms", "time_starttransfer_ms", "time_total_ms",
+        "size_download_bytes", "run_duration_ms", "latency_ms", "jitter_ms", "download_mbps", "upload_mbps"
+    }
+
     field_pairs = []
     for k in sorted(fields.keys()):
         v = fields[k]
         if v is None:
             continue
 
+        if k in float_fields:
+            try:
+                v = float(v)
+            except (ValueError, TypeError):
+                pass
+
         if isinstance(v, bool):
             encoded = "true" if v else "false"
-        elif isinstance(v, int):
-            encoded = f"{v}i"
         elif isinstance(v, float):
             encoded = f"{v}"
+        elif isinstance(v, int):
+            encoded = f"{v}i"
         else:
             encoded = f'"{escape_field_string(str(v))}"'
 
