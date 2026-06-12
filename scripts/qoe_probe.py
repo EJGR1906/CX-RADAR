@@ -11,6 +11,7 @@ Requirements: Python >= 3.8, stdlib only.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import datetime
 import hashlib
 import json
@@ -798,6 +799,160 @@ def upload_file_to_url(
     return (time.perf_counter() - start_time) * 1000
 
 
+def download_parallel_chunks(
+    url: str, transfer_dir: Path, target_bytes: int, num_connections: int,
+    timeout: float, user_agent: Optional[str] = None, verify_tls: bool = True
+) -> Tuple[float, float, str]:
+    """Download chunks of target_bytes in parallel using ThreadPoolExecutor and HTTP Range headers."""
+    # Attempt to resolve the real file content length using a lightweight 1-byte GET request
+    file_size = target_bytes
+    try:
+        req = urllib.request.Request(url)
+        req.add_header("Range", "bytes=0-0")
+        if user_agent:
+            req.add_header("User-Agent", user_agent)
+        ctx = ssl.create_default_context()
+        if not verify_tls:
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, context=ctx, timeout=5) as resp:
+            cr = resp.getheader("Content-Range")
+            if cr and "/" in cr:
+                file_size = int(cr.split("/")[-1])
+            else:
+                cl = resp.getheader("Content-Length")
+                if cl:
+                    file_size = int(cl)
+    except Exception:
+        pass
+
+    if num_connections <= 1 or file_size <= 0:
+        download_file = transfer_dir / "download-single.bin"
+        headers = {}
+        if file_size > 0:
+            headers["Range"] = f"bytes=0-{file_size - 1}"
+        try:
+            start_time = time.perf_counter()
+            dur = download_url_to_file(url, download_file, timeout, headers, user_agent, verify_tls)
+            downloaded_bytes = float(download_file.stat().st_size) if download_file.is_file() else 0.0
+            if download_file.is_file():
+                download_file.unlink()
+            return dur, downloaded_bytes, ""
+        except Exception as e:
+            return 0.0, 0.0, str(e)
+
+    # Determine if we partition the file or download the full file in parallel across connections.
+    # We partition if the file is reasonably large (>= 5MB).
+    partition = (file_size >= 5 * 1024 * 1024)
+
+    start_time = time.perf_counter()
+    futures = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_connections) as executor:
+        for i in range(num_connections):
+            if partition:
+                chunk_size = file_size // num_connections
+                start_range = i * chunk_size
+                if i == num_connections - 1:
+                    end_range = file_size - 1
+                else:
+                    end_range = (i + 1) * chunk_size - 1
+            else:
+                # Small files (< 5MB) are downloaded completely in parallel across all threads
+                start_range = 0
+                end_range = file_size - 1
+
+            chunk_file = transfer_dir / f"chunk-{i}.bin"
+            headers = {"Range": f"bytes={start_range}-{end_range}"}
+
+            futures.append(
+                executor.submit(
+                    download_url_to_file,
+                    url, chunk_file, timeout, headers, user_agent, verify_tls
+                )
+            )
+
+        errors = []
+        for future in futures:
+            try:
+                future.result()
+            except Exception as e:
+                errors.append(str(e))
+
+    end_time = time.perf_counter()
+    duration_ms = (end_time - start_time) * 1000
+
+    downloaded_bytes = 0.0
+    for i in range(num_connections):
+        chunk_file = transfer_dir / f"chunk-{i}.bin"
+        if chunk_file.is_file():
+            downloaded_bytes += float(chunk_file.stat().st_size)
+            try:
+                chunk_file.unlink()
+            except Exception:
+                pass
+
+    error_detail = "; ".join(errors) if errors else ""
+    return duration_ms, downloaded_bytes, error_detail
+
+
+def upload_parallel_chunks(
+    url: str, transfer_dir: Path, payload_bytes: int, num_connections: int,
+    method: str, timeout: float, user_agent: Optional[str] = None, verify_tls: bool = True
+) -> Tuple[float, float, str]:
+    """Upload blocks of payload_bytes in parallel using ThreadPoolExecutor."""
+    if num_connections <= 1:
+        upload_file = transfer_dir / "upload-single.bin"
+        upload_file.write_bytes(os.urandom(payload_bytes))
+        try:
+            start_time = time.perf_counter()
+            dur = upload_file_to_url(url, upload_file, method, timeout, user_agent, verify_tls)
+            if upload_file.is_file():
+                upload_file.unlink()
+            return dur, float(payload_bytes), ""
+        except Exception as e:
+            return 0.0, 0.0, str(e)
+
+    start_time = time.perf_counter()
+    futures = []
+    thread_payload_bytes = max(262144, payload_bytes // num_connections)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_connections) as executor:
+        for i in range(num_connections):
+            chunk_file = transfer_dir / f"upload-chunk-{i}.bin"
+            chunk_file.write_bytes(os.urandom(thread_payload_bytes))
+
+            futures.append(
+                executor.submit(
+                    upload_file_to_url,
+                    url, chunk_file, method, timeout, user_agent, verify_tls
+                )
+            )
+
+        errors = []
+        for future in futures:
+            try:
+                future.result()
+            except Exception as e:
+                errors.append(str(e))
+
+    end_time = time.perf_counter()
+    duration_ms = (end_time - start_time) * 1000
+
+    total_uploaded = 0.0
+    for i in range(num_connections):
+        chunk_file = transfer_dir / f"upload-chunk-{i}.bin"
+        if chunk_file.is_file():
+            total_uploaded += float(chunk_file.stat().st_size)
+            try:
+                chunk_file.unlink()
+            except Exception:
+                pass
+
+    error_detail = "; ".join(errors) if errors else ""
+    return duration_ms, total_uploaded, error_detail
+
+
 # ---------------------------------------------------------------------------
 # Upload Supplement Measurement
 # ---------------------------------------------------------------------------
@@ -857,28 +1012,32 @@ def run_upload_supplement(
             result["RunDurationMs"] = nq_res["RunDurationMs"]
 
         elif method in ("curl-upload", "upload-url"):
-            # Prepare payload file
-            upload_file = transfer_dir / "upload.bin"
             payload_bytes = max(1, get_optional_int(target, "uploadPayloadBytes", 1048576))
-            upload_file.write_bytes(os.urandom(payload_bytes))
-
             timeout = get_speedtest_timeout(target, probe_run, 120)
             verify_tls = bool(probe_run.get("verifyTls", True))
             ua = get_optional_str(probe_run, "userAgent")
+            num_connections = max(1, get_optional_int(target, "parallelConnections", get_optional_int(probe_run, "parallelConnections", 1)))
 
+            endpoint = ""
+            upload_method = "POST"
             if method == "curl-upload":
                 endpoint = get_optional_str(target, "uploadEndpoint", "https://speed.cloudflare.com/__up")
-                dur = upload_file_to_url(endpoint, upload_file, "POST", timeout, ua, verify_tls)
-                result["UploadMbps"] = get_mbps_from_bytes_duration(payload_bytes, dur)
-                result["RunDurationMs"] = dur
             else:
-                upload_url = get_optional_str(target, "uploadUrl")
-                if not upload_url:
+                endpoint = get_optional_str(target, "uploadUrl")
+                if not endpoint:
                     raise ValueError("Target is missing uploadUrl.")
                 upload_method = get_optional_str(target, "uploadMethod", "POST")
-                dur = upload_file_to_url(upload_url, upload_file, upload_method, timeout, ua, verify_tls)
-                result["UploadMbps"] = get_mbps_from_bytes_duration(payload_bytes, dur)
-                result["RunDurationMs"] = dur
+
+            dur, uploaded_bytes, err_det = upload_parallel_chunks(
+                endpoint, transfer_dir, payload_bytes, num_connections,
+                upload_method, timeout, user_agent=ua, verify_tls=verify_tls
+            )
+            if err_det:
+                raise RuntimeError(err_det)
+
+            result["UploadMbps"] = get_mbps_from_bytes_duration(uploaded_bytes, dur)
+            result["RunDurationMs"] = dur
+            result["Tool"] = f"{method}-{num_connections}x" if num_connections > 1 else method
 
     except Exception as e:
         result["ErrorClass"] = "upload_measurement_error"
@@ -1073,18 +1232,18 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
                 source_host = get_target_host(target)
 
             # 2. Fragment Download
-            fragment_file = transfer_dir / "probe-fragment.bin"
             fragment_bytes = max(1, get_optional_int(target, "fragmentBytes", 4194304))
             verify_tls = bool(probe_run.get("verifyTls", True))
+            num_connections = max(1, get_optional_int(target, "parallelConnections", get_optional_int(probe_run, "parallelConnections", 1)))
 
             try:
-                headers = {"Range": f"bytes=0-{fragment_bytes - 1}"}
-                download_duration_ms = download_url_to_file(
-                    direct_url, fragment_file, timeout, headers=headers,
-                    user_agent=get_optional_str(probe_run, "userAgent"), verify_tls=verify_tls
+                download_duration_ms, download_bytes, err_det = download_parallel_chunks(
+                    direct_url, transfer_dir, fragment_bytes, num_connections,
+                    timeout, user_agent=get_optional_str(probe_run, "userAgent"), verify_tls=verify_tls
                 )
-                if fragment_file.is_file():
-                    download_bytes = float(fragment_file.stat().st_size)
+                if err_det:
+                    err_class = "download_error"
+                    err_detail = err_det
             except Exception as e:
                 err_class = "download_error"
                 err_detail = str(e)
@@ -1097,7 +1256,7 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
             err_detail = "Direct media URL resolved but fragment download wrote no bytes."
 
         return {
-            "Tool": "yt-dlp",
+            "Tool": f"yt-dlp-{num_connections}x" if num_connections > 1 else "yt-dlp",
             "ExitCode": 0 if not err_class else -1,
             "TimedOut": False,
             "DownloadMbps": download_mbps,
@@ -1264,56 +1423,26 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
         timeout = get_speedtest_timeout(target, probe_run, 120)
         ua = get_optional_str(probe_run, "userAgent")
         target_bytes = max(0, get_optional_int(target, "targetTransferBytes", 0))
-        max_iters_default = 8 if target_bytes > 0 else 1
-        max_iters = max(1, get_optional_int(target, "maxDownloadIterations", max_iters_default))
+        num_connections = max(1, get_optional_int(target, "parallelConnections", get_optional_int(probe_run, "parallelConnections", 1)))
+        verify_tls = bool(probe_run.get("verifyTls", True))
 
         error_class = ""
         error_detail = ""
         download_duration_ms = 0.0
         upload_duration_ms = 0.0
         download_bytes = 0.0
-        download_attempts = 0
         verify_tls = bool(probe_run.get("verifyTls", True))
 
         start_time = time.perf_counter()
 
         try:
-            while True:
-                elapsed_seconds = time.perf_counter() - start_time
-                remaining_seconds = timeout - elapsed_seconds
-                if remaining_seconds <= 0:
-                    error_class = "timeout"
-                    error_detail = "burst download timed out before collecting target transfer size."
-                    break
-
-                download_attempts += 1
-                download_file = transfer_dir / f"download-{download_attempts}.bin"
-
-                headers = {}
-                if target_bytes > 0:
-                    bytes_to_request = target_bytes - download_bytes
-                    if bytes_to_request > 0:
-                        headers["Range"] = f"bytes=0-{int(bytes_to_request - 1)}"
-
-                attempt_dur = download_url_to_file(
-                    download_url, download_file, remaining_seconds,
-                    headers=headers, user_agent=ua, verify_tls=verify_tls
-                )
-                attempt_bytes = float(download_file.stat().st_size) if download_file.is_file() else 0.0
-
-                download_duration_ms += attempt_dur
-                download_bytes += attempt_bytes
-
-                if download_file.is_file():
-                    download_file.unlink()
-
-                if attempt_bytes <= 0:
-                    break
-
-                if target_bytes > 0 and download_bytes >= target_bytes:
-                    break
-                if download_attempts >= max_iters:
-                    break
+            download_duration_ms, download_bytes, err_det = download_parallel_chunks(
+                download_url, transfer_dir, target_bytes, num_connections,
+                timeout, user_agent=ua, verify_tls=verify_tls
+            )
+            if err_det:
+                error_class = "download_error"
+                error_detail = err_det
         except Exception as e:
             error_class = "download_error"
             error_detail = str(e)
@@ -1325,19 +1454,23 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
         upload_url = get_optional_str(target, "uploadUrl")
         if not error_class and upload_url:
             try:
-                upload_file = transfer_dir / "upload.bin"
                 payload_bytes = max(1, get_optional_int(target, "uploadPayloadBytes", 1048576))
-                upload_file.write_bytes(os.urandom(payload_bytes))
-
                 upload_method = get_optional_str(target, "uploadMethod", "POST")
                 elapsed_seconds = time.perf_counter() - start_time
                 remaining_seconds = timeout - elapsed_seconds
-                upload_dur = upload_file_to_url(
-                    upload_url, upload_file, upload_method, remaining_seconds,
-                    user_agent=ua, verify_tls=verify_tls
-                )
-                upload_mbps = get_mbps_from_bytes_duration(payload_bytes, upload_dur)
-                upload_duration_ms = upload_dur
+                if remaining_seconds <= 0:
+                    error_class = "timeout"
+                    error_detail = "burst upload timed out before starting."
+                else:
+                    upload_duration_ms, uploaded_bytes, err_det = upload_parallel_chunks(
+                        upload_url, transfer_dir, payload_bytes, num_connections,
+                        upload_method, remaining_seconds, user_agent=ua, verify_tls=verify_tls
+                    )
+                    if err_det:
+                        error_class = "upload_error"
+                        error_detail = err_det
+                    else:
+                        upload_mbps = get_mbps_from_bytes_duration(uploaded_bytes, upload_duration_ms)
             except Exception as e:
                 error_class = "upload_error"
                 error_detail = str(e)
@@ -1347,7 +1480,7 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
         latency = ping_stats["LatencyMs"]
 
         return {
-            "Tool": "burst",
+            "Tool": f"burst-{num_connections}x" if num_connections > 1 else "burst",
             "ExitCode": 0 if not error_class else -1,
             "TimedOut": False,
             "DownloadMbps": download_mbps,
@@ -1358,7 +1491,7 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
             "SourceHost": host,
             "ErrorClass": error_class,
             "ErrorDetail": error_detail,
-            "RawStdOut": f"download_attempts={download_attempts};download_bytes={int(download_bytes)};target_transfer_bytes={target_bytes};download_url={download_url}",
+            "RawStdOut": f"download_connections={num_connections};download_bytes={int(download_bytes)};target_transfer_bytes={target_bytes};download_url={download_url}",
             "RawStdErr": "",
             "RunDurationMs": download_duration_ms + upload_duration_ms,
             "Available": (error_class == "" and (download_bytes > 0 or upload_mbps > 0))
