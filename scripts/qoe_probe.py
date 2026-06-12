@@ -753,7 +753,9 @@ def download_url_to_file(
     start_time = time.perf_counter()
     with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:
         with open(output_path, "wb") as f:
-            shutil.copyfileobj(response, f)
+            # ⚡ Bolt: Increase copy buffer to 1MB to significantly reduce syscall overhead
+            # during high-throughput speed test file downloads (default is too small, ~16KB/64KB).
+            shutil.copyfileobj(response, f, length=1024 * 1024)
 
     return (time.perf_counter() - start_time) * 1000
 
