@@ -206,7 +206,14 @@ def _test_portable_node(node_root: Path) -> bool:
 # ---------------------------------------------------------------------------
 
 def _fast_cli_script_path(fast_cli_root: Path) -> Path:
-    return fast_cli_root / "node_modules" / "fast-cli" / "distribution" / "cli.js"
+    candidates = [
+        fast_cli_root / "node_modules" / "fast-cli" / "cli.js",
+        fast_cli_root / "node_modules" / "fast-cli" / "distribution" / "cli.js",
+    ]
+    for c in candidates:
+        if c.is_file():
+            return c
+    return candidates[0]
 
 
 def _npm_command(node_root: Path) -> Path:
@@ -229,36 +236,45 @@ def _patch_fast_cli(fast_cli_script: Path) -> None:
     content = api_js.read_text(encoding="utf-8")
     modified = False
 
-    # 1. Increase navigation timeout to 390 s
-    new_content, n = re.subn(
-        r"timeoutMs\s*=\s*(90000|240000|390000)",
-        "timeoutMs = 390000",
-        content,
-    )
-    if n:
-        content = new_content
-        modified = True
-
-    # 2. Disable AutomationControlled blink feature
-    if "AutomationControlled" not in content:
-        content = content.replace(
-            "'--ignore-certificate-errors'",
-            "'--ignore-certificate-errors', '--disable-blink-features=AutomationControlled'",
-        )
-        modified = True
-
-    # 3. Set a real Chrome User-Agent
+    # 1. Set a real Chrome User-Agent and set default navigation timeout
     if "setUserAgent" not in content:
         ua = (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/124.0.0.0 Safari/537.36"
         )
-        content = content.replace(
-            "const page = await browser.newPage();",
-            f"const page = await browser.newPage();\n    await page.setUserAgent('{ua}');",
+        if "const page = await browser.newPage();" in content:
+            content = content.replace(
+                "const page = await browser.newPage();",
+                f"const page = await browser.newPage();\n    await page.setUserAgent('{ua}');\n    await page.setDefaultNavigationTimeout(390000);"
+            )
+            modified = True
+
+    # 2. Increase navigation timeout to 390 s (for versions using timeoutMs variable)
+    if "timeoutMs" in content:
+        new_content, n = re.subn(
+            r"timeoutMs\s*=\s*(90000|240000|390000)",
+            "timeoutMs = 390000",
+            content,
         )
-        modified = True
+        if n:
+            content = new_content
+            modified = True
+
+    # 3. Disable AutomationControlled blink feature and ignore certificate errors
+    if "AutomationControlled" not in content:
+        if "'--ignore-certificate-errors'" in content:
+            content = content.replace(
+                "'--ignore-certificate-errors'",
+                "'--ignore-certificate-errors', '--disable-blink-features=AutomationControlled'",
+            )
+            modified = True
+        elif "args: ['--no-sandbox']" in content:
+            content = content.replace(
+                "args: ['--no-sandbox']",
+                "args: ['--no-sandbox', '--ignore-certificate-errors', '--disable-blink-features=AutomationControlled']",
+            )
+            modified = True
 
     if modified:
         api_js.write_text(content, encoding="utf-8")
@@ -325,7 +341,8 @@ def _install_fast_cli(
                 "fast-cli": version
             },
             "overrides": {
-                "string-width": "4.2.3"
+                "string-width": "4.2.3",
+                "yargs-parser": "20.2.9"
             }
         }
         try:
@@ -401,10 +418,14 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Automatically downgrade Node version for legacy Windows platforms (Server 2012 / Win 7/8)
-    if args.node_version == "v20.20.2" and _is_legacy_windows():
-        print("[System Info] Legacy Windows detected. Falling back to Node.js v16.20.2 for compatibility.")
-        args.node_version = "v16.20.2"
+    # Automatically downgrade Node version and fast-cli version for legacy Windows platforms (Server 2012 / Win 7/8)
+    if _is_legacy_windows():
+        if args.node_version == "v20.20.2":
+            print("[System Info] Legacy Windows detected. Falling back to Node.js v16.20.2 for compatibility.")
+            args.node_version = "v16.20.2"
+        if args.fast_cli_version == "5.2.0":
+            print("[System Info] Legacy Windows detected. Falling back to fast-cli v3.2.0 for compatibility.")
+            args.fast_cli_version = "3.2.0"
 
     # --- Paths ---
     script_dir = Path(__file__).resolve().parent

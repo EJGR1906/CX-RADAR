@@ -1650,9 +1650,15 @@ def main() -> None:
         nq_default = "networkquality"
     nq_child = get_optional_str(pt_cfg, "networkQualityExe", nq_default)
 
+    fast_cli_path = resolve_from_base(repo_root, fast_cli_child)
+    if not fast_cli_path.is_file():
+        alt_path = fast_cli_path.parent.parent / "cli.js"
+        if alt_path.is_file():
+            fast_cli_path = alt_path
+
     tools = {
         "node_exe": resolve_from_base(repo_root, node_child),
-        "fast_cli_script": resolve_from_base(repo_root, fast_cli_child),
+        "fast_cli_script": fast_cli_path,
         "yt_dlp_exe": resolve_from_base(repo_root, yt_dlp_child),
         "network_quality_exe": resolve_from_base(repo_root, nq_child),
         "temporary_directory": resolve_from_base(repo_root, tmp_child),
