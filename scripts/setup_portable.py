@@ -315,13 +315,29 @@ def _install_fast_cli(
             shutil.rmtree(fast_cli_root)
         fast_cli_root.mkdir(parents=True, exist_ok=True)
 
+        # Write package.json with overrides to prevent string-width from using Unicode set regex (/v flag) which requires Node 20+
+        import json
+        package_json = {
+            "name": "qoe-fast-cli-portable",
+            "version": "1.0.0",
+            "private": True,
+            "dependencies": {
+                "fast-cli": version
+            },
+            "overrides": {
+                "string-width": "4.2.3"
+            }
+        }
+        try:
+            (fast_cli_root / "package.json").write_text(json.dumps(package_json, indent=2), encoding="utf-8")
+        except Exception as e:
+            print(f"    Warning: Failed to write package.json: {e}")
+
         print(f"    npm install fast-cli@{version} (attempt {attempt}) ...")
         result = subprocess.run(
             [
                 str(npm_cmd), "install",
-                "--prefix", str(fast_cli_root),
                 "--no-fund", "--no-audit",
-                f"fast-cli@{version}",
             ],
             cwd=str(fast_cli_root),
             env=env,
