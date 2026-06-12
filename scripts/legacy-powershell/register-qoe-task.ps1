@@ -100,7 +100,7 @@ $actionArguments = @(
 ) -join ' '
 
 $action = New-ScheduledTaskAction -Execute $powerShellPath -Argument $actionArguments
-$trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).Date) -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes)
+$trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).Date) -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes) -RepetitionDuration ([TimeSpan]::MaxValue)
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -RunOnlyIfNetworkAvailable -StartWhenAvailable
 
 $currentUserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name

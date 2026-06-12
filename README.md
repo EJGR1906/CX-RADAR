@@ -119,6 +119,11 @@ Este comando descarga automáticamente todas las herramientas necesarias (`node`
 python scripts/setup_portable.py
 ```
 
+> **Nota:** Si estás actualizando una instalación existente o necesitas solucionar fallas previas forzando la descarga y reinstalación de todas las herramientas, ejecuta:
+> ```bash
+> python scripts/setup_portable.py --force
+> ```
+
 ### 3. Configurar los servicios a monitorear
 
 Abre el archivo `config/probe-catalog.json` con cualquier editor de texto. Ahí encontrarás:
@@ -163,15 +168,15 @@ Una vez que la prueba en seco funcione bien, ejecuta la sonda completa para que 
 python scripts/qoe_probe.py
 ```
 
-### 8. Programar la ejecución automática (opcional)
+### 8. Programar la ejecución automática de la sonda (opcional)
 
-Para que la sonda se ejecute sola cada 10 minutos en segundo plano:
+Para que la sonda principal se ejecute sola cada 10 minutos en segundo plano:
 
 ```bash
 python scripts/register_qoe_task.py
 ```
 
-Si estás en Windows en un equipo personal sin permisos de administrador, usa esta variante:
+Si estás en Windows en un equipo personal o un servidor donde prefieras utilizar el inicio de sesión interactivo de tu usuario, usa esta variante:
 
 ```bash
 python scripts/register_qoe_task.py --run-as-current-user
@@ -179,7 +184,21 @@ python scripts/register_qoe_task.py --run-as-current-user
 
 *(En Linux se utilizará Systemd/Cron, y en macOS LaunchAgents).*
 
-### 9. Ver los resultados
+### 9. Programar la actualización automática diaria (opcional)
+
+Para activar el script de actualización automática diaria (que a las 8:00 AM comprueba hashes contra el repositorio remoto y actualiza la sonda atómicamente si existen correcciones):
+
+```bash
+python scripts/update_qoe_probe.py --register
+```
+
+Si ejecutas sobre Windows Server 2012 R2 u otros sistemas heredados donde quieras omitir validaciones de SSL por certificados de sistema desactualizados y correr en sesión interactiva, usa:
+
+```bash
+python scripts/update_qoe_probe.py --register --run-as-current-user --no-verify-ssl
+```
+
+### 10. Ver los resultados
 
 - **Logs locales:** Revisa la carpeta `logs/` donde se genera un archivo diario con el detalle de cada medición.
 - **InfluxDB Cloud:** Verifica que las métricas aparezcan en tu bucket configurado.
