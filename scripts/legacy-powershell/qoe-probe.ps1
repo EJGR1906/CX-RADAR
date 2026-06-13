@@ -703,6 +703,33 @@ function Clean-OldLogs {
     return $removedCount
 }
 
+<#
+.SYNOPSIS
+    Realiza la limpieza del entorno, eliminando archivos temporales y logs antiguos.
+#>
+function Invoke-EnvironmentGarbageCollection {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string]$TemporaryDirectory,
+
+        [Parameter()]
+        [int]$LogRetentionDays = 7,
+
+        [Parameter()]
+        [int]$MinimumAgeMinutes = 20
+    )
+
+    $removedCount = 0
+
+    $removedCount += Clean-TemporaryFiles -TemporaryDirectory $TemporaryDirectory -MinimumAgeMinutes $MinimumAgeMinutes
+    $removedCount += Clean-OldLogs -RepoRoot $RepoRoot -LogRetentionDays $LogRetentionDays
+
+    return $removedCount
+}
+
 function Get-TargetHost {
     param(
         [Parameter(Mandatory = $true)]
