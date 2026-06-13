@@ -48,9 +48,9 @@
       "uploadMeasurementMethod": "curl-upload",
       "host": "download.microsoft.com",
       "downloadUrl": "https://download.microsoft.com/download/8/4/A/84A35BF1-DAFE-4AE8-82AF-AD2AE20B6B14/directx_Jun2010_redist.exe",
-      "targetTransferBytes": 8388608,
-      "parallelConnections": 16,
-      "uploadPayloadBytes": 8388608,
+      "targetTransferBytes": 33554432,
+      "parallelConnections": 8,
+      "uploadPayloadBytes": 33554432,
       "maxDownloadIterations": 4,
       "enabled": true
     },
@@ -61,10 +61,10 @@
       "speedTestMethod": "yt-dlp",
       "uploadMeasurementMethod": "curl-upload",
       "host": "www.youtube.com",
-      "videoUrl": "https://www.youtube.com/watch?v=LXb3EKWsInQ", 
+      "videoUrl": "https://www.youtube.com/watch?v=LXb3EKWsInQ",
       "format": "bestvideo+bestaudio/best",
-      "parallelConnections": 16,
-      "uploadPayloadBytes": 8388608,
+      "parallelConnections": 8,
+      "uploadPayloadBytes": 33554432,
       "enabled": true
     },
     {
@@ -83,9 +83,9 @@
       "uploadMeasurementMethod": "curl-upload",
       "host": "cnbl-cdn.bamgrid.com",
       "downloadUrl": "https://cnbl-cdn.bamgrid.com/assets/eb4d592bb1646448b0dcf7fb5d400c52c21c72afeefd8e79411f05a88b47fb0e/original",
-      "targetTransferBytes": 8388608,
-      "parallelConnections": 16,
-      "uploadPayloadBytes": 8388608,
+      "targetTransferBytes": 33554432,
+      "parallelConnections": 8,
+      "uploadPayloadBytes": 33554432,
       "maxDownloadIterations": 14,
       "enabled": true
     },
@@ -97,9 +97,9 @@
       "uploadMeasurementMethod": "curl-upload",
       "host": "m.media-amazon.com",
       "downloadUrl": "https://m.media-amazon.com/images/G/01/video/METI_2026_Trailer_15s_Legends_Post_Draper_16x9_Stereo_Final_en-US_.mp4",
-      "targetTransferBytes": 8388608,
-      "parallelConnections": 16,
-      "uploadPayloadBytes": 8388608,
+      "targetTransferBytes": 33554432,
+      "parallelConnections": 8,
+      "uploadPayloadBytes": 33554432,
       "maxDownloadIterations": 3,
       "enabled": true
     }

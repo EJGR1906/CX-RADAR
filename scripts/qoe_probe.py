@@ -43,7 +43,15 @@ def log_message(message: str, level: str = "INFO") -> None:
     """Write an ISO 8601 timestamped log line to file and stdout."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     line = f"[{timestamp}] [{level}] {message}"
-    print(line, flush=True)
+    try:
+        print(line, flush=True)
+    except UnicodeEncodeError:
+        try:
+            import sys
+            sys.stdout.write(line.encode(sys.stdout.encoding or 'ascii', errors='replace').decode(sys.stdout.encoding or 'ascii') + '\n')
+            sys.stdout.flush()
+        except Exception:
+            pass
     if log_path_global:
         try:
             with open(log_path_global, "a", encoding="utf-8") as f:
@@ -1188,6 +1196,8 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
     if not video_url:
         raise ValueError("Target requires videoUrl or url.")
 
+    num_connections = max(1, get_optional_int(target, "parallelConnections", get_optional_int(probe_run, "parallelConnections", 1)))
+
     temp_dir = tools.get("repo_root", Path(".")).resolve() / "bin" / "tmp"
     temp_dir.mkdir(parents=True, exist_ok=True)
     transfer_dir = temp_dir / f"yt-dlp-{get_optional_str(target, 'service')}-{get_optional_str(target, 'endpointName')}-{int(time.time())}"
@@ -1236,7 +1246,6 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
             # 2. Fragment Download
             fragment_bytes = max(1, get_optional_int(target, "fragmentBytes", 4194304))
             verify_tls = bool(probe_run.get("verifyTls", True))
-            num_connections = max(1, get_optional_int(target, "parallelConnections", get_optional_int(probe_run, "parallelConnections", 1)))
 
             try:
                 download_duration_ms, download_bytes, err_det = download_parallel_chunks(
