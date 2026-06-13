@@ -594,19 +594,26 @@ function Ensure-DirectoryExists {
 function Remove-PathIfExists {
     param(
         [Parameter()]
-        [string]$Path
+        [string]$Path,
+
+        [switch]$PassThru
     )
 
     if ([string]::IsNullOrWhiteSpace($Path)) {
+        if ($PassThru) { return $true }
         return
     }
 
     try {
-        if (Test-Path -Path $Path) {
-            Remove-Item -Path $Path -Recurse -Force
+        if ([System.IO.File]::Exists($Path) -or [System.IO.Directory]::Exists($Path)) {
+            Remove-Item -Path $Path -Recurse -Force -ErrorAction Stop
         }
     }
     catch {
+    }
+
+    if ($PassThru) {
+        return -not ([System.IO.File]::Exists($Path) -or [System.IO.Directory]::Exists($Path))
     }
 }
 
@@ -662,8 +669,7 @@ function Invoke-EnvironmentGarbageCollection {
                 }
 
                 $candidatePath = $candidate.FullName
-                Remove-PathIfExists -Path $candidatePath
-                if (-not (Test-Path -Path $candidatePath)) {
+                if (Remove-PathIfExists -Path $candidatePath -PassThru) {
                     $removedCount++
                 }
             }
@@ -680,8 +686,7 @@ function Invoke-EnvironmentGarbageCollection {
                 }
 
                 $candidatePath = $candidate.FullName
-                Remove-PathIfExists -Path $candidatePath
-                if (-not (Test-Path -Path $candidatePath)) {
+                if (Remove-PathIfExists -Path $candidatePath -PassThru) {
                     $removedCount++
                 }
             }
