@@ -105,95 +105,95 @@ Si planeas instalar la sonda en un servidor con **Windows Server 2012** o **Wind
 
 ---
 
-## Guía de instalación paso a paso
+## Guía de instalación y configuración
 
-### 1. Descargar el proyecto
+### Método Recomendado (Instalador Automatizado)
 
-Clona este repositorio o descárgalo como ZIP y descomprímelo en tu equipo. Abre una terminal (PowerShell, CMD, Bash o Zsh) en la carpeta raíz del proyecto.
+La forma más rápida, sencilla y libre de errores de instalar y configurar la sonda en un servidor es utilizando el script de instalación unificada. Este script interactúa contigo para recopilar las variables necesarias (o las acepta mediante argumentos de consola), actualiza la configuración, descarga las herramientas portables, almacena tus credenciales de InfluxDB de forma segura, y registra las tareas programadas en tu sistema operativo, todo en un solo comando.
 
-### 2. Descargar las herramientas portables
+#### 1. Descargar el proyecto
+Clona este repositorio o descárgalo como ZIP y descomprímelo en tu equipo. Abre una terminal en la carpeta raíz del proyecto.
 
+#### 2. Ejecutar el Instalador
+
+**Opción A: Instalación Interactiva (Recomendada)**
+Ejecuta el script sin parámetros adicionales. Te irá guiando y preguntando los datos con valores sugeridos entre corchetes:
+```bash
+python scripts/install.py
+```
+
+**Opción B: Instalación Desatendida (Ideal para Automatización/Scripts)**
+Si estás desplegando mediante Ansible, SSH o scripts de provisión, puedes pasar todos los parámetros directamente en una sola línea de comandos:
+```bash
+python scripts/install.py \
+  --probe-id "mi-sonda-01" \
+  --site "oficina-central" \
+  --environment "production" \
+  --isp "fiber-business" \
+  --influx-token "TU_TOKEN_DE_INFLUXDB" \
+  --influx-url "https://us-east-1-1.aws.cloud2.influxdata.com" \
+  --influx-org "mi-organizacion" \
+  --influx-bucket "qoe_metrics" \
+  --interval-minutes 10
+```
+
+*Nota: En Windows, si deseas que la tarea programada se ejecute bajo la sesión interactiva del usuario actual en lugar de ejecutarse en segundo plano (S4U), agrega la bandera `--run-as-current-user`.*
+
+---
+
+### Método Manual Paso a Paso (Alternativo/Depuración)
+
+Si prefieres realizar cada paso de forma manual e individualizada o estás depurando algún inconveniente:
+
+#### 1. Descargar el proyecto
+Clona este repositorio o descárgalo como ZIP y descomprímelo en tu equipo. Abre una terminal en la carpeta raíz del proyecto.
+
+#### 2. Descargar las herramientas portables
 Este comando descarga automáticamente todas las herramientas necesarias (`node`, `yt-dlp` y `fast-cli`) dentro de la carpeta `bin/` del proyecto sin modificar tu sistema (adaptándose a la compatibilidad de tu OS):
-
 ```bash
 python scripts/setup_portable.py
 ```
+*(Usa `--force` si necesitas reinstalarlas desde cero).*
 
-> **Nota:** Si estás actualizando una instalación existente o necesitas solucionar fallas previas forzando la descarga y reinstalación de todas las herramientas, ejecuta:
-> ```bash
-> python scripts/setup_portable.py --force
-> ```
+#### 3. Configurar los servicios a monitorear
+Abre el archivo `config/probe-catalog.json` con cualquier editor de texto y configura la información bajo `probe`, `influx` y la lista de `targets` (servicios) a monitorear.
 
-### 3. Configurar los servicios a monitorear
-
-Abre el archivo `config/probe-catalog.json` con cualquier editor de texto. Ahí encontrarás:
-
-- **`probe`**: datos que identifican a tu sonda (nombre, ubicación, tipo de conexión, tipo de sonda: `"python"`).
-- **`influx`**: los datos de conexión a InfluxDB Cloud (URL, organización, bucket).
-- **`targets`**: la lista de servicios que quieres monitorear. Puedes habilitarlos o deshabilitarlos cambiando `"enabled": true` a `false`.
-
-### 4. Guardar el token de InfluxDB de forma segura
-
-Ejecuta el siguiente comando y escribe tu token cuando se solicite. El token se almacenará en un archivo local `.env` con permisos restringidos:
-
+#### 4. Guardar el token de InfluxDB de forma segura
+Ejecuta el siguiente comando para guardar el token en un archivo local `.env` con permisos restringidos del sistema operativo:
 ```bash
 python scripts/set_influx_token.py --method file
 ```
 
-### 5. Verificar que todo esté listo
-
+#### 5. Verificar que todo esté listo
 Ejecuta la validación para comprobar que la configuración, las herramientas y el token estén correctos:
-
 ```bash
 python scripts/validate_qoe_probe.py
 ```
 
-Si todo está bien, verás indicadores en `True` para las herramientas disponibles y el token detectado.
-
-### 6. Hacer una prueba sin enviar datos
-
+#### 6. Hacer una prueba sin enviar datos
 Para probar que la sonda funciona sin enviar datos a InfluxDB (ejecución en seco):
-
 ```bash
 python scripts/qoe_probe.py --skip-influx-write
 ```
-
 Revisa los logs generados en la carpeta `logs/` para confirmar que las mediciones se realizaron correctamente.
 
-### 7. Ejecutar la sonda con envío real de datos
-
-Una vez que la prueba en seco funcione bien, ejecuta la sonda completa para que envíe métricas a InfluxDB:
-
+#### 7. Ejecutar la sonda con envío real de datos
 ```bash
 python scripts/qoe_probe.py
 ```
 
-### 8. Programar la ejecución automática de la sonda (opcional)
-
+#### 8. Programar la ejecución automática de la sonda
 Para que la sonda principal se ejecute sola cada 10 minutos en segundo plano:
-
 ```bash
 python scripts/register_qoe_task.py
 ```
 
-Si estás en Windows en un equipo personal o un servidor donde prefieras utilizar el inicio de sesión interactivo de tu usuario, usa esta variante:
-
-```bash
-python scripts/register_qoe_task.py --run-as-current-user
-```
-
-*(En Linux se utilizará Systemd/Cron, y en macOS LaunchAgents).*
-
-### 9. Programar la actualización automática diaria (opcional)
-
-Para activar el script de actualización automática diaria (que a las 8:00 AM comprueba hashes contra el repositorio remoto y actualiza la sonda atómicamente si existen correcciones):
-
+#### 9. Programar la actualización automática diaria
+Para activar el script de actualización automática diaria (a las 8:00 AM):
 ```bash
 python scripts/update_qoe_probe.py --register
 ```
-
 Si ejecutas sobre Windows Server 2012 R2 u otros sistemas heredados donde quieras omitir validaciones de SSL por certificados de sistema desactualizados y correr en sesión interactiva, usa:
-
 ```bash
 python scripts/update_qoe_probe.py --register --run-as-current-user --no-verify-ssl
 ```

@@ -56,7 +56,29 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
 
 Los logs se escriben en `logs\qoe-probe-YYYY-MM-DD.log`.
 
-## Registrar la Tarea Programada (Python 3)
+## Instalación y Registro Unificado (Recomendado)
+
+La forma más rápida y recomendada para provisionar el token, configurar el catálogo, descargar herramientas y registrar las tareas programadas en un servidor de producción es ejecutar:
+
+```bash
+python scripts/install.py
+```
+
+O en modo desatendido de una sola línea:
+
+```bash
+python scripts/install.py --probe-id "servidor-prod" --site "centro-datos" --environment "production" --isp "fiber" --influx-token "TOKEN" --influx-url "URL" --influx-org "ORG" --influx-bucket "BUCKET"
+```
+
+*(En Windows, si deseas que las tareas se ejecuten bajo la sesión interactiva del usuario actual en lugar de ejecutarse en segundo plano (S4U), agrega la bandera `--run-as-current-user` al instalador).*
+
+---
+
+## Registro Manual Alternativo de Tareas (Detallado)
+
+Si necesitas registrar o reconfigurar las tareas programadas individualmente sin alterar el resto de la configuración:
+
+### 1. Registrar la Tarea Programada de la Sonda (Python 3)
 
 Para programar la ejecución recurrente de la sonda (por defecto cada 10 minutos):
 
@@ -72,7 +94,7 @@ python scripts/register_qoe_task.py --run-as-current-user
 
 *(En Linux se utilizará Systemd/Cron, y en macOS LaunchAgents).*
 
-## Registrar la Tarea de Actualización Automática (Python 3)
+### 2. Registrar la Tarea de Actualización Automática (Python 3)
 
 Para programar la tarea diaria de actualización automática a las 8:00 AM (la cual verifica hashes SHA-256 contra GitHub para actualizar sólo cuando existan cambios):
 

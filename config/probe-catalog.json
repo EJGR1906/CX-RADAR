@@ -5,7 +5,7 @@
     "site": "home-office",
     "environment": "production",
     "probeVersion": "0.2.0",
-    "isp": "home-fiber"
+    "isp": "Inter"
   },
   "influx": {
     "baseUrl": "https://us-east-1-1.aws.cloud2.influxdata.com",
