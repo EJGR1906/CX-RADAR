@@ -128,7 +128,7 @@ function ConvertFrom-ProbeLog {
         [object[]]$Lines
     )
 
-    $targetResults = @()
+    $targetResults = [System.Collections.Generic.List[pscustomobject]]::new()
     $summary = $null
     $warningCount = 0
     $errorCount = 0
@@ -137,37 +137,37 @@ function ConvertFrom-ProbeLog {
     foreach ($line in $normalizedLines) {
         # HTTP check target: "Target svc/ep completed with HTTP 200, curl exit 0, total 123.4 ms"
         if ($line -match 'Target (?<service>[^/]+)/(?<endpoint>[^ ]+) completed with HTTP (?<http>\d+), curl exit (?<exit>-?\d+), total (?<total>[\d\.,]+) ms') {
-            $targetResults += [pscustomobject]@{
+            $targetResults.Add([pscustomobject]@{
                 service = [string]$matches.service
                 endpoint_name = [string]$matches.endpoint
                 http_status = [int]$matches.http
                 curl_exit_code = [int]$matches.exit
                 time_total_ms = ConvertTo-InvariantDouble -Value ([string]$matches.total)
-            }
+            })
             continue
         }
 
         # Speedtest target success: "Target svc/ep completed with download … latency 37,3 ms …"
         if ($line -match 'Target (?<service>[^/]+)/(?<endpoint>[^ ]+) completed with download [\d\.,]+ Mbps.*latency (?<latency>[\d\.,]+) ms') {
-            $targetResults += [pscustomobject]@{
+            $targetResults.Add([pscustomobject]@{
                 service = [string]$matches.service
                 endpoint_name = [string]$matches.endpoint
                 http_status = 0
                 curl_exit_code = 0
                 time_total_ms = ConvertTo-InvariantDouble -Value ([string]$matches.latency)
-            }
+            })
             continue
         }
 
         # Speedtest target failure: "Target svc/ep completed with error_class …"
         if ($line -match 'Target (?<service>[^/]+)/(?<endpoint>[^ ]+) completed with error_class') {
-            $targetResults += [pscustomobject]@{
+            $targetResults.Add([pscustomobject]@{
                 service = [string]$matches.service
                 endpoint_name = [string]$matches.endpoint
                 http_status = 0
                 curl_exit_code = -1
                 time_total_ms = 0.0
-            }
+            })
             continue
         }
 
@@ -508,7 +508,7 @@ try {
     $smokeConfig = Get-Content -Path $smokeConfigPath -Raw | ConvertFrom-Json
     $smokeResult = Invoke-SmokeCertification -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $smokeConfigPath -ScenarioConfig $smokeConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds
 
-    $resilienceResults = @()
+    $resilienceResults = [System.Collections.Generic.List[object]]::new()
 
     if ($RunResilienceChecks) {
         $dnsConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'dns-failure' -Targets @([
@@ -525,7 +525,7 @@ try {
             maxTimeSeconds = 6
         }
         $dnsConfig = Get-Content -Path $dnsConfigPath -Raw | ConvertFrom-Json
-        $resilienceResults += (Invoke-ResilienceScenario -Name 'dns_failure' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $dnsConfigPath -ScenarioConfig $dnsConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
+        $resilienceResults.Add((Invoke-ResilienceScenario -Name 'dns_failure' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $dnsConfigPath -ScenarioConfig $dnsConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
             param($ScenarioResult)
             return (
                 -not $ScenarioResult.process.timed_out -and
@@ -533,7 +533,7 @@ try {
                 $ScenarioResult.new_curl_process_ids.Count -eq 0 -and
                 (Get-ParsedLogFailureCount -ParsedLog $ScenarioResult.parsed_log) -ge 1
             )
-        })
+        }))
 
         $timeoutConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'timeout' -Targets @([
             pscustomobject]@{
@@ -549,7 +549,7 @@ try {
             maxTimeSeconds = 4
         }
         $timeoutConfig = Get-Content -Path $timeoutConfigPath -Raw | ConvertFrom-Json
-        $resilienceResults += (Invoke-ResilienceScenario -Name 'timeout_bound' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $timeoutConfigPath -ScenarioConfig $timeoutConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
+        $resilienceResults.Add((Invoke-ResilienceScenario -Name 'timeout_bound' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $timeoutConfigPath -ScenarioConfig $timeoutConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
             param($ScenarioResult)
             return (
                 -not $ScenarioResult.process.timed_out -and
@@ -557,7 +557,7 @@ try {
                 $ScenarioResult.new_curl_process_ids.Count -eq 0 -and
                 (Get-ParsedLogFailureCount -ParsedLog $ScenarioResult.parsed_log) -ge 1
             )
-        })
+        }))
 
         $influxOutageConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'influx-outage' -Targets @([
             pscustomobject]@{
@@ -576,7 +576,7 @@ try {
         }
         $influxOutageConfig = Get-Content -Path $influxOutageConfigPath -Raw | ConvertFrom-Json
         $dummyTokenName = [string]$influxOutageConfig.influx.tokenEnvVar
-        $resilienceResults += (Invoke-ResilienceScenario -Name 'influx_outage' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $influxOutageConfigPath -ScenarioConfig $influxOutageConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $false -EnvironmentOverrides @{ $dummyTokenName = 'dummy-token' } -PassCondition {
+        $resilienceResults.Add((Invoke-ResilienceScenario -Name 'influx_outage' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $influxOutageConfigPath -ScenarioConfig $influxOutageConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $false -EnvironmentOverrides @{ $dummyTokenName = 'dummy-token' } -PassCondition {
             param($ScenarioResult)
             return (
                 -not $ScenarioResult.process.timed_out -and
@@ -584,7 +584,7 @@ try {
                 $ScenarioResult.new_curl_process_ids.Count -eq 0 -and
                 $ScenarioResult.parsed_log.error_count -ge 1
             )
-        })
+        }))
 
         if ($IncludeTlsScenario) {
             $tlsConfigPath = New-ScenarioConfig -BaseConfig $baseConfig -ScenarioRoot $scenarioRoot -ScenarioName 'tls-failure' -Targets @([
@@ -601,14 +601,14 @@ try {
                 maxTimeSeconds = 15
             }
             $tlsConfig = Get-Content -Path $tlsConfigPath -Raw | ConvertFrom-Json
-            $resilienceResults += (Invoke-ResilienceScenario -Name 'tls_failure' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $tlsConfigPath -ScenarioConfig $tlsConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
+            $resilienceResults.Add((Invoke-ResilienceScenario -Name 'tls_failure' -ProbeScriptPath $resolvedProbeScriptPath -ScenarioConfigPath $tlsConfigPath -ScenarioConfig $tlsConfig -MaxProbeRuntimeSeconds $MaxProbeRuntimeSeconds -SkipInfluxWrite $true -PassCondition {
                 param($ScenarioResult)
                 return (
                     -not $ScenarioResult.process.timed_out -and
                     $ScenarioResult.new_curl_process_ids.Count -eq 0 -and
                     (Get-ParsedLogFailureCount -ParsedLog $ScenarioResult.parsed_log) -ge 1
                 )
-            })
+            }))
         }
     }
 
