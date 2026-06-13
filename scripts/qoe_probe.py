@@ -1071,11 +1071,13 @@ def kill_dangling_chrome(puppeteer_cache_dir: Path) -> None:
     if is_windows():
         cmd = [
             "powershell", "-NoProfile", "-Command",
-            f"Get-Process -Name 'chrome', 'chrome-headless-shell' -ErrorAction SilentlyContinue | "
-            f"Where-Object {{ $_.Path -and $_.Path.StartsWith('{cache_path_str}') }} | "
-            f"Stop-Process -Force -ErrorAction SilentlyContinue"
+            "Get-Process -Name 'chrome', 'chrome-headless-shell' -ErrorAction SilentlyContinue | "
+            "Where-Object { $_.Path -and $_.Path.StartsWith($env:TARGET_CACHE_PATH) } | "
+            "Stop-Process -Force -ErrorAction SilentlyContinue"
         ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc_env = os.environ.copy()
+        proc_env["TARGET_CACHE_PATH"] = cache_path_str
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=proc_env)
     else:
         try:
             proc = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True, text=True)
