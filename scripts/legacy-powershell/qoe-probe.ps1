@@ -634,18 +634,12 @@ function New-MeasurementTemporaryDirectory {
 
 <#
 .SYNOPSIS
-    Realiza la limpieza del entorno, eliminando archivos temporales y logs antiguos.
+    Realiza la limpieza de archivos temporales.
 #>
-function Invoke-EnvironmentGarbageCollection {
+function Clean-TemporaryFiles {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RepoRoot,
-
-        [Parameter(Mandatory = $true)]
         [string]$TemporaryDirectory,
-
-        [Parameter()]
-        [int]$LogRetentionDays = 7,
 
         [Parameter()]
         [int]$MinimumAgeMinutes = 20
@@ -670,6 +664,24 @@ function Invoke-EnvironmentGarbageCollection {
         }
     }
 
+    return $removedCount
+}
+
+<#
+.SYNOPSIS
+    Realiza la limpieza de logs antiguos.
+#>
+function Clean-OldLogs {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+
+        [Parameter()]
+        [int]$LogRetentionDays = 7
+    )
+
+    $removedCount = 0
+
     $logsPath = Join-Path -Path $RepoRoot -ChildPath 'logs'
     if (Test-Path -Path $logsPath -PathType Container) {
         $logCutoffTimeUtc = (Get-Date).ToUniversalTime().AddDays(-1 * [math]::Abs($LogRetentionDays))
@@ -687,6 +699,33 @@ function Invoke-EnvironmentGarbageCollection {
             }
         }
     }
+
+    return $removedCount
+}
+
+<#
+.SYNOPSIS
+    Realiza la limpieza del entorno, eliminando archivos temporales y logs antiguos.
+#>
+function Invoke-EnvironmentGarbageCollection {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string]$TemporaryDirectory,
+
+        [Parameter()]
+        [int]$LogRetentionDays = 7,
+
+        [Parameter()]
+        [int]$MinimumAgeMinutes = 20
+    )
+
+    $removedCount = 0
+
+    $removedCount += Clean-TemporaryFiles -TemporaryDirectory $TemporaryDirectory -MinimumAgeMinutes $MinimumAgeMinutes
+    $removedCount += Clean-OldLogs -RepoRoot $RepoRoot -LogRetentionDays $LogRetentionDays
 
     return $removedCount
 }
