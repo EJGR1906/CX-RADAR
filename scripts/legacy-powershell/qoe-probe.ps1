@@ -634,18 +634,12 @@ function New-MeasurementTemporaryDirectory {
 
 <#
 .SYNOPSIS
-    Realiza la limpieza del entorno, eliminando archivos temporales y logs antiguos.
+    Realiza la limpieza de archivos temporales.
 #>
-function Invoke-EnvironmentGarbageCollection {
+function Clean-TemporaryFiles {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RepoRoot,
-
-        [Parameter(Mandatory = $true)]
         [string]$TemporaryDirectory,
-
-        [Parameter()]
-        [int]$LogRetentionDays = 7,
 
         [Parameter()]
         [int]$MinimumAgeMinutes = 20
@@ -669,6 +663,24 @@ function Invoke-EnvironmentGarbageCollection {
             }
         }
     }
+
+    return $removedCount
+}
+
+<#
+.SYNOPSIS
+    Realiza la limpieza de logs antiguos.
+#>
+function Clean-OldLogs {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+
+        [Parameter()]
+        [int]$LogRetentionDays = 7
+    )
+
+    $removedCount = 0
 
     $logsPath = Join-Path -Path $RepoRoot -ChildPath 'logs'
     if (Test-Path -Path $logsPath -PathType Container) {
@@ -2275,7 +2287,9 @@ try {
 
     $gcRepoRoot = Get-FullPathFromBase -BasePath $scriptBasePath -ChildPath '..'
     $gcTempDir = if ($null -ne $portableTools) { $portableTools.TemporaryDirectory } else { Join-Path -Path $gcRepoRoot -ChildPath 'bin\tmp' }
-    $staleTemporaryArtifactCount = Invoke-EnvironmentGarbageCollection -RepoRoot $gcRepoRoot -TemporaryDirectory $gcTempDir
+    $staleTemporaryArtifactCount = 0
+    $staleTemporaryArtifactCount += Clean-TemporaryFiles -TemporaryDirectory $gcTempDir
+    $staleTemporaryArtifactCount += Clean-OldLogs -RepoRoot $gcRepoRoot
     if ($staleTemporaryArtifactCount -gt 0) {
         Write-Log -Message ("Environment GC removed {0} stale artifact(s) or log(s)." -f $staleTemporaryArtifactCount) -LogPath $logPath
     }
