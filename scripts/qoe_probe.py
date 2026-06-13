@@ -964,16 +964,18 @@ def get_upload_supplement_method(target: Dict[str, Any], probe_run: Dict[str, An
 
 
 def get_upload_supplement_cache_key(target: Dict[str, Any], method: str) -> str:
+    service = get_optional_str(target, "service", "").lower()
+    endpoint_name = get_optional_str(target, "endpointName", "").lower()
     if method == "networkquality":
-        return "networkquality"
+        return f"networkquality::{service}::{endpoint_name}"
     elif method == "curl-upload":
         endpoint = get_optional_str(target, "uploadEndpoint", "https://speed.cloudflare.com/__up")
-        return f"curl-upload::{endpoint.lower()}"
+        return f"curl-upload::{service}::{endpoint_name}::{endpoint.lower()}"
     elif method == "upload-url":
         upload_url = get_optional_str(target, "uploadUrl")
         if not upload_url:
             return ""
-        return f"upload-url::{upload_url.lower()}"
+        return f"upload-url::{service}::{endpoint_name}::{upload_url.lower()}"
     return ""
 
 
