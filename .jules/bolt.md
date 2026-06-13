@@ -1,3 +1,6 @@
 ## 2024-05-18 - [Optimized shutil.copyfileobj Buffer Size for High-Throughput HTTP Downloads]
 **Learning:** `shutil.copyfileobj` relies on a default block size which is often too small for high-bandwidth connections (e.g., 16KB or 64KB). When performing synthetic speed tests (like downloading an 8MB or 100MB chunk to measure throughput), this small buffer causes excessive `read()`/`write()` syscalls and Python-level loop overhead. This can artificially limit the measured download Mbps, confusing probe overhead with true network capacity.
 **Action:** Always provide a larger explicit `length` parameter (e.g., `length=1024 * 1024` for 1MB blocks) to `shutil.copyfileobj` when building diagnostic tools or high-throughput file transfer loops in Python to prevent the interpreter/OS context switches from becoming the bottleneck.
+## 2026-06-13 - [Optimized PowerShell array concatenation]
+**Learning:** In PowerShell, arrays are immutable. The `+=` operator creates a new array every time it is called, copying all existing elements. This leads to O(n^2) time complexity for repeated appends, causing severe performance degradation for large datasets.
+**Action:** When dynamically appending elements to a collection in PowerShell, use a generic List (`[System.Collections.Generic.List[Type]]::new()`) and its `.Add()` method instead of array `+=`.
