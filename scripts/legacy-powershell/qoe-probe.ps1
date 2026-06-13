@@ -655,17 +655,20 @@ function Invoke-EnvironmentGarbageCollection {
 
     if (Test-Path -Path $TemporaryDirectory -PathType Container) {
         $cutoffTimeUtc = (Get-Date).ToUniversalTime().AddMinutes(-1 * [math]::Abs($MinimumAgeMinutes))
-        foreach ($pattern in @('burst-*', 'yt-dlp-*', 'fast-cli-*', 'puppeteer_dev_chrome_profile-*', '*.tmp', '*.bak')) {
-            foreach ($candidate in @(Get-ChildItem -Path $TemporaryDirectory -Filter $pattern -Force -ErrorAction SilentlyContinue)) {
-                if ($candidate.LastWriteTime.ToUniversalTime() -gt $cutoffTimeUtc) {
-                    continue
-                }
 
-                $candidatePath = $candidate.FullName
-                Remove-PathIfExists -Path $candidatePath
-                if (-not (Test-Path -Path $candidatePath)) {
-                    $removedCount++
-                }
+        $candidates = @(Get-ChildItem -Path $TemporaryDirectory -Force -ErrorAction SilentlyContinue | Where-Object {
+            $_.Name -match '^(?i)(burst-|yt-dlp-|fast-cli-|puppeteer_dev_chrome_profile-)' -or $_.Name -match '(?i)\.(tmp|bak)$'
+        })
+
+        foreach ($candidate in $candidates) {
+            if ($candidate.LastWriteTime.ToUniversalTime() -gt $cutoffTimeUtc) {
+                continue
+            }
+
+            $candidatePath = $candidate.FullName
+            Remove-PathIfExists -Path $candidatePath
+            if (-not (Test-Path -Path $candidatePath)) {
+                $removedCount++
             }
         }
     }
