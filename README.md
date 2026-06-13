@@ -192,10 +192,10 @@ Para activar el script de actualización automática diaria (que a las 8:00 AM c
 python scripts/update_qoe_probe.py --register
 ```
 
-Si ejecutas sobre Windows Server 2012 R2 u otros sistemas heredados donde quieras omitir validaciones de SSL por certificados de sistema desactualizados y correr en sesión interactiva, usa:
+Si ejecutas sobre Windows en un entorno donde quieras utilizar la sesión interactiva del usuario actual, usa:
 
 ```bash
-python scripts/update_qoe_probe.py --register --run-as-current-user --no-verify-ssl
+python scripts/update_qoe_probe.py --register --run-as-current-user
 ```
 
 ### 10. Ver los resultados
@@ -263,8 +263,7 @@ Ejecuta suites de prueba (smoke y resiliencia) para certificar el estado de la s
 
 ### 5. `update_qoe_probe.py` (Actualización Automática de la Sonda)
 Compara hashes SHA-256 locales con el repositorio remoto de GitHub y descarga actualizaciones de forma atómica y segura para los archivos principales de la sonda.
-- **`--config-path <string>`**: Ruta al catálogo de configuración para leer la directiva de verificación TLS (por defecto: `config/probe-catalog.json`).
-- **`--no-verify-ssl`**: Ignora errores de certificados SSL/TLS al descargar (útil en Windows Server 2012 heredados).
+- **`--config-path <string>`**: Ruta al catálogo de configuración (por defecto: `config/probe-catalog.json`).
 - **`--register`**: Registra el script de actualización automática en el planificador de tareas nativo del sistema para ejecutarse diariamente (por defecto a las `08:00`).
 - **`--run-as-current-user`**: (Windows) Registra la tarea programada utilizando el inicio de sesión interactivo del usuario actual.
 - **`--task-name <string>`**: Nombre personalizado de la tarea programada (por defecto: `CX-Radar-QoE-Updater`).

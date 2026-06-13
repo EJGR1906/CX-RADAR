@@ -75,31 +75,17 @@ def compute_sha256(file_path: Path) -> str:
         return ""
 
 
-def load_config_verify_tls(config_path: Path) -> bool:
-    """Read verifyTls setting from config/probe-catalog.json."""
-    if not config_path.is_file():
-        return True
-    try:
-        data = json.loads(config_path.read_text(encoding="utf-8"))
-        return bool(data.get("probeRun", {}).get("verifyTls", True))
-    except Exception:
-        return True
-
-
 # ---------------------------------------------------------------------------
 # Downloader with Fallback
 # ---------------------------------------------------------------------------
 
 def download_file(
-    url: str, dest_path: Path, verify_ssl: bool
+    url: str, dest_path: Path
 ) -> bool:
     """Download url to dest_path using urllib, fallback to curl on failure."""
     # Create ssl context
     import ssl
     ctx = ssl.create_default_context()
-    if not verify_ssl:
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
 
     print(f"Downloading {url} ...")
     
@@ -122,8 +108,6 @@ def download_file(
     if curl_path:
         print(f"  Attempting fallback with curl...")
         args = [curl_path, "-fsSL", url, "-o", str(dest_path)]
-        if not verify_ssl:
-            args.append("-k")  # insecure
         code, stdout, stderr = run_cmd(args)
         if code == 0 and dest_path.is_file():
             print(f"  Successfully downloaded via curl.")
@@ -139,7 +123,7 @@ def download_file(
 # Update Verification and Replacement
 # ---------------------------------------------------------------------------
 
-def perform_updates(verify_ssl: bool, scripts_dir: Path, config_path: Path) -> int:
+def perform_updates(scripts_dir: Path) -> int:
     """Download and update files. Returns count of files updated."""
     updated_count = 0
     
@@ -149,7 +133,7 @@ def perform_updates(verify_ssl: bool, scripts_dir: Path, config_path: Path) -> i
         url = f"{GITHUB_RAW_BASE}/{filename}"
         
         # Download to tmp file
-        success = download_file(url, tmp_path, verify_ssl)
+        success = download_file(url, tmp_path)
         if not success:
             print(f"Error: Failed to download {filename}. Skipping.")
             if tmp_path.is_file():
@@ -400,11 +384,6 @@ def main() -> None:
         help="Path to probe-catalog.json (default: ../config/probe-catalog.json)"
     )
     parser.add_argument(
-        "--no-verify-ssl",
-        action="store_true",
-        help="Bypass SSL certificate verification for downloading updates"
-    )
-    parser.add_argument(
         "--register",
         action="store_true",
         help="Register autoupdater to run daily at 8:00 AM"
@@ -437,14 +416,7 @@ def main() -> None:
     else:
         config_path = (repo_root / "config" / "probe-catalog.json").resolve()
         
-    # Read config TLS settings
-    config_verify_tls = load_config_verify_tls(config_path)
-    verify_ssl = (not args.no_verify_ssl) and config_verify_tls
-    
-    if not verify_ssl:
-        print("SSL Verification: DISABLED")
-    else:
-        print("SSL Verification: ENABLED")
+    print("SSL Verification: ENABLED")
 
     # If register flag is set, handle task registration
     if args.register:
@@ -492,7 +464,7 @@ def main() -> None:
 
     # Run check and update
     print(f"Checking for updates for scripts in {script_dir}...")
-    updated = perform_updates(verify_ssl, script_dir, config_path)
+    updated = perform_updates(script_dir)
     print(f"Update finished. {updated} files updated.")
 
 
