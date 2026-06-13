@@ -10,9 +10,9 @@ Este documento detalla la refactorización y migración estructural del proyecto
 
 ---
 
-## Equivalencia de Archivos
+## Equivalencia de Archivos (Histórico)
 
-Los scripts originales se han guardado en `scripts/legacy-powershell/` para contingencias y referencia histórica. La correspondencia es la siguiente:
+Los scripts originales de PowerShell se guardaron inicialmente en `scripts/legacy-powershell/` para contingencias y referencia histórica, y posteriormente fueron eliminados para limpiar el repositorio. La correspondencia histórica es la siguiente:
 
 | Script Original (PowerShell) | Nuevo Script (Python 3) | Propósito |
 | :--- | :--- | :--- |
