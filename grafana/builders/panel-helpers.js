@@ -240,5 +240,5 @@ function gridItem(name, x, y, w, h) {
   return { kind: 'GridLayoutItem', spec: { element: { kind: 'ElementReference', name }, x, y, width: w, height: h } };
 }
 
-module.exports = { statPanel, tsPanel, barGaugePanel, tablePanel, stateTimelinePanel, geomapPanel, gridItem, DS };
+module.exports = { query, statPanel, tsPanel, barGaugePanel, tablePanel, stateTimelinePanel, geomapPanel, gridItem, DS };
 
