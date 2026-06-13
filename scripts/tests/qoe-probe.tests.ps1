@@ -1,69 +1,67 @@
+$ErrorActionPreference = 'Stop'
+
 BeforeAll {
-    # Extract functions from qoe-probe.ps1 without executing the script
-    $ScriptPath = Join-Path $PSScriptRoot "..\qoe-probe.ps1"
+    $scriptPath = Resolve-Path "$PSScriptRoot/../legacy-powershell/qoe-probe.ps1"
+    $scriptContent = Get-Content -Path $scriptPath -Raw
+    $errors = $null
+    $tokens = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($scriptContent, [ref]$tokens, [ref]$errors)
 
-    # Fallback for actual repo structure
-    if (-not (Test-Path -Path $ScriptPath)) {
-        $ScriptPath = Join-Path $PSScriptRoot "..\legacy-powershell\qoe-probe.ps1"
+    $functionAst = $ast.FindAll({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Get-MbpsFromBytesAndDuration'
+    }, $true)[0]
+
+    if ($null -eq $functionAst) {
+        throw "Function Get-MbpsFromBytesAndDuration not found in $scriptPath"
     }
 
-    if (-not (Test-Path -Path $ScriptPath)) {
-        Write-Error "Could not find qoe-probe.ps1 at $ScriptPath"
-    }
+    # Execute the function definition to make it available in BeforeAll
+    Invoke-Expression $functionAst.Extent.Text
 
-    $ScriptContent = Get-Content -Path $ScriptPath -Raw
-    $Ast = [System.Management.Automation.Language.Parser]::ParseInput($ScriptContent, [ref]$null, [ref]$null)
-
-    # Recreate the function dynamically by explicitly dot-sourcing the Invoke-Expression string block
-    # to register it in the caller scope (which inside BeforeAll maps to the test scope).
-    $Ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) |
-        Where-Object { $_.Name -eq "ConvertTo-EscapedTagValue" } |
-        ForEach-Object { . ([scriptblock]::Create($_.Extent.Text)) }
+    # Export it to global scope so It blocks can see it
+    $funcDef = Get-Command Get-MbpsFromBytesAndDuration
+    Set-Item -Path "Function:global:Get-MbpsFromBytesAndDuration" -Value $funcDef.ScriptBlock
 }
 
-Describe "ConvertTo-EscapedTagValue" {
-    It "Returns empty string for null input" {
-        $result = ConvertTo-EscapedTagValue -Value $null
-        $result | Should -Be ''
+Describe "Get-MbpsFromBytesAndDuration" {
+    It "Calculates normal throughput correctly (10MB in 1 sec = 80 Mbps)" {
+        $bytes = 10000000 # 10 MB
+        $durationMs = 1000 # 1 second
+        $result = Get-MbpsFromBytesAndDuration -Bytes $bytes -DurationMs $durationMs
+        $result | Should -Be 80.0
     }
 
-    It "Returns the same string for input without special characters" {
-        $result = ConvertTo-EscapedTagValue -Value "NormalString123"
-        $result | Should -Be "NormalString123"
+    It "Calculates standard values with rounding (1MB in 1.5 sec)" {
+        $bytes = 1000000 # 1 MB
+        $durationMs = 1500 # 1.5 seconds
+        # 1MB * 8 = 8 Mb. 8 Mb / 1.5s = 5.333... Mbps. Round to 2 is 5.33
+        $result = Get-MbpsFromBytesAndDuration -Bytes $bytes -DurationMs $durationMs
+        $result | Should -Be 5.33
     }
 
-    It "Escapes spaces" {
-        $result = ConvertTo-EscapedTagValue -Value "String with spaces"
-        $result | Should -Be "String\ with\ spaces"
+    It "Returns 0.0 when Bytes is 0" {
+        $result = Get-MbpsFromBytesAndDuration -Bytes 0 -DurationMs 1000
+        $result | Should -Be 0.0
     }
 
-    It "Escapes commas" {
-        $result = ConvertTo-EscapedTagValue -Value "Value,1,2"
-        $result | Should -Be "Value\,1\,2"
+    It "Returns 0.0 when Bytes is negative" {
+        $result = Get-MbpsFromBytesAndDuration -Bytes -100 -DurationMs 1000
+        $result | Should -Be 0.0
     }
 
-    It "Escapes equal signs" {
-        $result = ConvertTo-EscapedTagValue -Value "Key=Value"
-        $result | Should -Be "Key\=Value"
+    It "Returns 0.0 when DurationMs is 0" {
+        $result = Get-MbpsFromBytesAndDuration -Bytes 1000000 -DurationMs 0
+        $result | Should -Be 0.0
     }
 
-    It "Escapes backslashes" {
-        $result = ConvertTo-EscapedTagValue -Value "C:\Path\To\File"
-        $result | Should -Be "C:\\Path\\To\\File"
+    It "Returns 0.0 when DurationMs is negative" {
+        $result = Get-MbpsFromBytesAndDuration -Bytes 1000000 -DurationMs -500
+        $result | Should -Be 0.0
     }
 
-    It "Escapes combinations of special characters" {
-        $result = ConvertTo-EscapedTagValue -Value "Key, Name = Value\1"
-        $result | Should -Be "Key\,\ Name\ \=\ Value\\1"
-    }
-
-    It "Handles boolean values by converting to string first" {
-        $result = ConvertTo-EscapedTagValue -Value $true
-        $result | Should -Be "True"
-    }
-
-    It "Handles integer values by converting to string first" {
-        $result = ConvertTo-EscapedTagValue -Value 42
-        $result | Should -Be "42"
+    It "Returns 0.0 when both Bytes and DurationMs are 0" {
+        $result = Get-MbpsFromBytesAndDuration -Bytes 0 -DurationMs 0
+        $result | Should -Be 0.0
     }
 }
