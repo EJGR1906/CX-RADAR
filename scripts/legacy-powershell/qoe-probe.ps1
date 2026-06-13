@@ -1473,13 +1473,17 @@ function Resolve-YtDlpDirectUrl {
         return ''
     }
 
+    if (-not ($videoUrl.StartsWith('http://', [System.StringComparison]::OrdinalIgnoreCase) -or $videoUrl.StartsWith('https://', [System.StringComparison]::OrdinalIgnoreCase))) {
+        return ''
+    }
+
     $arguments = New-Object System.Collections.Generic.List[string]
     foreach ($argument in (Get-YtDlpBaseArguments -PortableTools $PortableTools)) {
         $arguments.Add([string]$argument)
     }
 
     $formatSelector = Get-OptionalStringValue -Source $Target -PropertyName 'format' -DefaultValue 'best[protocol^=https][height<=480]/best[height<=480]/best'
-    foreach ($argument in @('--print', 'urls', '--format', $formatSelector, $videoUrl)) {
+    foreach ($argument in @('--print', 'urls', '--format', $formatSelector, '--', $videoUrl)) {
         $arguments.Add([string]$argument)
     }
 
@@ -1513,6 +1517,10 @@ function Invoke-YtDlpMeasurement {
     $videoUrl = Get-OptionalStringValue -Source $Target -PropertyName 'videoUrl' -DefaultValue (Get-OptionalStringValue -Source $Target -PropertyName 'url' -DefaultValue '')
     if ([string]::IsNullOrWhiteSpace($videoUrl)) {
         throw "Speed-test target '$($Target.service)/$($Target.endpointName)' requires videoUrl when speedTestMethod is 'yt-dlp'."
+    }
+
+    if (-not ($videoUrl.StartsWith('http://', [System.StringComparison]::OrdinalIgnoreCase) -or $videoUrl.StartsWith('https://', [System.StringComparison]::OrdinalIgnoreCase))) {
+        throw "Speed-test target '$($Target.service)/$($Target.endpointName)' requires videoUrl to start with 'http://' or 'https://'."
     }
 
     $downloadDirectory = New-MeasurementTemporaryDirectory -PortableTools $PortableTools -Prefix 'yt-dlp' -Target $Target

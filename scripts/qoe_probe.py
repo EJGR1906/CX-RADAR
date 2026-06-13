@@ -1196,6 +1196,9 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
     if not video_url:
         raise ValueError("Target requires videoUrl or url.")
 
+    if not (video_url.lower().startswith("http://") or video_url.lower().startswith("https://")):
+        raise ValueError("Target videoUrl must start with http:// or https://")
+
     num_connections = max(1, get_optional_int(target, "parallelConnections", get_optional_int(probe_run, "parallelConnections", 1)))
 
     temp_dir = tools.get("repo_root", Path(".")).resolve() / "bin" / "tmp"
@@ -1213,7 +1216,7 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
             args.extend(["--no-js-runtimes", "--js-runtimes", f"node:{node_exe}"])
 
         fmt = get_optional_str(target, "format", "best[protocol^=https][height<=480]/best[height<=480]/best")
-        args.extend(["--print", "urls", "--format", fmt, video_url])
+        args.extend(["--print", "urls", "--format", fmt, "--", video_url])
 
         exit_code, stdout, stderr, _, timed_out = run_external_process(
             [str(yt_dlp_exe)] + args, 60, cwd=tools.get("repo_root")
