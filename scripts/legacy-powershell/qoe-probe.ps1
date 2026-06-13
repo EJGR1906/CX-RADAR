@@ -2240,8 +2240,22 @@ if (-not [string]::IsNullOrWhiteSpace($RunReportPath)) {
     $resolvedRunReportPath = Get-FullPathFromBase -BasePath $repoRoot -ChildPath $RunReportPath
 }
 
-$logDirectory = Join-Path -Path (Split-Path -Path $resolvedConfigPath -Parent) -ChildPath "..\$($config.probeRun.logDirectory)"
-$logDirectory = [System.IO.Path]::GetFullPath($logDirectory)
+$logDirectoryConfig = $config.probeRun.logDirectory
+if ([string]::IsNullOrWhiteSpace($logDirectoryConfig)) {
+    $logDirectoryConfig = 'logs'
+}
+
+$logDirectory = Get-FullPathFromBase -BasePath $repoRoot -ChildPath $logDirectoryConfig
+
+$repoRootWithSeparator = $repoRoot
+if (-not $repoRootWithSeparator.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+    $repoRootWithSeparator += [System.IO.Path]::DirectorySeparatorChar
+}
+
+if (-not $logDirectory.StartsWith($repoRootWithSeparator, [System.StringComparison]::OrdinalIgnoreCase) -and $logDirectory -ne $repoRoot) {
+    throw "Security Exception: Invalid logDirectory path traversal detected. Path must be within the repository root."
+}
+
 if (-not (Test-Path -Path $logDirectory)) {
     New-Item -Path $logDirectory -ItemType Directory -Force | Out-Null
 }
