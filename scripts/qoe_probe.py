@@ -788,21 +788,24 @@ def upload_file_to_url(
 ) -> float:
     """Upload a local file content to a URL, measuring time elapsed."""
     start_time = time.perf_counter()
+    # ⚡ Bolt: Use os.path.getsize to allow Path or str, and pass the file object
+    # to urllib to stream directly from disk instead of buffering massive files into memory.
+    file_size = os.path.getsize(file_path)
+
     with open(file_path, "rb") as f:
-        data = f.read()
+        req = urllib.request.Request(url, data=f, method=method)
+        req.add_header("Content-Type", "application/octet-stream")
+        req.add_header("Content-Length", str(file_size))
+        if user_agent:
+            req.add_header("User-Agent", user_agent)
 
-    req = urllib.request.Request(url, data=data, method=method)
-    req.add_header("Content-Type", "application/octet-stream")
-    if user_agent:
-        req.add_header("User-Agent", user_agent)
+        ctx = ssl.create_default_context()
+        if not verify_tls:
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
 
-    ctx = ssl.create_default_context()
-    if not verify_tls:
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-
-    with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:
-        response.read()
+        with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:
+            response.read()
 
     return (time.perf_counter() - start_time) * 1000
 

@@ -11,3 +11,6 @@
 2. Run dry run probe: `python scripts/qoe_probe.py --skip-influx-write`
 3. Run full probe: `python scripts/qoe_probe.py`
 4. Run QA certification: `python scripts/run_qoe_certification.py`
+## 2026-06-14 - urllib file upload memory spike
+**Learning:** In standard Python library `urllib.request`, passing a file object directly to the `data=` argument of a `Request` instead of reading the entire file contents (`data = f.read()`) natively streams the payload block-by-block. However, when using streaming uploads, it is critical to supply `Content-Length` header manually, as `urllib` cannot inherently determine the stream size. By calculating the file size with `os.path.getsize()`, it is possible to drastically decrease memory consumption.
+**Action:** Always stream large payload transfers rather than fully buffer them into RAM before invoking network tasks. Verify that necessary headers (`Content-Length`) are correctly resolved beforehand.
