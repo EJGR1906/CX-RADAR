@@ -244,7 +244,7 @@ def main() -> None:
     var_name = _get_token_env_var(config)
 
     # --- Obtain token ---
-    token = args.token
+    token = args.token or os.environ.get("CX_RADAR_PROVISIONING_TOKEN", "")
     if not token:
         token = getpass.getpass(prompt=f"Enter InfluxDB Cloud API token ({var_name}): ")
     if not token.strip():

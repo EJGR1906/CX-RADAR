@@ -18,6 +18,7 @@ import platform
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 
 def _is_windows() -> bool:
@@ -62,12 +63,15 @@ def check_existing_token(repo_root: Path, var_name: str) -> bool:
     return False
 
 
-def run_step(name: str, args: list[str], cwd: Path) -> None:
+def run_step(name: str, args: list[str], cwd: Path, env: Optional[dict[str, str]] = None) -> None:
     print(f"\n>>> Running Step: {name}...")
     print(f"    Command: {' '.join(args)}")
     try:
         # Run directly without capturing so the user gets real-time progress/interactive prompts
-        result = subprocess.run(args, cwd=str(cwd), check=True)
+        proc_env = os.environ.copy()
+        if env:
+            proc_env.update(env)
+        result = subprocess.run(args, cwd=str(cwd), env=proc_env, check=True)
         if result.returncode == 0:
             print(f"[OK] Step '{name}' completed successfully.")
         else:
@@ -216,11 +220,10 @@ def main() -> None:
         token_cmd = [
             sys.executable,
             str(script_dir / "set_influx_token.py"),
-            "--token", token,
             "--method", "file",
             "--force"
         ]
-        run_step("Store InfluxDB Token", token_cmd, repo_root)
+        run_step("Store InfluxDB Token", token_cmd, repo_root, env={"CX_RADAR_PROVISIONING_TOKEN": token})
     else:
         print("\n[OK] Keeping existing InfluxDB token.")
 

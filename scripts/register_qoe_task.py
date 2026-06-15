@@ -169,6 +169,7 @@ WantedBy=timers.target
     print(f"Writing systemd units to {systemd_user_dir}...")
     try:
         service_path.write_text(service_content, encoding="utf-8")
+        service_path.chmod(0o600)  # Secure the service file due to plaintext token
         timer_path.write_text(timer_content, encoding="utf-8")
     except Exception as e:
         print(f"Error writing systemd units: {e}")
@@ -232,6 +233,7 @@ def register_macos_launchd(
     print(f"Writing LaunchAgent plist to {plist_path}...")
     try:
         plist_path.write_text(plist_content, encoding="utf-8")
+        plist_path.chmod(0o600)  # Secure the plist file due to plaintext token
     except Exception as e:
         print(f"Error writing launchd plist: {e}")
         return False
