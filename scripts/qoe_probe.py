@@ -280,6 +280,10 @@ def get_influx_token(influx_cfg: Dict[str, Any], config_dir: Path) -> str:
 # ---------------------------------------------------------------------------
 # Garbage Collection
 # ---------------------------------------------------------------------------
+
+LOG_PATTERN_PROBE = re.compile(r'^qoe-probe-\d{4}-\d{2}-\d{2}\.log$')
+LOG_PATTERN_SPEED = re.compile(r'^qoe-speed-test-\d{4}-\d{2}-\d{2}\.log$')
+
 def run_garbage_collection(repo_root: Path, temp_dir: Path, log_retention_days: int = 7, min_age_minutes: int = 20) -> int:
     """Remove stale log files and temporary artifacts."""
     removed_count = 0
@@ -307,10 +311,8 @@ def run_garbage_collection(repo_root: Path, temp_dir: Path, log_retention_days: 
     logs_dir = repo_root / "logs"
     if logs_dir.exists() and logs_dir.is_dir():
         cutoff_logs = now - (log_retention_days * 24 * 3600)
-        pattern_probe = re.compile(r'^qoe-probe-\d{4}-\d{2}-\d{2}\.log$')
-        pattern_speed = re.compile(r'^qoe-speed-test-\d{4}-\d{2}-\d{2}\.log$')
         for item in logs_dir.glob("*.log"):
-            if pattern_probe.match(item.name) or pattern_speed.match(item.name):
+            if LOG_PATTERN_PROBE.match(item.name) or LOG_PATTERN_SPEED.match(item.name):
                 try:
                     mtime = item.stat().st_mtime
                     if mtime <= cutoff_logs:
@@ -378,6 +380,9 @@ def run_external_process(
 # ---------------------------------------------------------------------------
 # Ping Stats implementation
 # ---------------------------------------------------------------------------
+# Regex matching English and Spanish time: time=12ms, tiempo=12ms, time<1ms, tiempo<1ms
+PING_TIME_REGEX = re.compile(r'(?:time|tiempo)\s*[=<]\s*(\d+(?:\.\d+)?)\s*ms', re.IGNORECASE)
+
 def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> Dict[str, Any]:
     """Compute RTT latency and Mean Absolute Successive Jitter using ping."""
     result = {
@@ -406,12 +411,10 @@ def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> 
     exit_code, stdout, _, _, _ = run_external_process(args, timeout_seconds)
 
     samples = []
-    # Regex matching English and Spanish time: time=12ms, tiempo=12ms, time<1ms, tiempo<1ms
-    time_regex = re.compile(r'(?:time|tiempo)\s*[=<]\s*(\d+(?:\.\d+)?)\s*ms', re.IGNORECASE)
 
     lines = stdout.splitlines()
     for line in lines:
-        m = time_regex.search(line)
+        m = PING_TIME_REGEX.search(line)
         if m:
             samples.append(float(m.group(1)))
 
