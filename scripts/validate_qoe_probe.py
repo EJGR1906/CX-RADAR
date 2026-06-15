@@ -359,22 +359,13 @@ def _build_report(config_path: Path) -> Dict[str, Any]:
         tools["yt_dlp_exe"].is_file() if yt_dlp_targets else True
     )
 
-    all_nq = list(dict.fromkeys(
-        id(t) for t in nq_targets + upload_nq_targets
-    ))
-    all_nq_targets_list = [
-        t for t in nq_targets + upload_nq_targets
-        if id(t) in all_nq  # deduplicate by identity
-    ]
-    # Deduplicate properly
     _seen_ids: set = set()
-    _unique_nq: List[Dict[str, Any]] = []
+    all_nq_targets_list: List[Dict[str, Any]] = []
     for t in nq_targets + upload_nq_targets:
         tid = id(t)
         if tid not in _seen_ids:
             _seen_ids.add(tid)
-            _unique_nq.append(t)
-    all_nq_targets_list = _unique_nq
+            all_nq_targets_list.append(t)
 
     nq_command_available = (
         all(
