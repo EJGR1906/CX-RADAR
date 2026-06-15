@@ -602,7 +602,21 @@ def run_python_http_probe(target: Dict[str, Any], probe_run: Dict[str, Any]) -> 
             return super().redirect_request(req, fp, code, msg, headers, newurl)
 
     tracker = RedirectTracker()
-    opener = urllib.request.build_opener(tracker)
+    handlers = [tracker]
+    ctx = None
+    if parsed_url.scheme == "https":
+        ctx = ssl.create_default_context()
+        if not verify_tls:
+            log_message("WARNING: TLS verification is disabled. This is a security risk.", level="WARNING")
+            warnings.warn(
+                "Unverified HTTPS request is being made. Adding certificate verification is strongly advised.",
+                InsecureRequestWarning,
+                stacklevel=2,
+            )
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE  # nosec B501
+        handlers.append(urllib.request.HTTPSHandler(context=ctx))
+    opener = urllib.request.build_opener(*handlers)
 
     # 1. Connection-phase timings via sockets
     sock_start = time.perf_counter()
@@ -624,16 +638,6 @@ def run_python_http_probe(target: Dict[str, Any], probe_run: Dict[str, Any]) -> 
         # TLS Handshake
         if parsed_url.scheme == "https":
             tls_start = time.perf_counter()
-            ctx = ssl.create_default_context()
-            if not verify_tls:
-                log_message("WARNING: TLS verification is disabled. This is a security risk.", level="WARNING")
-                warnings.warn(
-                    "Unverified HTTPS request is being made. Adding certificate verification is strongly advised.",
-                    InsecureRequestWarning,
-                    stacklevel=2,
-                )
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE  # nosec B501
             tls_sock = ctx.wrap_socket(sock, server_hostname=host)
             tls_ms = round((time.perf_counter() - tls_start) * 1000, 2)
             tls_sock.close()
@@ -687,20 +691,9 @@ def run_python_http_probe(target: Dict[str, Any], probe_run: Dict[str, Any]) -> 
     if user_agent:
         req.add_header("User-Agent", user_agent)
 
-    ctx = ssl.create_default_context()
-    if not verify_tls:
-        log_message("WARNING: TLS verification is disabled. This is a security risk.", level="WARNING")
-        warnings.warn(
-            "Unverified HTTPS request is being made. Adding certificate verification is strongly advised.",
-            InsecureRequestWarning,
-            stacklevel=2,
-        )
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE  # nosec B501
-
     urllib_start = time.perf_counter()
     try:
-        with opener.open(req, context=ctx, timeout=max_time) as resp:
+        with opener.open(req, timeout=max_time) as resp:
             ttfb_ms = round((time.perf_counter() - urllib_start) * 1000, 2)
             body = resp.read()
             total_ms = round((time.perf_counter() - urllib_start) * 1000, 2)
