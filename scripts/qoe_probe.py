@@ -280,6 +280,10 @@ def get_influx_token(influx_cfg: Dict[str, Any], config_dir: Path) -> str:
 # ---------------------------------------------------------------------------
 # Garbage Collection
 # ---------------------------------------------------------------------------
+
+LOG_PATTERN_PROBE = re.compile(r'^qoe-probe-\d{4}-\d{2}-\d{2}\.log$')
+LOG_PATTERN_SPEED = re.compile(r'^qoe-speed-test-\d{4}-\d{2}-\d{2}\.log$')
+
 def run_garbage_collection(repo_root: Path, temp_dir: Path, log_retention_days: int = 7, min_age_minutes: int = 20) -> int:
     """Remove stale log files and temporary artifacts."""
     removed_count = 0
@@ -307,10 +311,8 @@ def run_garbage_collection(repo_root: Path, temp_dir: Path, log_retention_days: 
     logs_dir = repo_root / "logs"
     if logs_dir.exists() and logs_dir.is_dir():
         cutoff_logs = now - (log_retention_days * 24 * 3600)
-        pattern_probe = re.compile(r'^qoe-probe-\d{4}-\d{2}-\d{2}\.log$')
-        pattern_speed = re.compile(r'^qoe-speed-test-\d{4}-\d{2}-\d{2}\.log$')
         for item in logs_dir.glob("*.log"):
-            if pattern_probe.match(item.name) or pattern_speed.match(item.name):
+            if LOG_PATTERN_PROBE.match(item.name) or LOG_PATTERN_SPEED.match(item.name):
                 try:
                     mtime = item.stat().st_mtime
                     if mtime <= cutoff_logs:
