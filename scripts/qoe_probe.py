@@ -39,6 +39,28 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 PROBE_VERSION = "0.2.0"
 log_path_global: Optional[Path] = None
 
+# Pre-compiled regular expressions and constants for performance
+PING_TIME_REGEX = re.compile(r'(?:time|tiempo)\s*[=<]\s*(\d+(?:\.\d+)?)\s*ms', re.IGNORECASE)
+PING_SUB_MS_REGEX = re.compile(r'(?:time|tiempo)\s*<\s*1\s*ms', re.IGNORECASE)
+
+GC_PATTERN_PROBE = re.compile(r'^qoe-probe-\d{4}-\d{2}-\d{2}\.log$')
+GC_PATTERN_SPEED = re.compile(r'^qoe-speed-test-\d{4}-\d{2}-\d{2}\.log$')
+
+NQ_DL_REGEX_1 = re.compile(r'Download(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+NQ_DL_REGEX_2 = re.compile(r'Down(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+NQ_UL_REGEX_1 = re.compile(r'Upload(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+NQ_UL_REGEX_2 = re.compile(r'Up(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+NQ_LAT_REGEX_1 = re.compile(r'(?:Idle\s+)?Latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.IGNORECASE)
+NQ_LAT_REGEX_2 = re.compile(r'Round\s*trip\s*latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.IGNORECASE)
+NQ_RPM_REGEX_1 = re.compile(r'Responsiveness\s*:\s*.*?\(([0-9]+(?:\.[0-9]+)?)\s*RPM\)', re.IGNORECASE)
+NQ_RPM_REGEX_2 = re.compile(r'RPM(?:\s+Responsiveness)?\s*:\s*([0-9]+(?:\.[0-9]+)?)', re.IGNORECASE)
+
+INFLUX_FLOAT_FIELDS = frozenset({
+    "download_speed", "upload_speed", "latency", "jitter", "rpm_responsiveness",
+    "time_namelookup_ms", "time_connect_ms", "time_appconnect_ms", "time_starttransfer_ms", "time_total_ms",
+    "size_download_bytes", "run_duration_ms", "latency_ms", "jitter_ms", "download_mbps", "upload_mbps"
+})
+
 def log_message(message: str, level: str = "INFO") -> None:
     """Write an ISO 8601 timestamped log line to file and stdout."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
@@ -198,20 +220,13 @@ def build_influx_line(measurement: str, tags: Dict[str, Any], fields: Dict[str, 
             continue
         tag_pairs.append(f"{escape_tag(k)}={escape_tag(str(v))}")
 
-    # Set of fields that must always be represented as floats in Line Protocol (to avoid schema conflicts)
-    float_fields = {
-        "download_speed", "upload_speed", "latency", "jitter", "rpm_responsiveness",
-        "time_namelookup_ms", "time_connect_ms", "time_appconnect_ms", "time_starttransfer_ms", "time_total_ms",
-        "size_download_bytes", "run_duration_ms", "latency_ms", "jitter_ms", "download_mbps", "upload_mbps"
-    }
-
     field_pairs = []
     for k in sorted(fields.keys()):
         v = fields[k]
         if v is None:
             continue
 
-        if k in float_fields:
+        if k in INFLUX_FLOAT_FIELDS:
             try:
                 v = float(v)
             except (ValueError, TypeError):
@@ -314,10 +329,8 @@ def run_garbage_collection(repo_root: Path, temp_dir: Path, log_retention_days: 
     logs_dir = repo_root / "logs"
     if logs_dir.exists() and logs_dir.is_dir():
         cutoff_logs = now - (log_retention_days * 24 * 3600)
-        pattern_probe = re.compile(r'^qoe-probe-\d{4}-\d{2}-\d{2}\.log$')
-        pattern_speed = re.compile(r'^qoe-speed-test-\d{4}-\d{2}-\d{2}\.log$')
         for item in logs_dir.glob("*.log"):
-            if pattern_probe.match(item.name) or pattern_speed.match(item.name):
+            if GC_PATTERN_PROBE.match(item.name) or GC_PATTERN_SPEED.match(item.name):
                 try:
                     mtime = item.stat().st_mtime
                     if mtime <= cutoff_logs:
@@ -414,15 +427,12 @@ def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> 
 
     samples = []
     # Regex matching English and Spanish time: time=12ms, tiempo=12ms, time<1ms, tiempo<1ms
-    time_regex = re.compile(r'(?:time|tiempo)\s*[=<]\s*(\d+(?:\.\d+)?)\s*ms', re.IGNORECASE)
-    sub_ms_regex = re.compile(r'(?:time|tiempo)\s*<\s*1\s*ms', re.IGNORECASE)
-
     for line in stdout.splitlines():
-        m = time_regex.search(line)
+        m = PING_TIME_REGEX.search(line)
         if m:
             samples.append(float(m.group(1)))
             continue
-        if sub_ms_regex.search(line):
+        if PING_SUB_MS_REGEX.search(line):
             samples.append(1.0)
 
     if not samples:
@@ -1364,30 +1374,30 @@ def run_networkquality_measurement(
             # Fallback regex parsing on stdout text
             combined = stdout + "\n" + stderr
             # Download
-            m_dl = re.search(r'Download(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+            m_dl = NQ_DL_REGEX_1.search(combined)
             if not m_dl:
-                m_dl = re.search(r'Down(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+                m_dl = NQ_DL_REGEX_2.search(combined)
             if m_dl:
                 download_speed = float(m_dl.group(1))
 
             # Upload
-            m_ul = re.search(r'Upload(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+            m_ul = NQ_UL_REGEX_1.search(combined)
             if not m_ul:
-                m_ul = re.search(r'Up(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+                m_ul = NQ_UL_REGEX_2.search(combined)
             if m_ul:
                 upload_speed = float(m_ul.group(1))
 
             # Latency
-            m_lat = re.search(r'(?:Idle\s+)?Latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', combined, re.I)
+            m_lat = NQ_LAT_REGEX_1.search(combined)
             if not m_lat:
-                m_lat = re.search(r'Round\s*trip\s*latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', combined, re.I)
+                m_lat = NQ_LAT_REGEX_2.search(combined)
             if m_lat:
                 latency = float(m_lat.group(1))
 
             # RPM
-            m_rpm = re.search(r'Responsiveness\s*:\s*.*?\(([0-9]+(?:\.[0-9]+)?)\s*RPM\)', combined, re.I)
+            m_rpm = NQ_RPM_REGEX_1.search(combined)
             if not m_rpm:
-                m_rpm = re.search(r'RPM(?:\s+Responsiveness)?\s*:\s*([0-9]+(?:\.[0-9]+)?)', combined, re.I)
+                m_rpm = NQ_RPM_REGEX_2.search(combined)
             if m_rpm:
                 rpm_responsiveness = float(m_rpm.group(1))
 
