@@ -145,19 +145,26 @@ def _detect_shell_rc() -> Path:
 
 def _set_env_persistent(var_name: str, token: str, force: bool) -> None:
     if _is_windows():
-        # setx persists to the user environment on Windows
+        # Persist to the user environment on Windows using PowerShell.
+        # This avoids exposing the token in the process command line (unlike setx).
+        ps_command = f"[Environment]::SetEnvironmentVariable('{var_name}', $env:CX_RADAR_PROVISIONING_TOKEN, 'User')"
+
+        env_vars = os.environ.copy()
+        env_vars["CX_RADAR_PROVISIONING_TOKEN"] = token
+
         result = subprocess.run(
-            ["setx", var_name, token],
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_command],
             capture_output=True,
             text=True,
+            env=env_vars,
         )
         if result.returncode != 0:
             raise SystemExit(
-                f"setx failed (exit {result.returncode}): {result.stderr.strip()}"
+                f"PowerShell SetEnvironmentVariable failed (exit {result.returncode}): {result.stderr.strip()}"
             )
-        print(f"Token set via setx for current user.")
+        print(f"Token set via PowerShell for current user.")
         print(f"  Variable : {var_name}")
-        print(f"  Method   : env (setx)")
+        print(f"  Method   : env (PowerShell)")
         print(f"  Note     : Open a new terminal for the change to take effect.")
     else:
         rc_file = _detect_shell_rc()
@@ -246,7 +253,10 @@ def main() -> None:
     # --- Obtain token ---
     token = args.token
     if not token:
-        token = getpass.getpass(prompt=f"Enter InfluxDB Cloud API token ({var_name}): ")
+        # Check provisioning environment variable for secure headless injection
+        token = os.environ.get("CX_RADAR_PROVISIONING_TOKEN", "")
+        if not token:
+            token = getpass.getpass(prompt=f"Enter InfluxDB Cloud API token ({var_name}): ")
     if not token.strip():
         raise SystemExit("Token must not be empty.")
 
