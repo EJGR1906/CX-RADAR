@@ -2,9 +2,8 @@
 """Set the InfluxDB Cloud API token for the QoE probe.
 
 Cross-platform Python port of set-influx-token.ps1.
-Supports two storage methods:
+Supports storage method:
   • file  – write to a .env file with restricted OS permissions (default)
-  • env   – persist via ``setx`` (Windows) or shell-rc export (Linux/macOS)
 
 Requirements: Python >= 3.8, stdlib only.
 """
@@ -131,67 +130,6 @@ def _write_env_file(
 
 
 # ---------------------------------------------------------------------------
-# Persistent environment variable
-# ---------------------------------------------------------------------------
-
-def _detect_shell_rc() -> Path:
-    """Return the preferred shell rc file for the current user."""
-    shell = os.environ.get("SHELL", "")
-    home = Path.home()
-    if "zsh" in shell:
-        return home / ".zshrc"
-    return home / ".bashrc"
-
-
-def _set_env_persistent(var_name: str, token: str, force: bool) -> None:
-    if _is_windows():
-        # setx persists to the user environment on Windows
-        result = subprocess.run(
-            ["setx", var_name, token],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            raise SystemExit(
-                f"setx failed (exit {result.returncode}): {result.stderr.strip()}"
-            )
-        print(f"Token set via setx for current user.")
-        print(f"  Variable : {var_name}")
-        print(f"  Method   : env (setx)")
-        print(f"  Note     : Open a new terminal for the change to take effect.")
-    else:
-        rc_file = _detect_shell_rc()
-        export_line = f'export {var_name}="{token}"'
-        existing = ""
-        if rc_file.is_file():
-            existing = rc_file.read_text(encoding="utf-8")
-
-        # Check if already present
-        if f"export {var_name}=" in existing:
-            if not force:
-                raise SystemExit(
-                    f"Variable '{var_name}' already exported in {rc_file}. "
-                    f"Use --force to overwrite."
-                )
-            # Replace existing line
-            new_lines = []
-            for line in existing.splitlines():
-                if line.strip().startswith(f"export {var_name}="):
-                    new_lines.append(export_line)
-                else:
-                    new_lines.append(line)
-            rc_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-        else:
-            with rc_file.open("a", encoding="utf-8") as f:
-                f.write(f"\n# CX-Radar InfluxDB token\n{export_line}\n")
-
-        print(f"Token appended to {rc_file}")
-        print(f"  Variable : {var_name}")
-        print(f"  Method   : env (shell rc)")
-        print(f"  Note     : Run 'source {rc_file}' or open a new terminal.")
-
-
-# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -213,9 +151,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--method",
-        choices=["env", "file"],
+        choices=["file"],
         default="file",
-        help="Storage method: 'file' (default) writes a .env file; 'env' sets a persistent environment variable.",
+        help="Storage method: 'file' (default) writes a .env file. 'env' is deprecated and no longer supported.",
     )
     parser.add_argument(
         "--env-file-path",
@@ -251,15 +189,12 @@ def main() -> None:
         raise SystemExit("Token must not be empty.")
 
     # --- Store ---
-    if args.method == "file":
-        if args.env_file_path:
-            env_path = Path(args.env_file_path).resolve()
-        else:
-            repo_root = config_path.parent.parent
-            env_path = repo_root / ".env"
-        _write_env_file(env_path, var_name, token, args.force)
+    if args.env_file_path:
+        env_path = Path(args.env_file_path).resolve()
     else:
-        _set_env_persistent(var_name, token, args.force)
+        repo_root = config_path.parent.parent
+        env_path = repo_root / ".env"
+    _write_env_file(env_path, var_name, token, args.force)
 
     # --- Summary ---
     print()
