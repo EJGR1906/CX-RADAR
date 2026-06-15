@@ -382,7 +382,6 @@ def run_external_process(
 # ---------------------------------------------------------------------------
 # Regex matching English and Spanish time: time=12ms, tiempo=12ms, time<1ms, tiempo<1ms
 PING_TIME_REGEX = re.compile(r'(?:time|tiempo)\s*[=<]\s*(\d+(?:\.\d+)?)\s*ms', re.IGNORECASE)
-PING_SUB_MS_REGEX = re.compile(r'(?:time|tiempo)\s*<\s*1\s*ms', re.IGNORECASE)
 
 def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> Dict[str, Any]:
     """Compute RTT latency and Mean Absolute Successive Jitter using ping."""
@@ -413,13 +412,11 @@ def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> 
 
     samples = []
 
-    for line in stdout.splitlines():
+    lines = stdout.splitlines()
+    for line in lines:
         m = PING_TIME_REGEX.search(line)
         if m:
             samples.append(float(m.group(1)))
-            continue
-        if PING_SUB_MS_REGEX.search(line):
-            samples.append(1.0)
 
     if not samples:
         return result
