@@ -11,6 +11,7 @@
 2. Run dry run probe: `python scripts/qoe_probe.py --skip-influx-write`
 3. Run full probe: `python scripts/qoe_probe.py`
 4. Run QA certification: `python scripts/run_qoe_certification.py`
-## 2026-06-15 - [Performance Optimization: List Concatenation & Deduplication]
-**Learning:** Creating intermediate concatenated lists (like `nq_targets + upload_nq_targets`) repeatedly inside loops and list comprehensions is highly inefficient, taking O(N) time for each concatenation and increasing memory overhead. Redundant deduplication logic (using `dict.fromkeys` followed by a custom loop) is also wasteful. Deduplicating items in a single pass while appending to a final list avoids repeated list creations.
-**Action:** When merging lists and deduplicating, prefer doing it in a single pass over the items. Iterate over the combined elements (e.g. `nq_targets + upload_nq_targets` or `itertools.chain`) while using a `set` to track seen identities and accumulating unique items directly into the final list.
+
+## 2026-06-15 - [Performance Optimization: Pre-compile Regex at Module Level]
+**Learning:** Compiling regex with `re.compile` inside frequently executed functions or loops adds unnecessary overhead by repeatedly checking the `re` module's internal cache or worse, recompiling it if the cache overflows. This CPU overhead can subtly skew latency or performance measurement loops.
+**Action:** Always move `re.compile` declarations to the global module level so they are evaluated exactly once when the script loads, especially inside functions doing latency extraction or iterative string processing.
