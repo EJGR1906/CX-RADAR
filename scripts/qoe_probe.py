@@ -112,18 +112,6 @@ def get_optional_int(source: Optional[Dict[str, Any]], key: str, default: int = 
         return default
 
 
-def get_optional_float(source: Optional[Dict[str, Any]], key: str, default: float = 0.0) -> float:
-    if source is None:
-        return default
-    val = source.get(key)
-    if val is None:
-        return default
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return default
-
-
 def get_target_type(target: Dict[str, Any]) -> str:
     return get_optional_str(target, "type", "http").lower()
 
