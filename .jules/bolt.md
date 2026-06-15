@@ -18,3 +18,6 @@
 ## 2026-06-15 - [Performance Optimization: Pre-compile Regex at Module Level]
 **Learning:** Compiling regex with `re.compile` inside frequently executed functions or loops adds unnecessary overhead by repeatedly checking the `re` module's internal cache or worse, recompiling it if the cache overflows. This CPU overhead can subtly skew latency or performance measurement loops.
 **Action:** Always move `re.compile` declarations to the global module level so they are evaluated exactly once when the script loads, especially inside functions doing latency extraction or iterative string processing.
+## 2026-06-15 - [Optimize Identity Deduplication with dict comprehension]
+**Learning:** Manual loop and set tracking for deduplicating Python objects by their identity (`id()`) incurs measurable overhead due to bytecode execution for sets and list appends. For high-frequency or large-scale tasks, dict comprehensions (`list({id(x): x for x in items}.values())`) perform the same behavior but execute much faster using the underlying optimized C dictionary implementation while preserving insertion order (Python 3.7+).
+**Action:** When performing identity-based or unique-key deduplication in Python while needing to preserve order, prefer dictionary comprehensions extracting `.values()` over `for` loops combined with `set()` tracking.
