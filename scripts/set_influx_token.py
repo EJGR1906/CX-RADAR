@@ -2,9 +2,8 @@
 """Set the InfluxDB Cloud API token for the QoE probe.
 
 Cross-platform Python port of set-influx-token.ps1.
-Supports two storage methods:
+Supports storage method:
   • file  – write to a .env file with restricted OS permissions (default)
-  • env   – persist via ``setx`` (Windows) or shell-rc export (Linux/macOS)
 
 Requirements: Python >= 3.8, stdlib only.
 """
@@ -220,9 +219,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--method",
-        choices=["env", "file"],
+        choices=["file"],
         default="file",
-        help="Storage method: 'file' (default) writes a .env file; 'env' sets a persistent environment variable.",
+        help="Storage method: 'file' (default) writes a .env file. 'env' is deprecated and no longer supported.",
     )
     parser.add_argument(
         "--env-file-path",
@@ -261,15 +260,12 @@ def main() -> None:
         raise SystemExit("Token must not be empty.")
 
     # --- Store ---
-    if args.method == "file":
-        if args.env_file_path:
-            env_path = Path(args.env_file_path).resolve()
-        else:
-            repo_root = config_path.parent.parent
-            env_path = repo_root / ".env"
-        _write_env_file(env_path, var_name, token, args.force)
+    if args.env_file_path:
+        env_path = Path(args.env_file_path).resolve()
     else:
-        _set_env_persistent(var_name, token, args.force)
+        repo_root = config_path.parent.parent
+        env_path = repo_root / ".env"
+    _write_env_file(env_path, var_name, token, args.force)
 
     # --- Summary ---
     print()
