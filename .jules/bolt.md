@@ -11,3 +11,7 @@
 2. Run dry run probe: `python scripts/qoe_probe.py --skip-influx-write`
 3. Run full probe: `python scripts/qoe_probe.py`
 4. Run QA certification: `python scripts/run_qoe_certification.py`
+
+## 2026-06-15 - [Performance Optimization: Pre-compile Regex at Module Level]
+**Learning:** Compiling regex with `re.compile` inside frequently executed functions or loops adds unnecessary overhead by repeatedly checking the `re` module's internal cache or worse, recompiling it if the cache overflows. This CPU overhead can subtly skew latency or performance measurement loops.
+**Action:** Always move `re.compile` declarations to the global module level so they are evaluated exactly once when the script loads, especially inside functions doing latency extraction or iterative string processing.
