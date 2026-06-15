@@ -29,6 +29,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -37,6 +38,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 # Global Constants & Logging Setup
 # ---------------------------------------------------------------------------
 PROBE_VERSION = "0.2.0"
+
+class InsecureRequestWarning(Warning):
+    """Warning for unverified TLS requests."""
+    pass
 log_path_global: Optional[Path] = None
 
 def log_message(message: str, level: str = "INFO") -> None:
@@ -633,8 +638,14 @@ def run_python_http_probe(target: Dict[str, Any], probe_run: Dict[str, Any]) -> 
             tls_start = time.perf_counter()
             ctx = ssl.create_default_context()
             if not verify_tls:
+                log_message("WARNING: TLS verification is disabled. This is a security risk.", level="WARNING")
+                warnings.warn(
+                    "Unverified HTTPS request is being made. Adding certificate verification is strongly advised.",
+                    InsecureRequestWarning,
+                    stacklevel=2,
+                )
                 ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
+                ctx.verify_mode = ssl.CERT_NONE  # nosec B501
             tls_sock = ctx.wrap_socket(sock, server_hostname=host)
             tls_ms = round((time.perf_counter() - tls_start) * 1000, 2)
             tls_sock.close()
@@ -690,8 +701,14 @@ def run_python_http_probe(target: Dict[str, Any], probe_run: Dict[str, Any]) -> 
 
     ctx = ssl.create_default_context()
     if not verify_tls:
+        log_message("WARNING: TLS verification is disabled. This is a security risk.", level="WARNING")
+        warnings.warn(
+            "Unverified HTTPS request is being made. Adding certificate verification is strongly advised.",
+            InsecureRequestWarning,
+            stacklevel=2,
+        )
         ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        ctx.verify_mode = ssl.CERT_NONE  # nosec B501
 
     urllib_start = time.perf_counter()
     try:
@@ -769,8 +786,14 @@ def download_url_to_file(
 
     ctx = ssl.create_default_context()
     if not verify_tls:
+        log_message("WARNING: TLS verification is disabled. This is a security risk.", level="WARNING")
+        warnings.warn(
+            "Unverified HTTPS request is being made. Adding certificate verification is strongly advised.",
+            InsecureRequestWarning,
+            stacklevel=2,
+        )
         ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        ctx.verify_mode = ssl.CERT_NONE  # nosec B501
 
     start_time = time.perf_counter()
     with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:
@@ -798,8 +821,14 @@ def upload_file_to_url(
 
     ctx = ssl.create_default_context()
     if not verify_tls:
+        log_message("WARNING: TLS verification is disabled. This is a security risk.", level="WARNING")
+        warnings.warn(
+            "Unverified HTTPS request is being made. Adding certificate verification is strongly advised.",
+            InsecureRequestWarning,
+            stacklevel=2,
+        )
         ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        ctx.verify_mode = ssl.CERT_NONE  # nosec B501
 
     with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:
         response.read()
@@ -821,8 +850,14 @@ def download_parallel_chunks(
             req.add_header("User-Agent", user_agent)
         ctx = ssl.create_default_context()
         if not verify_tls:
+            log_message("WARNING: TLS verification is disabled. This is a security risk.", level="WARNING")
+            warnings.warn(
+                "Unverified HTTPS request is being made. Adding certificate verification is strongly advised.",
+                InsecureRequestWarning,
+                stacklevel=2,
+            )
             ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
+            ctx.verify_mode = ssl.CERT_NONE  # nosec B501
         with urllib.request.urlopen(req, context=ctx, timeout=5) as resp:
             cr = resp.getheader("Content-Range")
             if cr and "/" in cr:
