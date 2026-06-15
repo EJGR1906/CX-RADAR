@@ -824,6 +824,17 @@ def upload_file_to_url(
     return (time.perf_counter() - start_time) * 1000
 
 
+def _wait_for_futures(futures: List[concurrent.futures.Future]) -> List[str]:
+    """Wait for futures to complete and collect any raised exceptions as strings."""
+    errors = []
+    for future in futures:
+        try:
+            future.result()
+        except Exception as e:
+            errors.append(str(e))
+    return errors
+
+
 def download_parallel_chunks(
     url: str, transfer_dir: Path, target_bytes: int, num_connections: int,
     timeout: float, user_agent: Optional[str] = None, verify_tls: bool = True
@@ -903,12 +914,7 @@ def download_parallel_chunks(
                 )
             )
 
-        errors = []
-        for future in futures:
-            try:
-                future.result()
-            except Exception as e:
-                errors.append(str(e))
+        errors = _wait_for_futures(futures)
 
     end_time = time.perf_counter()
     duration_ms = (end_time - start_time) * 1000
@@ -960,12 +966,7 @@ def upload_parallel_chunks(
                 )
             )
 
-        errors = []
-        for future in futures:
-            try:
-                future.result()
-            except Exception as e:
-                errors.append(str(e))
+        errors = _wait_for_futures(futures)
 
     end_time = time.perf_counter()
     duration_ms = (end_time - start_time) * 1000
