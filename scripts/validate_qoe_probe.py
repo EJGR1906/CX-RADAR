@@ -19,14 +19,12 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from qoe_probe import is_windows, resolve_from_base, exe_name, read_env_file_var
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _is_windows() -> bool:
-    return platform.system() == "Windows"
-
 
 def _optional_str(source: Optional[Dict[str, Any]], key: str, default: str = "") -> str:
     """Return a non-blank string value from *source* or *default*."""
@@ -53,33 +51,17 @@ def _portable_tool_prop(
     return str(val)
 
 
-def _resolve_from_base(base: Path, child: str) -> Path:
-    """Expand env-vars in *child* and resolve relative to *base*."""
-    expanded = os.path.expandvars(child)
-    p = Path(expanded)
-    if p.is_absolute():
-        return p.resolve()
-    return (base / p).resolve()
-
-
-def _exe_name(name: str) -> str:
-    """Append .exe on Windows when there is no extension already."""
-    if _is_windows() and not name.endswith(".exe"):
-        return name + ".exe"
-    return name
-
-
 # ---------------------------------------------------------------------------
 # Tool detection
 # ---------------------------------------------------------------------------
 
 def _test_curl(repo_root: Path) -> bool:
     """Check for curl in bin/, system path, or PATH."""
-    portable = repo_root / "bin" / _exe_name("curl")
+    portable = repo_root / "bin" / exe_name("curl")
     if portable.is_file():
         return True
 
-    if _is_windows():
+    if is_windows():
         sys_root = os.environ.get("SystemRoot", r"C:\Windows")
         system_curl = Path(sys_root) / "System32" / "curl.exe"
         if system_curl.is_file():
@@ -98,7 +80,7 @@ def _get_portable_tools(
 
     node_child = _portable_tool_prop(
         pt_cfg, "nodeExe",
-        str(Path("bin", "node", _exe_name("node"))),
+        str(Path("bin", "node", exe_name("node"))),
     )
     fast_cli_child = _portable_tool_prop(
         pt_cfg, "fastCliScript",
@@ -106,10 +88,10 @@ def _get_portable_tools(
     )
     yt_dlp_child = _portable_tool_prop(
         pt_cfg, "ytDlpExe",
-        str(Path("bin", _exe_name("yt-dlp"))),
+        str(Path("bin", exe_name("yt-dlp"))),
     )
 
-    if _is_windows():
+    if is_windows():
         nq_default = str(Path(os.environ.get("SystemRoot", r"C:\Windows"),
                               "System32", "networkquality.exe"))
     else:
@@ -117,17 +99,17 @@ def _get_portable_tools(
 
     nq_child = _portable_tool_prop(pt_cfg, "networkQualityExe", nq_default)
 
-    fast_cli_path = _resolve_from_base(repo_root, fast_cli_child)
+    fast_cli_path = resolve_from_base(repo_root, fast_cli_child)
     if not fast_cli_path.is_file():
         alt_path = fast_cli_path.parent.parent / "cli.js"
         if alt_path.is_file():
             fast_cli_path = alt_path
 
     return {
-        "node_exe": _resolve_from_base(repo_root, node_child),
+        "node_exe": resolve_from_base(repo_root, node_child),
         "fast_cli_script": fast_cli_path,
-        "yt_dlp_exe": _resolve_from_base(repo_root, yt_dlp_child),
-        "network_quality_exe": _resolve_from_base(repo_root, nq_child),
+        "yt_dlp_exe": resolve_from_base(repo_root, yt_dlp_child),
+        "network_quality_exe": resolve_from_base(repo_root, nq_child),
         "repo_root": repo_root,
     }
 
@@ -275,7 +257,7 @@ def _get_influx_token_status(
 
     cred_path_raw = _optional_str(influx_cfg, "credentialFilePath")
     if cred_path_raw:
-        credential_file_path = str(_resolve_from_base(config_dir, cred_path_raw))
+        credential_file_path = str(resolve_from_base(config_dir, cred_path_raw))
         credential_file_exists = Path(credential_file_path).is_file()
         # Note: Python cannot read PowerShell CliXml credential files, so we
         # skip the credential-file-based token source on non-Windows or when
@@ -291,7 +273,7 @@ def _get_influx_token_status(
     if not token_value:
         for candidate in (config_dir.parent / ".env", config_dir / ".env"):
             if candidate.is_file():
-                token_value = _read_env_file_var(candidate, token_var)
+                token_value = read_env_file_var(candidate, token_var)
                 if token_value:
                     break
 
@@ -304,27 +286,6 @@ def _get_influx_token_status(
         "CredentialFilePath": credential_file_path,
         "CredentialFileExists": credential_file_exists,
     }
-
-
-def _read_env_file_var(env_path: Path, var_name: str) -> str:
-    """Read a variable from a simple KEY=VALUE .env file."""
-    try:
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if line.startswith("export "):
-                line = line[len("export "):]
-            if "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            key = key.strip()
-            value = value.strip().strip("'\"")
-            if key == var_name:
-                return value
-    except OSError:
-        pass
-    return ""
 
 
 # ---------------------------------------------------------------------------
