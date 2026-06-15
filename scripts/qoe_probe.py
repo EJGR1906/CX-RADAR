@@ -408,15 +408,12 @@ def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> 
     samples = []
     # Regex matching English and Spanish time: time=12ms, tiempo=12ms, time<1ms, tiempo<1ms
     time_regex = re.compile(r'(?:time|tiempo)\s*[=<]\s*(\d+(?:\.\d+)?)\s*ms', re.IGNORECASE)
-    sub_ms_regex = re.compile(r'(?:time|tiempo)\s*<\s*1\s*ms', re.IGNORECASE)
 
-    for line in stdout.splitlines():
+    lines = stdout.splitlines()
+    for line in lines:
         m = time_regex.search(line)
         if m:
             samples.append(float(m.group(1)))
-            continue
-        if sub_ms_regex.search(line):
-            samples.append(1.0)
 
     if not samples:
         return result

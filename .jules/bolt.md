@@ -11,3 +11,7 @@
 2. Run dry run probe: `python scripts/qoe_probe.py --skip-influx-write`
 3. Run full probe: `python scripts/qoe_probe.py`
 4. Run QA certification: `python scripts/run_qoe_certification.py`
+
+## 2026-06-15 - [Identify Dead Regex Checks for Faster Parsing]
+**Learning:** Sometimes overlapping regexes cause dead code that iterates without effect. In `scripts/qoe_probe.py`, `sub_ms_regex` checking for `< 1 ms` was entirely redundant because the primary `time_regex` already matched `<1ms` successfully and correctly grouped the `1`.
+**Action:** When optimizing repeated regex searches inside line-parsing loops, analyze the regex logic for overlaps to avoid unnecessary regex executions entirely.
