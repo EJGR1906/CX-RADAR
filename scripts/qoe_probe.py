@@ -182,6 +182,14 @@ def escape_field_string(value: str) -> str:
     return val
 
 
+# ⚡ Bolt: Extracted to module-level frozenset to prevent O(N) allocation on every metric format call
+# Set of fields that must always be represented as floats in Line Protocol (to avoid schema conflicts)
+_INFLUX_FLOAT_FIELDS = frozenset({
+    "download_speed", "upload_speed", "latency", "jitter", "rpm_responsiveness",
+    "time_namelookup_ms", "time_connect_ms", "time_appconnect_ms", "time_starttransfer_ms", "time_total_ms",
+    "size_download_bytes", "run_duration_ms", "latency_ms", "jitter_ms", "download_mbps", "upload_mbps"
+})
+
 def build_influx_line(measurement: str, tags: Dict[str, Any], fields: Dict[str, Any], timestamp_ms: int) -> str:
     """Construct an InfluxDB Line Protocol string from inputs."""
     tag_pairs = []
@@ -191,20 +199,13 @@ def build_influx_line(measurement: str, tags: Dict[str, Any], fields: Dict[str, 
             continue
         tag_pairs.append(f"{escape_tag(k)}={escape_tag(str(v))}")
 
-    # Set of fields that must always be represented as floats in Line Protocol (to avoid schema conflicts)
-    float_fields = {
-        "download_speed", "upload_speed", "latency", "jitter", "rpm_responsiveness",
-        "time_namelookup_ms", "time_connect_ms", "time_appconnect_ms", "time_starttransfer_ms", "time_total_ms",
-        "size_download_bytes", "run_duration_ms", "latency_ms", "jitter_ms", "download_mbps", "upload_mbps"
-    }
-
     field_pairs = []
     for k in sorted(fields.keys()):
         v = fields[k]
         if v is None:
             continue
 
-        if k in float_fields:
+        if k in _INFLUX_FLOAT_FIELDS:
             try:
                 v = float(v)
             except (ValueError, TypeError):
