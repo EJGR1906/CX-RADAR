@@ -1606,10 +1606,14 @@ def run_speedtest_target_wrapper(
         "run_duration_ms": res["RunDurationMs"]
     }
 
+    probe_cfg = config.get("probe", {})
     tags = {
         "service": target["service"],
-        "probe_id": config.get("probe", {}).get("probeId", "unknown"),
-        "isp": isp
+        "probe_id": probe_cfg.get("probeId", "unknown"),
+        "isp": isp,
+        "router_brand": probe_cfg.get("router_brand", "unknown"),
+        "router_model": probe_cfg.get("router_model", "unknown"),
+        "connection_type": probe_cfg.get("connection_type", "unknown")
     }
 
     report = {
@@ -1679,10 +1683,14 @@ def get_speedtest_failure_target_result(target: Dict[str, Any], config: Dict[str
         "run_duration_ms": duration_ms
     }
 
+    probe_cfg = config.get("probe", {})
     tags = {
         "service": target["service"],
-        "probe_id": config.get("probe", {}).get("probeId", "unknown"),
-        "isp": isp
+        "probe_id": probe_cfg.get("probeId", "unknown"),
+        "isp": isp,
+        "router_brand": probe_cfg.get("router_brand", "unknown"),
+        "router_model": probe_cfg.get("router_model", "unknown"),
+        "connection_type": probe_cfg.get("connection_type", "unknown")
     }
 
     report = {
@@ -1929,7 +1937,10 @@ def main() -> None:
                         "environment": probe_cfg.get("environment", "unknown"),
                         "service": target["service"],
                         "endpoint_name": target["endpointName"],
-                        "probe_version": probe_cfg.get("probeVersion", PROBE_VERSION)
+                        "probe_version": probe_cfg.get("probeVersion", PROBE_VERSION),
+                        "router_brand": probe_cfg.get("router_brand", "unknown"),
+                        "router_model": probe_cfg.get("router_model", "unknown"),
+                        "connection_type": probe_cfg.get("connection_type", "unknown")
                     }
 
                     fields = {
@@ -1997,7 +2008,10 @@ def main() -> None:
                         "environment": probe_cfg.get("environment", "unknown"),
                         "service": target["service"],
                         "endpoint_name": target["endpointName"],
-                        "probe_version": probe_cfg.get("probeVersion", PROBE_VERSION)
+                        "probe_version": probe_cfg.get("probeVersion", PROBE_VERSION),
+                        "router_brand": probe_cfg.get("router_brand", "unknown"),
+                        "router_model": probe_cfg.get("router_model", "unknown"),
+                        "connection_type": probe_cfg.get("connection_type", "unknown")
                     }
                     fields = {
                         "available": False,
@@ -2075,7 +2089,10 @@ def main() -> None:
             "probe_type": probe_cfg.get("probeType", "python"),
             "site": probe_cfg.get("site", "unknown"),
             "environment": probe_cfg.get("environment", "unknown"),
-            "probe_version": probe_cfg.get("probeVersion", PROBE_VERSION)
+            "probe_version": probe_cfg.get("probeVersion", PROBE_VERSION),
+            "router_brand": probe_cfg.get("router_brand", "unknown"),
+            "router_model": probe_cfg.get("router_model", "unknown"),
+            "connection_type": probe_cfg.get("connection_type", "unknown")
         }
         probe_timestamp_ms = int(time.time() * 1000)
         summary_line = build_influx_line(probe_run.get("probeMeasurement", "qoe_probe_run"), probe_tags, probe_fields, probe_timestamp_ms)
