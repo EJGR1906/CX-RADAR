@@ -14,3 +14,8 @@
 **Vulnerability:** An example crontab file (`orchestration/crontab-example.txt`) contained an inline export of the `INFLUXDB_TOKEN` secret.
 **Learning:** Including inline secrets or instructions to "set it inline" in documentation or example files encourages bad security practices that can lead to secrets being exposed in OS logs, process listings, or accidentally committed.
 **Prevention:** Always ensure documentation and example files direct users to use secure credential management (like `.env` files or secure vaults) rather than inline exports or hardcoded placeholders in command lines.
+
+## 2024-06-21 - Broken Authentication Due to Incomplete Security Fix
+**Vulnerability:** While removing hardcoded token generation from `register_qoe_task.py`, the systemd environment was not given an alternative credential source, causing dynamic task deployments to fail authentication.
+**Learning:** Removing an exposed secret from a template without substituting it with a secure runtime alternative (like `EnvironmentFile`) causes operational regressions. Removing security risks must not break core functionality.
+**Prevention:** When removing hardcoded tokens from dynamic configuration templates (e.g., systemd service files), ensure a secure alternative is provided (such as adding `EnvironmentFile={script_path.parent.parent}/.env` for systemd) to prevent authentication regressions in generated tasks.

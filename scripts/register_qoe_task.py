@@ -152,7 +152,7 @@ After=network.target
 Type=oneshot
 WorkingDirectory={script_path.parent.parent}
 ExecStart={sys.executable} {script_path} --config-path {config_path}
-Environment=INFLUXDB_TOKEN={os.environ.get("INFLUXDB_TOKEN", "")}
+EnvironmentFile={script_path.parent.parent}/.env
 """
 
     timer_content = f"""[Unit]

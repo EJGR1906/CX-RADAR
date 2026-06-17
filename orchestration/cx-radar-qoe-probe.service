@@ -8,9 +8,9 @@ Type=oneshot
 WorkingDirectory=/absolute/path/to/CX-RADAR
 # Path to your python interpreter and probe script
 ExecStart=/usr/bin/python3 scripts/qoe_probe.py --config-path config/probe-catalog.json
-# Option to pass the token via environment variable here or in a separate file
-Environment=INFLUXDB_TOKEN=your-token-value-here
-# Optional: EnvironmentFile=/absolute/path/to/CX-RADAR/.env
+# IMPORTANT: Never hardcode tokens in this file.
+# Read the token securely from the generated .env file instead.
+EnvironmentFile=/absolute/path/to/CX-RADAR/.env
 
 [Install]
 WantedBy=default.target
