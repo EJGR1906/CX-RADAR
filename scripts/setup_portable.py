@@ -130,6 +130,17 @@ def _download(url: str, dest: Path, *, label: str = "") -> None:
 # Archive extraction
 # ---------------------------------------------------------------------------
 
+def _is_safe_path(base: Path, target: str) -> bool:
+    """Check if the target path is safely within the base directory (Python 3.8 compatible)."""
+    try:
+        target_path = (base / target).resolve()
+        base_path = base.resolve()
+        common = os.path.commonpath([str(base_path), str(target_path)])
+        return common == str(base_path)
+    except ValueError:
+        return False
+
+
 def _extract_node_archive(archive_path: Path, dest_root: Path) -> None:
     """Extract a Node.js archive and flatten so node(.exe) sits in *dest_root*."""
     staging = archive_path.parent / (archive_path.stem.split(".")[0] + "-extract")
@@ -140,10 +151,14 @@ def _extract_node_archive(archive_path: Path, dest_root: Path) -> None:
     name_lower = archive_path.name.lower()
     if name_lower.endswith(".zip"):
         with zipfile.ZipFile(archive_path, "r") as zf:
-            zf.extractall(staging)
+            for member in zf.infolist():
+                if _is_safe_path(staging, member.filename):
+                    zf.extract(member, path=staging)
     elif name_lower.endswith(".tar.gz") or name_lower.endswith(".tar.xz"):
         with tarfile.open(archive_path, "r:*") as tf:
-            tf.extractall(staging)
+            for member in tf.getmembers():
+                if _is_safe_path(staging, member.name):
+                    tf.extract(member, path=staging)
     else:
         raise RuntimeError(f"Unsupported archive format: {archive_path.name}")
 
