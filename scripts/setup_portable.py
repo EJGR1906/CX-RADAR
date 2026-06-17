@@ -138,11 +138,20 @@ def _extract_node_archive(archive_path: Path, dest_root: Path) -> None:
     staging.mkdir(parents=True, exist_ok=True)
 
     name_lower = archive_path.name.lower()
+    staging_resolved = staging.resolve()
     if name_lower.endswith(".zip"):
         with zipfile.ZipFile(archive_path, "r") as zf:
+            for member in zf.infolist():
+                target_path = (staging / member.filename).resolve()
+                if os.path.commonpath([str(staging_resolved), str(target_path)]) != str(staging_resolved):
+                    raise RuntimeError(f"Zip Slip vulnerability detected: {member.filename}")
             zf.extractall(staging)
     elif name_lower.endswith(".tar.gz") or name_lower.endswith(".tar.xz"):
         with tarfile.open(archive_path, "r:*") as tf:
+            for member in tf.getmembers():
+                target_path = (staging / member.name).resolve()
+                if os.path.commonpath([str(staging_resolved), str(target_path)]) != str(staging_resolved):
+                    raise RuntimeError(f"Tar Slip vulnerability detected: {member.name}")
             tf.extractall(staging)
     else:
         raise RuntimeError(f"Unsupported archive format: {archive_path.name}")

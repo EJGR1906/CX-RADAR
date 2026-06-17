@@ -6,3 +6,7 @@
 **Vulnerability:** InfluxDB token exposure in OS process lists via `setx` arguments (Windows) and `--token` arguments during provisioning.
 **Learning:** Using command-line arguments to pass sensitive tokens exposes them to any user who can run `ps` or view process lists (e.g., Task Manager).
 **Prevention:** Pass sensitive tokens using environment variables specifically scoped for the provisioning task (like `CX_RADAR_PROVISIONING_TOKEN`), and use OS-level APIs (like PowerShell `[Environment]::SetEnvironmentVariable`) that support environment variable expansion within the script/process rather than as process arguments.
+## 2024-06-17 - [Zip/Tar Slip Path Traversal]
+**Vulnerability:** Found uses of `extractall()` in `zipfile` and `tarfile` logic in `scripts/setup_portable.py` which allowed malicious archives to extract files outside the designated target folder.
+**Learning:** `extractall` blind extraction was used because it is shorter and more convenient to write. However, it implicitly trusts archive contents which can contain `../` sequences leading to directory traversal.
+**Prevention:** To avoid this next time, iterate over `zf.infolist()` and `tf.getmembers()` manually and always use `os.path.commonpath([resolved_dest, resolved_target_path]) == resolved_dest` to restrict target destinations strictly within the expected parent path before performing the extraction.
