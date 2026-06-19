@@ -24,6 +24,7 @@ function statPanel(id, title, desc, flux, unit, thresholds, opts = {}) {
         spec: {
           fieldConfig: {
             defaults: {
+              noValue: 'Sin datos',
               color: { mode: 'thresholds' }, decimals: opts.decimals ?? 1,
               unit, thresholds: { mode: 'absolute', steps: thresholds },
               ...(opts.mappings ? { mappings: opts.mappings } : {}),
@@ -53,6 +54,7 @@ function tsPanel(id, title, desc, flux, unit, thresholds, opts = {}) {
         spec: {
           fieldConfig: {
             defaults: {
+              noValue: 'Sin datos',
               color: { mode: opts.colorMode || 'palette-classic' },
               custom: {
                 axisBorderShow: false, axisCenteredZero: false, axisColorMode: 'text',
@@ -95,6 +97,7 @@ function barGaugePanel(id, title, desc, flux, unit, thresholds, opts = {}) {
         spec: {
           fieldConfig: {
             defaults: {
+              noValue: 'Sin datos',
               color: { mode: 'thresholds' }, decimals: 1,
               max: opts.max ?? 100, min: opts.min ?? 0, unit,
               thresholds: { mode: 'absolute', steps: thresholds }
@@ -123,6 +126,7 @@ function tablePanel(id, title, desc, flux, overrides = []) {
         spec: {
           fieldConfig: {
             defaults: {
+              noValue: 'Sin datos',
               color: { mode: 'thresholds' },
               custom: { align: 'center', cellOptions: { type: 'auto' }, footer: { reducers: [] }, inspect: false },
               thresholds: { mode: 'absolute', steps: [{ color: 'green', value: 0 }] }
@@ -145,6 +149,7 @@ function stateTimelinePanel(id, title, desc, flux) {
         spec: {
           fieldConfig: {
             defaults: {
+              noValue: 'Sin datos',
               color: { mode: 'thresholds' }, custom: { fillOpacity: 80, lineWidth: 1 },
               mappings: [
                 { options: { '1': { color: 'green', index: 0, text: 'Disponible' }, '0': { color: 'red', index: 1, text: 'Caído' } }, type: 'value' }
@@ -218,6 +223,7 @@ function geomapPanel(id, title, desc, flux) {
           },
           fieldConfig: {
             defaults: {
+              noValue: 'Sin datos',
               custom: {},
               color: { mode: 'thresholds' },
               thresholds: {
