@@ -19,3 +19,13 @@
 **Vulnerability:** While removing hardcoded token generation from `register_qoe_task.py`, the systemd environment was not given an alternative credential source, causing dynamic task deployments to fail authentication.
 **Learning:** Removing an exposed secret from a template without substituting it with a secure runtime alternative (like `EnvironmentFile`) causes operational regressions. Removing security risks must not break core functionality.
 **Prevention:** When removing hardcoded tokens from dynamic configuration templates (e.g., systemd service files), ensure a secure alternative is provided (such as adding `EnvironmentFile={script_path.parent.parent}/.env` for systemd) to prevent authentication regressions in generated tasks.
+## 2024-06-21 - PowerShell Command Injection in Shell Command
+
+**Vulnerability:** PowerShell command injection vulnerabilities existed in multiple places where string formatting (like f-strings) was used to construct PowerShell scripts. Specifically, user-controlled parameters (, , ) were interpolated directly into the script block executing via .
+**Learning:** String interpolation to construct shell scripts passed directly to standard subprocess tools provides an attack vector. If any of those parameters contained unescaped backticks or quotes, an attacker could execute arbitrary PowerShell on the system with the tool's permissions.
+**Prevention:** Pass these arguments via standard  environment variables (e.g. setting them on  and assigning  in ) and inside the PowerShell script, reference the variables via the  syntax rather than string injection.
+## 2024-06-21 - PowerShell Command Injection in Shell Command
+
+**Vulnerability:** PowerShell command injection vulnerabilities existed in multiple places where string formatting (like f-strings) was used to construct PowerShell scripts. Specifically, user-controlled parameters (`task_name`, `script_path`, `description`) were interpolated directly into the script block executing via `subprocess.run(["powershell", "-Command", ps_script])`.
+**Learning:** String interpolation to construct shell scripts passed directly to standard subprocess tools provides an attack vector. If any of those parameters contained unescaped backticks or quotes, an attacker could execute arbitrary PowerShell on the system with the tool's permissions.
+**Prevention:** Pass these arguments via standard `os.environ` environment variables (e.g. setting them on `proc_env` and assigning `env=proc_env` in `subprocess.run`) and inside the PowerShell script, reference the variables via the `$env:...` syntax rather than string injection.

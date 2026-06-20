@@ -47,14 +47,15 @@ def is_linux() -> bool:
     return platform.system() == "Linux"
 
 
-def run_cmd(args: List[str]) -> Tuple[int, str, str]:
+def run_cmd(args: List[str], env: Optional[Dict[str, str]] = None) -> Tuple[int, str, str]:
     try:
         proc = subprocess.run(
             args,
             capture_output=True,
             text=True,
             encoding="utf-8",
-            errors="replace"
+            errors="replace",
+            env=env
         )
         return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
     except Exception as e:
@@ -212,20 +213,27 @@ def register_windows(
     
     ps_script = f"""
     $ErrorActionPreference = 'Stop'
-    $action = New-ScheduledTaskAction -Execute '{sys.executable}' -Argument '"{script_path}"'
-    $trigger = New-ScheduledTaskTrigger -Daily -At '{time_str}'
+    $action = New-ScheduledTaskAction -Execute $env:CX_RADAR_SYS_EXE -Argument "`"$env:CX_RADAR_SCRIPT_PATH`""
+    $trigger = New-ScheduledTaskTrigger -Daily -At $env:CX_RADAR_TIME_STR
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -RunOnlyIfNetworkAvailable -StartWhenAvailable
     $currentUserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
     $principal = New-ScheduledTaskPrincipal -UserId $currentUserName -LogonType {logon_type} -RunLevel Limited
-    $task = New-ScheduledTask -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description '{description}'
-    Register-ScheduledTask -TaskName '{task_name}' -InputObject $task -Force | Out-Null
+    $task = New-ScheduledTask -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description $env:CX_RADAR_DESC
+    Register-ScheduledTask -TaskName $env:CX_RADAR_TASK_NAME -InputObject $task -Force | Out-Null
     """
     
     print(f"Registering Windows Scheduled Task '{task_name}' via PowerShell (LogonType: {logon_type}, Daily: {time_str})...")
     
+    proc_env = os.environ.copy()
+    proc_env["CX_RADAR_SYS_EXE"] = sys.executable
+    proc_env["CX_RADAR_SCRIPT_PATH"] = str(script_path)
+    proc_env["CX_RADAR_TIME_STR"] = time_str
+    proc_env["CX_RADAR_TASK_NAME"] = task_name
+    proc_env["CX_RADAR_DESC"] = description
+
     code, stdout, stderr = run_cmd([
         "powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script
-    ])
+    ], env=proc_env)
     
     if code == 0:
         print(f"Successfully registered Windows Scheduled Task '{task_name}'.")
@@ -239,7 +247,7 @@ def register_windows(
         retry_ps_script = ps_script.replace("LogonType S4U", "LogonType Interactive")
         code_retry, _, stderr_retry = run_cmd([
             "powershell", "-NoProfile", "-NonInteractive", "-Command", retry_ps_script
-        ])
+        ], env=proc_env)
         if code_retry == 0:
             print(f"Successfully registered Windows Scheduled Task '{task_name}' (Interactive logon).")
             return True
