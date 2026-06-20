@@ -58,6 +58,23 @@ def get_scenario_log_path(config_path: Path, config: Dict[str, Any], run_date: d
     return log_dir / log_file_name
 
 
+# PERFORMANCE OPTIMIZATION (Bolt):
+# Pre-compile regular expressions at the module level rather than inside the `convert_from_probe_log`
+# function. This avoids the CPU overhead of repetitive regex compilation and internal `re` module
+# cache lookups every time a log is parsed, significantly speeding up log processing.
+HTTP_SUCCESS_RX = re.compile(
+    r'Target ([^/]+)/([^ ]+) completed with HTTP (\d+), curl exit (-?\d+), total ([\d\.,]+) ms'
+)
+SPEED_SUCCESS_RX = re.compile(
+    r'Target ([^/]+)/([^ ]+) completed with download ([\d\.,]+) Mbps.*latency ([\d\.,]+) ms'
+)
+SPEED_FAIL_RX = re.compile(
+    r'Target ([^/]+)/([^ ]+) completed with error_class'
+)
+SUMMARY_RX = re.compile(
+    r'QoE probe finished\. Success=(\d+), Failure=(\d+), Duration=([\d\.,]+) ms'
+)
+
 def convert_from_probe_log(lines: List[str]) -> Dict[str, Any]:
     """Parse log lines and return target results, summaries, and counts."""
     target_results = []
@@ -65,21 +82,8 @@ def convert_from_probe_log(lines: List[str]) -> Dict[str, Any]:
     warning_count = 0
     error_count = 0
 
-    http_success_rx = re.compile(
-        r'Target ([^/]+)/([^ ]+) completed with HTTP (\d+), curl exit (-?\d+), total ([\d\.,]+) ms'
-    )
-    speed_success_rx = re.compile(
-        r'Target ([^/]+)/([^ ]+) completed with download ([\d\.,]+) Mbps.*latency ([\d\.,]+) ms'
-    )
-    speed_fail_rx = re.compile(
-        r'Target ([^/]+)/([^ ]+) completed with error_class'
-    )
-    summary_rx = re.compile(
-        r'QoE probe finished\. Success=(\d+), Failure=(\d+), Duration=([\d\.,]+) ms'
-    )
-
     for line in lines:
-        m_http = http_success_rx.search(line)
+        m_http = HTTP_SUCCESS_RX.search(line)
         if m_http:
             target_results.append({
                 "service": m_http.group(1),
@@ -90,7 +94,7 @@ def convert_from_probe_log(lines: List[str]) -> Dict[str, Any]:
             })
             continue
 
-        m_speed = speed_success_rx.search(line)
+        m_speed = SPEED_SUCCESS_RX.search(line)
         if m_speed:
             target_results.append({
                 "service": m_speed.group(1),
@@ -101,7 +105,7 @@ def convert_from_probe_log(lines: List[str]) -> Dict[str, Any]:
             })
             continue
 
-        m_speed_fail = speed_fail_rx.search(line)
+        m_speed_fail = SPEED_FAIL_RX.search(line)
         if m_speed_fail:
             target_results.append({
                 "service": m_speed_fail.group(1),
@@ -112,12 +116,12 @@ def convert_from_probe_log(lines: List[str]) -> Dict[str, Any]:
             })
             continue
 
-        m_sum = summary_rx.search(line)
-        if m_sum:
+        m_summary = SUMMARY_RX.search(line)
+        if m_summary:
             summary = {
-                "success_count": int(m_sum.group(1)),
-                "failure_count": int(m_sum.group(2)),
-                "run_duration_ms": float(m_sum.group(3).replace(",", "."))
+                "success_count": int(m_summary.group(1)),
+                "failure_count": int(m_summary.group(2)),
+                "run_duration_ms": float(m_summary.group(3).replace(",", "."))
             }
             continue
 
