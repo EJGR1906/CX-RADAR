@@ -19,3 +19,7 @@
 **Vulnerability:** While removing hardcoded token generation from `register_qoe_task.py`, the systemd environment was not given an alternative credential source, causing dynamic task deployments to fail authentication.
 **Learning:** Removing an exposed secret from a template without substituting it with a secure runtime alternative (like `EnvironmentFile`) causes operational regressions. Removing security risks must not break core functionality.
 **Prevention:** When removing hardcoded tokens from dynamic configuration templates (e.g., systemd service files), ensure a secure alternative is provided (such as adding `EnvironmentFile={script_path.parent.parent}/.env` for systemd) to prevent authentication regressions in generated tasks.
+## 2026-06-21 - [Command Injection via f-strings in subprocess.run(powershell)]
+**Vulnerability:** PowerShell execution commands built dynamically with Python f-strings exposed the scripts to command injection.
+**Learning:** Using `$env:VAR_NAME` syntax inside the PowerShell block and passing arguments securely via the `env` dictionary to `subprocess.run()` prevents arbitrary command execution from dynamically injected string content.
+**Prevention:** Never use f-strings to inject user-provided or dynamically derived variables into PowerShell scripts executed via `subprocess.run()`. Always map them to process environment variables (`env=env`) and reference them using `$env:VAR_NAME` inside the script.

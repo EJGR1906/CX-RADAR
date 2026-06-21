@@ -47,14 +47,19 @@ def is_linux() -> bool:
     return platform.system() == "Linux"
 
 
-def run_cmd(args: List[str]) -> Tuple[int, str, str]:
+def run_cmd(args: List[str], env: Optional[Dict[str, str]] = None) -> Tuple[int, str, str]:
     try:
+        proc_env = os.environ.copy()
+        if env:
+            proc_env.update(env)
+
         proc = subprocess.run(
             args,
             capture_output=True,
             text=True,
             encoding="utf-8",
-            errors="replace"
+            errors="replace",
+            env=proc_env
         )
         return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
     except Exception as e:
@@ -210,22 +215,38 @@ def register_windows(
     """Register daily task on Windows using PowerShell ScheduledTask cmdlets."""
     logon_type = "Interactive" if run_as_current_user else "S4U"
     
-    ps_script = f"""
+    ps_script = """
     $ErrorActionPreference = 'Stop'
-    $action = New-ScheduledTaskAction -Execute '{sys.executable}' -Argument '"{script_path}"'
-    $trigger = New-ScheduledTaskTrigger -Daily -At '{time_str}'
+    $exe = $env:SYS_EXECUTABLE
+    $script = $env:SCRIPT_PATH
+    $timeStr = $env:TIME_STR
+    $logon = $env:LOGON_TYPE
+    $desc = $env:TASK_DESC
+    $tName = $env:TASK_NAME
+
+    $action = New-ScheduledTaskAction -Execute $exe -Argument "`"$script`""
+    $trigger = New-ScheduledTaskTrigger -Daily -At $timeStr
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -RunOnlyIfNetworkAvailable -StartWhenAvailable
     $currentUserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $principal = New-ScheduledTaskPrincipal -UserId $currentUserName -LogonType {logon_type} -RunLevel Limited
-    $task = New-ScheduledTask -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description '{description}'
-    Register-ScheduledTask -TaskName '{task_name}' -InputObject $task -Force | Out-Null
+    $principal = New-ScheduledTaskPrincipal -UserId $currentUserName -LogonType $logon -RunLevel Limited
+    $task = New-ScheduledTask -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description $desc
+    Register-ScheduledTask -TaskName $tName -InputObject $task -Force | Out-Null
     """
     
+    env = {
+        "SYS_EXECUTABLE": sys.executable,
+        "SCRIPT_PATH": str(script_path),
+        "TIME_STR": time_str,
+        "LOGON_TYPE": logon_type,
+        "TASK_DESC": description,
+        "TASK_NAME": task_name
+    }
+
     print(f"Registering Windows Scheduled Task '{task_name}' via PowerShell (LogonType: {logon_type}, Daily: {time_str})...")
     
     code, stdout, stderr = run_cmd([
         "powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script
-    ])
+    ], env=env)
     
     if code == 0:
         print(f"Successfully registered Windows Scheduled Task '{task_name}'.")
@@ -236,10 +257,10 @@ def register_windows(
     
     if logon_type == "S4U":
         print("\nRetrying with interactive logon type (equivalent to --run-as-current-user)...")
-        retry_ps_script = ps_script.replace("LogonType S4U", "LogonType Interactive")
+        env["LOGON_TYPE"] = "Interactive"
         code_retry, _, stderr_retry = run_cmd([
-            "powershell", "-NoProfile", "-NonInteractive", "-Command", retry_ps_script
-        ])
+            "powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script
+        ], env=env)
         if code_retry == 0:
             print(f"Successfully registered Windows Scheduled Task '{task_name}' (Interactive logon).")
             return True
