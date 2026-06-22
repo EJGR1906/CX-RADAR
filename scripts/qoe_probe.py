@@ -379,6 +379,21 @@ def run_external_process(
 
 
 # ---------------------------------------------------------------------------
+# Speed test stdout regex parsing constants
+# ---------------------------------------------------------------------------
+SPEED_DL_RE = re.compile(r'Download(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+SPEED_DL_FALLBACK_RE = re.compile(r'Down(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+
+SPEED_UL_RE = re.compile(r'Upload(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+SPEED_UL_FALLBACK_RE = re.compile(r'Up(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+
+SPEED_LAT_RE = re.compile(r'(?:Idle\s+)?Latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.IGNORECASE)
+SPEED_LAT_FALLBACK_RE = re.compile(r'Round\s*trip\s*latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.IGNORECASE)
+
+SPEED_RPM_RE = re.compile(r'Responsiveness\s*:\s*.*?\(([0-9]+(?:\.[0-9]+)?)\s*RPM\)', re.IGNORECASE)
+SPEED_RPM_FALLBACK_RE = re.compile(r'RPM(?:\s+Responsiveness)?\s*:\s*([0-9]+(?:\.[0-9]+)?)', re.IGNORECASE)
+
+# ---------------------------------------------------------------------------
 # Ping Stats implementation
 # ---------------------------------------------------------------------------
 # Regex matching English and Spanish time: time=12ms, tiempo=12ms, time<1ms, tiempo<1ms
@@ -1382,30 +1397,30 @@ def run_networkquality_measurement(
             # Fallback regex parsing on stdout text
             combined = stdout + "\n" + stderr
             # Download
-            m_dl = re.search(r'Download(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+            m_dl = SPEED_DL_RE.search(combined)
             if not m_dl:
-                m_dl = re.search(r'Down(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+                m_dl = SPEED_DL_FALLBACK_RE.search(combined)
             if m_dl:
                 download_speed = float(m_dl.group(1))
 
             # Upload
-            m_ul = re.search(r'Upload(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+            m_ul = SPEED_UL_RE.search(combined)
             if not m_ul:
-                m_ul = re.search(r'Up(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+                m_ul = SPEED_UL_FALLBACK_RE.search(combined)
             if m_ul:
                 upload_speed = float(m_ul.group(1))
 
             # Latency
-            m_lat = re.search(r'(?:Idle\s+)?Latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', combined, re.I)
+            m_lat = SPEED_LAT_RE.search(combined)
             if not m_lat:
-                m_lat = re.search(r'Round\s*trip\s*latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', combined, re.I)
+                m_lat = SPEED_LAT_FALLBACK_RE.search(combined)
             if m_lat:
                 latency = float(m_lat.group(1))
 
             # RPM
-            m_rpm = re.search(r'Responsiveness\s*:\s*.*?\(([0-9]+(?:\.[0-9]+)?)\s*RPM\)', combined, re.I)
+            m_rpm = SPEED_RPM_RE.search(combined)
             if not m_rpm:
-                m_rpm = re.search(r'RPM(?:\s+Responsiveness)?\s*:\s*([0-9]+(?:\.[0-9]+)?)', combined, re.I)
+                m_rpm = SPEED_RPM_FALLBACK_RE.search(combined)
             if m_rpm:
                 rpm_responsiveness = float(m_rpm.group(1))
 
