@@ -384,6 +384,16 @@ def run_external_process(
 # Regex matching English and Spanish time: time=12ms, tiempo=12ms, time<1ms, tiempo<1ms
 PING_TIME_REGEX = re.compile(r'(?:time|tiempo)\s*[=<]\s*(\d+(?:\.\d+)?)\s*ms', re.IGNORECASE)
 
+# Regexes for networkquality fallback parsing
+_NQ_DL_CAP_REGEX = re.compile(r'Download(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.I)
+_NQ_DL_BW_REGEX = re.compile(r'Down(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.I)
+_NQ_UL_CAP_REGEX = re.compile(r'Upload(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.I)
+_NQ_UL_BW_REGEX = re.compile(r'Up(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.I)
+_NQ_LATENCY_REGEX = re.compile(r'(?:Idle\s+)?Latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.I)
+_NQ_RT_LATENCY_REGEX = re.compile(r'Round\s*trip\s*latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.I)
+_NQ_RPM_RESP_REGEX = re.compile(r'Responsiveness\s*:\s*.*?\(([0-9]+(?:\.[0-9]+)?)\s*RPM\)', re.I)
+_NQ_RPM_REGEX = re.compile(r'RPM(?:\s+Responsiveness)?\s*:\s*([0-9]+(?:\.[0-9]+)?)', re.I)
+
 def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> Dict[str, Any]:
     """Compute RTT latency and Mean Absolute Successive Jitter using ping."""
     result = {
@@ -1382,30 +1392,30 @@ def run_networkquality_measurement(
             # Fallback regex parsing on stdout text
             combined = stdout + "\n" + stderr
             # Download
-            m_dl = re.search(r'Download(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+            m_dl = _NQ_DL_CAP_REGEX.search(combined)
             if not m_dl:
-                m_dl = re.search(r'Down(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+                m_dl = _NQ_DL_BW_REGEX.search(combined)
             if m_dl:
                 download_speed = float(m_dl.group(1))
 
             # Upload
-            m_ul = re.search(r'Upload(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+            m_ul = _NQ_UL_CAP_REGEX.search(combined)
             if not m_ul:
-                m_ul = re.search(r'Up(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+                m_ul = _NQ_UL_BW_REGEX.search(combined)
             if m_ul:
                 upload_speed = float(m_ul.group(1))
 
             # Latency
-            m_lat = re.search(r'(?:Idle\s+)?Latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', combined, re.I)
+            m_lat = _NQ_LATENCY_REGEX.search(combined)
             if not m_lat:
-                m_lat = re.search(r'Round\s*trip\s*latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', combined, re.I)
+                m_lat = _NQ_RT_LATENCY_REGEX.search(combined)
             if m_lat:
                 latency = float(m_lat.group(1))
 
             # RPM
-            m_rpm = re.search(r'Responsiveness\s*:\s*.*?\(([0-9]+(?:\.[0-9]+)?)\s*RPM\)', combined, re.I)
+            m_rpm = _NQ_RPM_RESP_REGEX.search(combined)
             if not m_rpm:
-                m_rpm = re.search(r'RPM(?:\s+Responsiveness)?\s*:\s*([0-9]+(?:\.[0-9]+)?)', combined, re.I)
+                m_rpm = _NQ_RPM_REGEX.search(combined)
             if m_rpm:
                 rpm_responsiveness = float(m_rpm.group(1))
 
