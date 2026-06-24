@@ -285,6 +285,16 @@ def get_influx_token(influx_cfg: Dict[str, Any], config_dir: Path) -> str:
 LOG_PATTERN_PROBE = re.compile(r'^qoe-probe-\d{4}-\d{2}-\d{2}\.log$')
 LOG_PATTERN_SPEED = re.compile(r'^qoe-speed-test-\d{4}-\d{2}-\d{2}\.log$')
 
+# networkquality fallback parsing regexes
+NQ_DL_REGEX_1 = re.compile(r'Download(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.I)
+NQ_DL_REGEX_2 = re.compile(r'Down(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.I)
+NQ_UL_REGEX_1 = re.compile(r'Upload(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.I)
+NQ_UL_REGEX_2 = re.compile(r'Up(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.I)
+NQ_LAT_REGEX_1 = re.compile(r'(?:Idle\s+)?Latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.I)
+NQ_LAT_REGEX_2 = re.compile(r'Round\s*trip\s*latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.I)
+NQ_RPM_REGEX_1 = re.compile(r'Responsiveness\s*:\s*.*?\(([0-9]+(?:\.[0-9]+)?)\s*RPM\)', re.I)
+NQ_RPM_REGEX_2 = re.compile(r'RPM(?:\s+Responsiveness)?\s*:\s*([0-9]+(?:\.[0-9]+)?)', re.I)
+
 def run_garbage_collection(repo_root: Path, temp_dir: Path, log_retention_days: int = 7, min_age_minutes: int = 20) -> int:
     """Remove stale log files and temporary artifacts."""
     removed_count = 0
@@ -1382,30 +1392,30 @@ def run_networkquality_measurement(
             # Fallback regex parsing on stdout text
             combined = stdout + "\n" + stderr
             # Download
-            m_dl = re.search(r'Download(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+            m_dl = NQ_DL_REGEX_1.search(combined)
             if not m_dl:
-                m_dl = re.search(r'Down(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+                m_dl = NQ_DL_REGEX_2.search(combined)
             if m_dl:
                 download_speed = float(m_dl.group(1))
 
             # Upload
-            m_ul = re.search(r'Upload(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+            m_ul = NQ_UL_REGEX_1.search(combined)
             if not m_ul:
-                m_ul = re.search(r'Up(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+                m_ul = NQ_UL_REGEX_2.search(combined)
             if m_ul:
                 upload_speed = float(m_ul.group(1))
 
             # Latency
-            m_lat = re.search(r'(?:Idle\s+)?Latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', combined, re.I)
+            m_lat = NQ_LAT_REGEX_1.search(combined)
             if not m_lat:
-                m_lat = re.search(r'Round\s*trip\s*latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', combined, re.I)
+                m_lat = NQ_LAT_REGEX_2.search(combined)
             if m_lat:
                 latency = float(m_lat.group(1))
 
             # RPM
-            m_rpm = re.search(r'Responsiveness\s*:\s*.*?\(([0-9]+(?:\.[0-9]+)?)\s*RPM\)', combined, re.I)
+            m_rpm = NQ_RPM_REGEX_1.search(combined)
             if not m_rpm:
-                m_rpm = re.search(r'RPM(?:\s+Responsiveness)?\s*:\s*([0-9]+(?:\.[0-9]+)?)', combined, re.I)
+                m_rpm = NQ_RPM_REGEX_2.search(combined)
             if m_rpm:
                 rpm_responsiveness = float(m_rpm.group(1))
 
