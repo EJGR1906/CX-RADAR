@@ -72,7 +72,7 @@ def convert_from_probe_log(lines: List[str]) -> Dict[str, Any]:
         r'Target ([^/]+)/([^ ]+) completed with download ([\d\.,]+) Mbps.*latency ([\d\.,]+) ms'
     )
     speed_fail_rx = re.compile(
-        r'Target ([^/]+)/([^ ]+) completed with error_class'
+        r'Target ([^/]+)/([^ ]+) (?:completed with error_class|failed:)'
     )
     summary_rx = re.compile(
         r'QoE probe finished\. Success=(\d+), Failure=(\d+), Duration=([\d\.,]+) ms'
