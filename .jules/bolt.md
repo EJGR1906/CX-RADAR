@@ -21,3 +21,7 @@
 ## 2026-06-15 - [Optimize Identity Deduplication with dict comprehension]
 **Learning:** Manual loop and set tracking for deduplicating Python objects by their identity (`id()`) incurs measurable overhead due to bytecode execution for sets and list appends. For high-frequency or large-scale tasks, dict comprehensions (`list({id(x): x for x in items}.values())`) perform the same behavior but execute much faster using the underlying optimized C dictionary implementation while preserving insertion order (Python 3.7+).
 **Action:** When performing identity-based or unique-key deduplication in Python while needing to preserve order, prefer dictionary comprehensions extracting `.values()` over `for` loops combined with `set()` tracking.
+
+## 2024-05-18 - Avoid inline regex compilation in frequent parsers
+**Learning:** In python, `re.search(pattern, ...)` inside a frequently executed loop or function parsing output requires the python engine to lookup the compiled regex in cache or recompile it, introducing overhead.
+**Action:** Always move `re.compile` declarations to the global module level so they are evaluated exactly once when the script loads, preventing cache lookup/recompilation overhead.
