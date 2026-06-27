@@ -146,10 +146,12 @@ def _set_env_persistent(var_name: str, token: str, force: bool) -> None:
     if _is_windows():
         # Persist to the user environment on Windows using PowerShell.
         # This avoids exposing the token in the process command line (unlike setx).
-        ps_command = f"[Environment]::SetEnvironmentVariable('{var_name}', $env:CX_RADAR_PROVISIONING_TOKEN, 'User')"
+        # We pass var_name securely via environment to prevent command injection.
+        ps_command = "[Environment]::SetEnvironmentVariable($env:CX_RADAR_VAR_NAME, $env:CX_RADAR_PROVISIONING_TOKEN, 'User')"
 
         env_vars = os.environ.copy()
         env_vars["CX_RADAR_PROVISIONING_TOKEN"] = token
+        env_vars["CX_RADAR_VAR_NAME"] = var_name
 
         result = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_command],
