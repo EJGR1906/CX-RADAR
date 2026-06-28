@@ -37,14 +37,15 @@ def is_linux() -> bool:
     return platform.system() == "Linux"
 
 
-def run_cmd(args: List[str]) -> Tuple[int, str, str]:
+def run_cmd(args: List[str], env: Optional[Dict[str, str]] = None) -> Tuple[int, str, str]:
     try:
         proc = subprocess.run(
             args,
             capture_output=True,
             text=True,
             encoding="utf-8",
-            errors="replace"
+            errors="replace",
+            env=env
         )
         return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
     except Exception as e:
@@ -61,23 +62,32 @@ def register_windows(
     # LogonType Interactive runs when the user is logged in.
     logon_type = "Interactive" if run_as_current_user else "S4U"
     
-    ps_script = f"""
+    ps_script = """
     $ErrorActionPreference = 'Stop'
-    $action = New-ScheduledTaskAction -Execute '{sys.executable}' -Argument '"{script_path}" --config-path "{config_path}"'
-    $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).Date) -RepetitionInterval (New-TimeSpan -Minutes {interval_minutes})
+    $action = New-ScheduledTaskAction -Execute $env:CX_RADAR_SYS_EXE -Argument "`"$env:CX_RADAR_SCRIPT_PATH`" --config-path `"$env:CX_RADAR_CONFIG_PATH`""
+    $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).Date) -RepetitionInterval (New-TimeSpan -Minutes $env:CX_RADAR_INTERVAL)
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -RunOnlyIfNetworkAvailable -StartWhenAvailable
     $currentUserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $principal = New-ScheduledTaskPrincipal -UserId $currentUserName -LogonType {logon_type} -RunLevel Limited
-    $task = New-ScheduledTask -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description '{description}'
-    Register-ScheduledTask -TaskName '{task_name}' -InputObject $task -Force | Out-Null
+    $principal = New-ScheduledTaskPrincipal -UserId $currentUserName -LogonType $env:CX_RADAR_LOGON_TYPE -RunLevel Limited
+    $task = New-ScheduledTask -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description $env:CX_RADAR_DESCRIPTION
+    Register-ScheduledTask -TaskName $env:CX_RADAR_TASK_NAME -InputObject $task -Force | Out-Null
     """
     
     print(f"Registering Windows Scheduled Task '{task_name}' via PowerShell (LogonType: {logon_type})...")
     
+    env_vars = os.environ.copy()
+    env_vars["CX_RADAR_SYS_EXE"] = sys.executable
+    env_vars["CX_RADAR_SCRIPT_PATH"] = str(script_path)
+    env_vars["CX_RADAR_CONFIG_PATH"] = str(config_path)
+    env_vars["CX_RADAR_INTERVAL"] = str(interval_minutes)
+    env_vars["CX_RADAR_LOGON_TYPE"] = logon_type
+    env_vars["CX_RADAR_TASK_NAME"] = task_name
+    env_vars["CX_RADAR_DESCRIPTION"] = description
+
     # We invoke powershell
     code, stdout, stderr = run_cmd([
         "powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script
-    ])
+    ], env=env_vars)
     
     if code == 0:
         print(f"Successfully registered Windows Scheduled Task '{task_name}'.")
@@ -89,10 +99,10 @@ def register_windows(
     # If S4U failed, try interactive logon type as fallback
     if logon_type == "S4U":
         print("\nRetrying with interactive logon type (equivalent to --run-as-current-user)...")
-        retry_ps_script = ps_script.replace("LogonType S4U", "LogonType Interactive")
+        env_vars["CX_RADAR_LOGON_TYPE"] = "Interactive"
         code_retry, _, stderr_retry = run_cmd([
-            "powershell", "-NoProfile", "-NonInteractive", "-Command", retry_ps_script
-        ])
+            "powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script
+        ], env=env_vars)
         if code_retry == 0:
             print(f"Successfully registered Windows Scheduled Task '{task_name}' (Interactive logon).")
             return True
