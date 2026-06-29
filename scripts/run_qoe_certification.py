@@ -49,6 +49,20 @@ def run_process(args: List[str], timeout: float = 120, env: Optional[Dict[str, s
         return -1, "", f"Process execution failed: {e}"
 
 
+HTTP_SUCCESS_RX = re.compile(
+    r'Target ([^/]+)/([^ ]+) completed with HTTP (\d+), curl exit (-?\d+), total ([\d\.,]+) ms'
+)
+SPEED_SUCCESS_RX = re.compile(
+    r'Target ([^/]+)/([^ ]+) completed with download ([\d\.,]+) Mbps.*latency ([\d\.,]+) ms'
+)
+SPEED_FAIL_RX = re.compile(
+    r'Target ([^/]+)/([^ ]+) (?:completed with error_class|failed:)'
+)
+SUMMARY_RX = re.compile(
+    r'QoE probe finished\. Success=(\d+), Failure=(\d+), Duration=([\d\.,]+) ms'
+)
+
+
 def get_scenario_log_path(config_path: Path, config: Dict[str, Any], run_date: datetime.date) -> Path:
     """Resolve the log file path for a scenario catalog."""
     log_dir_raw = config.get("probeRun", {}).get("logDirectory", "logs")
@@ -65,21 +79,8 @@ def convert_from_probe_log(lines: List[str]) -> Dict[str, Any]:
     warning_count = 0
     error_count = 0
 
-    http_success_rx = re.compile(
-        r'Target ([^/]+)/([^ ]+) completed with HTTP (\d+), curl exit (-?\d+), total ([\d\.,]+) ms'
-    )
-    speed_success_rx = re.compile(
-        r'Target ([^/]+)/([^ ]+) completed with download ([\d\.,]+) Mbps.*latency ([\d\.,]+) ms'
-    )
-    speed_fail_rx = re.compile(
-        r'Target ([^/]+)/([^ ]+) (?:completed with error_class|failed:)'
-    )
-    summary_rx = re.compile(
-        r'QoE probe finished\. Success=(\d+), Failure=(\d+), Duration=([\d\.,]+) ms'
-    )
-
     for line in lines:
-        m_http = http_success_rx.search(line)
+        m_http = HTTP_SUCCESS_RX.search(line)
         if m_http:
             target_results.append({
                 "service": m_http.group(1),
@@ -90,7 +91,7 @@ def convert_from_probe_log(lines: List[str]) -> Dict[str, Any]:
             })
             continue
 
-        m_speed = speed_success_rx.search(line)
+        m_speed = SPEED_SUCCESS_RX.search(line)
         if m_speed:
             target_results.append({
                 "service": m_speed.group(1),
@@ -101,7 +102,7 @@ def convert_from_probe_log(lines: List[str]) -> Dict[str, Any]:
             })
             continue
 
-        m_speed_fail = speed_fail_rx.search(line)
+        m_speed_fail = SPEED_FAIL_RX.search(line)
         if m_speed_fail:
             target_results.append({
                 "service": m_speed_fail.group(1),
@@ -112,7 +113,7 @@ def convert_from_probe_log(lines: List[str]) -> Dict[str, Any]:
             })
             continue
 
-        m_sum = summary_rx.search(line)
+        m_sum = SUMMARY_RX.search(line)
         if m_sum:
             summary = {
                 "success_count": int(m_sum.group(1)),
