@@ -25,6 +25,7 @@ import socket
 import ssl
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -187,7 +188,8 @@ def escape_field_string(value: str) -> str:
 _INFLUX_FLOAT_FIELDS = frozenset({
     "download_speed", "upload_speed", "latency", "jitter", "rpm_responsiveness",
     "time_namelookup_ms", "time_connect_ms", "time_appconnect_ms", "time_starttransfer_ms", "time_total_ms",
-    "size_download_bytes", "run_duration_ms", "latency_ms", "jitter_ms", "download_mbps", "upload_mbps"
+    "size_download_bytes", "run_duration_ms", "latency_ms", "jitter_ms", "download_mbps", "upload_mbps",
+    "packet_loss_percentage", "gateway_latency_ms", "bufferbloat_download_ms", "bufferbloat_upload_ms"
 })
 
 def build_influx_line(measurement: str, tags: Dict[str, Any], fields: Dict[str, Any], timestamp_ms: int) -> str:
@@ -391,7 +393,8 @@ def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> 
         "LatencyMs": 0.0,
         "JitterMs": 0.0,
         "SuccessfulReplies": 0,
-        "Samples": []
+        "Samples": [],
+        "PacketLossPercentage": 0.0
     }
 
     if not host or host.strip() == "":
@@ -420,6 +423,7 @@ def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> 
             samples.append(float(m.group(1)))
 
     if not samples:
+        result["PacketLossPercentage"] = 100.0
         return result
 
     latency_ms = round(sum(samples) / len(samples), 2)
@@ -428,13 +432,113 @@ def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> 
         delta_sum = sum(abs(samples[i] - samples[i-1]) for i in range(1, len(samples)))
         jitter_ms = round(delta_sum / (len(samples) - 1), 2)
 
+    loss_pct = round(((count - len(samples)) / count) * 100.0, 2) if count > 0 else 0.0
+
     return {
         "Host": host,
         "LatencyMs": latency_ms,
         "JitterMs": jitter_ms,
         "SuccessfulReplies": len(samples),
-        "Samples": samples
+        "Samples": samples,
+        "PacketLossPercentage": loss_pct
     }
+
+
+def get_default_gateway() -> str:
+    """Retrieve default gateway IP address in a cross-platform way using standard tools."""
+    try:
+        # Hide command window on Windows
+        startupinfo = None
+        if is_windows():
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+
+        if is_windows():
+            # Try powershell first
+            cmd = ["powershell", "-NoProfile", "-Command", "(Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue).NextHop"]
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, startupinfo=startupinfo)
+            stdout, _ = proc.communicate(timeout=5)
+            if proc.returncode == 0:
+                for line in stdout.splitlines():
+                    ip = line.strip()
+                    if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', ip):
+                        return ip
+            
+            # Fallback to route print
+            proc2 = subprocess.Popen(["route", "print", "0.0.0.0"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, startupinfo=startupinfo)
+            stdout2, _ = proc2.communicate(timeout=5)
+            for line in stdout2.splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 4 and parts[0] == "0.0.0.0":
+                    gw = parts[2]
+                    if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', gw):
+                        return gw
+        elif platform.system() == "Darwin":
+            proc = subprocess.Popen(["route", "-n", "get", "default"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            stdout, _ = proc.communicate(timeout=5)
+            for line in stdout.splitlines():
+                if "gateway:" in line.lower():
+                    gw = line.split(":")[-1].strip()
+                    if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', gw) or ":" in gw:
+                        return gw
+        else:
+            # Linux: read /proc/net/route or parse ip route
+            if os.path.exists("/proc/net/route"):
+                with open("/proc/net/route", "r") as f:
+                    for line in f.read().splitlines()[1:]:
+                        parts = line.split()
+                        if len(parts) >= 3 and parts[1] == "00000000":
+                            gw_hex = parts[2]
+                            if len(gw_hex) == 8:
+                                octets = [int(gw_hex[i:i+2], 16) for i in range(6, -1, -2)]
+                                return ".".join(map(str, octets))
+            proc = subprocess.Popen(["ip", "route", "show", "default"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            stdout, _ = proc.communicate(timeout=5)
+            for line in stdout.splitlines():
+                parts = line.split()
+                if len(parts) >= 3 and parts[0] == "default" and parts[1] == "via":
+                    return parts[2]
+    except Exception:
+        pass
+    return ""
+
+
+class ConcurrentPingCollector:
+    """Run a periodic ping in a background thread to measure loaded latency during throughput tests."""
+    def __init__(self, host: str, interval_seconds: float = 0.5):
+        self.host = host
+        self.interval = interval_seconds
+        self.latencies = []
+        self.stop_event = threading.Event()
+        self.thread = None
+
+    def start(self):
+        self.stop_event.clear()
+        self.latencies = []
+        self.thread = threading.Thread(target=self._run)
+        self.thread.daemon = True
+        self.thread.start()
+
+    def stop(self) -> List[float]:
+        self.stop_event.set()
+        if self.thread:
+            self.thread.join(timeout=2.0)
+        return self.latencies
+
+    def _run(self):
+        if not self.host or self.host.strip() == "":
+            return
+        while not self.stop_event.is_set():
+            start_time = time.perf_counter()
+            stats = get_ping_burst_stats(self.host, count=1, timeout_ms=800)
+            if stats["SuccessfulReplies"] > 0 and stats["Samples"]:
+                self.latencies.extend(stats["Samples"])
+            
+            elapsed = time.perf_counter() - start_time
+            sleep_time = max(0.01, self.interval - elapsed)
+            if self.stop_event.wait(sleep_time):
+                break
 
 
 def get_approximate_rpm(latency_ms: float) -> float:
@@ -831,9 +935,16 @@ def _wait_for_futures(futures: List[concurrent.futures.Future]) -> List[str]:
 
 def download_parallel_chunks(
     url: str, transfer_dir: Path, target_bytes: int, num_connections: int,
-    timeout: float, user_agent: Optional[str] = None, verify_tls: bool = True
-) -> Tuple[float, float, str]:
+    timeout: float, user_agent: Optional[str] = None, verify_tls: bool = True,
+    ping_host: Optional[str] = None
+) -> Tuple[float, float, str, List[float]]:
     """Download chunks of target_bytes in parallel using ThreadPoolExecutor and HTTP Range headers."""
+    # Start ping collector if host provided
+    collector = None
+    if ping_host:
+        collector = ConcurrentPingCollector(ping_host, interval_seconds=0.5)
+        collector.start()
+
     # Attempt to resolve the real file content length using a lightweight 1-byte GET request
     file_size = target_bytes
     try:
@@ -873,9 +984,11 @@ def download_parallel_chunks(
             downloaded_bytes = float(download_file.stat().st_size) if download_file.is_file() else 0.0
             if download_file.is_file():
                 download_file.unlink()
-            return dur, downloaded_bytes, ""
+            latencies = collector.stop() if collector else []
+            return dur, downloaded_bytes, "", latencies
         except Exception as e:
-            return 0.0, 0.0, str(e)
+            latencies = collector.stop() if collector else []
+            return 0.0, 0.0, str(e), latencies
 
     # Determine if we partition the file or download the full file in parallel across connections.
     # We partition if the file is reasonably large (>= 5MB).
@@ -924,14 +1037,22 @@ def download_parallel_chunks(
                 pass
 
     error_detail = "; ".join(errors) if errors else ""
-    return duration_ms, downloaded_bytes, error_detail
+    latencies = collector.stop() if collector else []
+    return duration_ms, downloaded_bytes, error_detail, latencies
 
 
 def upload_parallel_chunks(
     url: str, transfer_dir: Path, payload_bytes: int, num_connections: int,
-    method: str, timeout: float, user_agent: Optional[str] = None, verify_tls: bool = True
-) -> Tuple[float, float, str]:
+    method: str, timeout: float, user_agent: Optional[str] = None, verify_tls: bool = True,
+    ping_host: Optional[str] = None
+) -> Tuple[float, float, str, List[float]]:
     """Upload blocks of payload_bytes in parallel using ThreadPoolExecutor."""
+    # Start ping collector if host provided
+    collector = None
+    if ping_host:
+        collector = ConcurrentPingCollector(ping_host, interval_seconds=0.5)
+        collector.start()
+
     if num_connections <= 1:
         upload_file = transfer_dir / "upload-single.bin"
         upload_file.write_bytes(os.urandom(payload_bytes))
@@ -940,9 +1061,11 @@ def upload_parallel_chunks(
             dur = upload_file_to_url(url, upload_file, method, timeout, user_agent, verify_tls)
             if upload_file.is_file():
                 upload_file.unlink()
-            return dur, float(payload_bytes), ""
+            latencies = collector.stop() if collector else []
+            return dur, float(payload_bytes), "", latencies
         except Exception as e:
-            return 0.0, 0.0, str(e)
+            latencies = collector.stop() if collector else []
+            return 0.0, 0.0, str(e), latencies
 
     start_time = time.perf_counter()
     futures = []
@@ -976,7 +1099,8 @@ def upload_parallel_chunks(
                 pass
 
     error_detail = "; ".join(errors) if errors else ""
-    return duration_ms, total_uploaded, error_detail
+    latencies = collector.stop() if collector else []
+    return duration_ms, total_uploaded, error_detail, latencies
 
 
 # ---------------------------------------------------------------------------
@@ -1056,9 +1180,11 @@ def run_upload_supplement(
                     raise ValueError("Target is missing uploadUrl.")
                 upload_method = get_optional_str(target, "uploadMethod", "POST")
 
-            dur, uploaded_bytes, err_det = upload_parallel_chunks(
+            ref_host = get_optional_str(probe_run, "bufferbloatReferenceHost", "1.1.1.1")
+            dur, uploaded_bytes, err_det, ul_latencies = upload_parallel_chunks(
                 endpoint, transfer_dir, payload_bytes, num_connections,
-                upload_method, timeout, user_agent=ua, verify_tls=verify_tls
+                upload_method, timeout, user_agent=ua, verify_tls=verify_tls,
+                ping_host=ref_host
             )
             if err_det:
                 raise RuntimeError(err_det)
@@ -1066,6 +1192,7 @@ def run_upload_supplement(
             result["UploadMbps"] = get_mbps_from_bytes_duration(uploaded_bytes, dur)
             result["RunDurationMs"] = dur
             result["Tool"] = f"{method}-{num_connections}x" if num_connections > 1 else method
+            result["Latencies"] = ul_latencies
 
     except Exception as e:
         result["ErrorClass"] = "upload_measurement_error"
@@ -1143,6 +1270,20 @@ def run_fast_cli_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], 
     timed_out = False
     duration_ms = 0.0
 
+    ref_host = get_optional_str(probe_run, "bufferbloatReferenceHost", "1.1.1.1")
+    ref_base_stats = get_ping_burst_stats(ref_host, count=10, timeout_ms=800)
+    ref_base_latency = ref_base_stats["LatencyMs"]
+    packet_loss = ref_base_stats["PacketLossPercentage"]
+
+    gw_ip = get_default_gateway()
+    gw_latency = 0.0
+    if gw_ip:
+        gw_stats = get_ping_burst_stats(gw_ip, count=5, timeout_ms=500)
+        gw_latency = gw_stats["LatencyMs"]
+
+    collector = ConcurrentPingCollector(ref_host, interval_seconds=0.5)
+    collector.start()
+
     try:
         for attempt in range(1, attempts + 1):
             args = [str(node_exe), str(fast_cli_script), "--upload", "--json"]
@@ -1153,6 +1294,10 @@ def run_fast_cli_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], 
             is_retryable = (not timed_out) and (exit_code != 0) and ("Navigation timeout" in combined)
             if not is_retryable or attempt == attempts:
                 break
+
+        latencies = collector.stop()
+        loaded_latency = sum(latencies) / len(latencies) if latencies else 0.0
+        bb_combined = max(0.0, round(loaded_latency - ref_base_latency, 2)) if loaded_latency > 0 and ref_base_latency > 0 else 0.0
 
         err_class = ""
         err_detail = ""
@@ -1178,6 +1323,9 @@ def run_fast_cli_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], 
                 err_class = "parse_error"
                 err_detail = f"Failed to parse fast-cli JSON output: {e}"
 
+        dl_speed = round(float(parsed.get("downloadSpeed", 0.0)), 2)
+        ul_speed = round(float(parsed.get("uploadSpeed", 0.0)), 2)
+
         host = get_target_host(target)
         ping_stats = get_ping_burst_stats(host)
         latency = round(parsed.get("latency", ping_stats["LatencyMs"]), 2)
@@ -1186,8 +1334,8 @@ def run_fast_cli_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], 
             "Tool": "fast-cli",
             "ExitCode": exit_code,
             "TimedOut": timed_out,
-            "DownloadMbps": round(float(parsed.get("downloadSpeed", 0.0)), 2),
-            "UploadMbps": round(float(parsed.get("uploadSpeed", 0.0)), 2),
+            "DownloadMbps": dl_speed,
+            "UploadMbps": ul_speed,
             "LatencyMs": latency,
             "JitterMs": ping_stats["JitterMs"],
             "RpmResponsiveness": get_approximate_rpm(latency),
@@ -1197,7 +1345,12 @@ def run_fast_cli_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], 
             "RawStdOut": stdout,
             "RawStdErr": stderr,
             "RunDurationMs": duration_ms,
-            "Available": (err_class == "" and exit_code == 0)
+            "Available": (err_class == "" and exit_code == 0),
+            "PacketLossPercentage": packet_loss,
+            "GatewayLatencyMs": gw_latency,
+            "BufferbloatDownloadMs": bb_combined,
+            "BufferbloatUploadMs": bb_combined,
+            "RefBaseLatencyMs": ref_base_latency
         }
     finally:
         kill_dangling_chrome(cache_dir)
@@ -1270,10 +1423,23 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
             fragment_bytes = max(1, get_optional_int(target, "fragmentBytes", 4194304))
             verify_tls = bool(probe_run.get("verifyTls", True))
 
+            ref_host = get_optional_str(probe_run, "bufferbloatReferenceHost", "1.1.1.1")
+            ref_base_stats = get_ping_burst_stats(ref_host, count=10, timeout_ms=800)
+            ref_base_latency = ref_base_stats["LatencyMs"]
+            packet_loss = ref_base_stats["PacketLossPercentage"]
+
+            gw_ip = get_default_gateway()
+            gw_latency = 0.0
+            if gw_ip:
+                gw_stats = get_ping_burst_stats(gw_ip, count=5, timeout_ms=500)
+                gw_latency = gw_stats["LatencyMs"]
+
+            dl_latencies = []
             try:
-                download_duration_ms, download_bytes, err_det = download_parallel_chunks(
+                download_duration_ms, download_bytes, err_det, dl_latencies = download_parallel_chunks(
                     direct_url, transfer_dir, fragment_bytes, num_connections,
-                    timeout, user_agent=get_optional_str(probe_run, "userAgent"), verify_tls=verify_tls
+                    timeout, user_agent=get_optional_str(probe_run, "userAgent"), verify_tls=verify_tls,
+                    ping_host=ref_host
                 )
                 if err_det:
                     err_class = "download_error"
@@ -1284,6 +1450,9 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
 
         ping_stats = get_ping_burst_stats(source_host)
         download_mbps = get_mbps_from_bytes_duration(download_bytes, download_duration_ms)
+
+        dl_loaded_latency = sum(dl_latencies) / len(dl_latencies) if dl_latencies else 0.0
+        bb_dl = max(0.0, round(dl_loaded_latency - ref_base_latency, 2)) if dl_loaded_latency > 0 and ref_base_latency > 0 else 0.0
 
         if not err_class and download_bytes <= 0:
             err_class = "download_empty"
@@ -1304,7 +1473,12 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
             "RawStdOut": direct_url,
             "RawStdErr": stderr if not direct_url else "",
             "RunDurationMs": download_duration_ms,
-            "Available": (err_class == "" and download_bytes > 0)
+            "Available": (err_class == "" and download_bytes > 0),
+            "PacketLossPercentage": packet_loss,
+            "GatewayLatencyMs": gw_latency,
+            "BufferbloatDownloadMs": bb_dl,
+            "BufferbloatUploadMs": 0.0,
+            "RefBaseLatencyMs": ref_base_latency
         }
 
     finally:
@@ -1437,11 +1611,97 @@ def run_networkquality_measurement(
         "RunDurationMs": duration_ms,
         "Available": (err_class == "" and exit_code == 0)
     }
+def log_bufferbloat_diagnostic(
+    target: Dict[str, Any],
+    download_mbps: float,
+    upload_mbps: float,
+    base_latency: float,
+    dl_latency_increase: float,
+    ul_latency_increase: float,
+    packet_loss: float,
+    gw_latency: float
+):
+    """Print a beautiful bufferbloat diagnostic report card in Spanish in the logs."""
+    max_increase = max(dl_latency_increase, ul_latency_increase)
+    
+    # Determine grade
+    if max_increase < 5.0:
+        grade = "A+"
+        desc = "Tu latencia casi no aumentó bajo carga."
+    elif max_increase < 30.0:
+        grade = "A"
+        desc = "Tu latencia aumentó ligeramente bajo carga."
+    elif max_increase < 60.0:
+        grade = "B"
+        desc = "Tu latencia aumentó de forma moderada bajo carga."
+    elif max_increase < 200.0:
+        grade = "C"
+        desc = "Tu latencia aumentó de forma notable bajo carga."
+    elif max_increase < 400.0:
+        grade = "D"
+        desc = "Tu latencia aumentó de forma crítica bajo carga."
+    else:
+        grade = "F"
+        desc = "Tu latencia sufre una degradación extrema bajo carga."
+
+    # Loaded latencies
+    dl_loaded_latency = base_latency + dl_latency_increase
+    ul_loaded_latency = base_latency + ul_latency_increase
+    max_loaded_latency = max(dl_loaded_latency, ul_loaded_latency)
+
+    # Connection suitability logic
+    # Web Browsing: Download > 2 Mbps, Upload > 100 Kbps (0.1 Mbps), Latency < 500 ms
+    web_ideal = download_mbps > 2.0 and upload_mbps > 0.1 and base_latency < 500.0
+    web_stress = download_mbps > 2.0 and upload_mbps > 0.1 and max_loaded_latency < 500.0
+
+    # Audio Calls: Download > 100 Kbps (0.1 Mbps), Upload > 100 Kbps (0.1 Mbps), Latency < 400 ms
+    audio_ideal = download_mbps > 0.1 and upload_mbps > 0.1 and base_latency < 400.0
+    audio_stress = download_mbps > 0.1 and upload_mbps > 0.1 and max_loaded_latency < 400.0
+
+    # 4K Video Streaming: Download > 25 Mbps
+    video_4k_ideal = download_mbps > 25.0
+    video_4k_stress = download_mbps > 25.0
+
+    # Video Conferencing: Download > 10 Mbps, Upload > 5 Mbps, Latency < 400 ms
+    conf_ideal = download_mbps > 10.0 and upload_mbps > 5.0 and base_latency < 400.0
+    conf_stress = download_mbps > 10.0 and upload_mbps > 5.0 and max_loaded_latency < 400.0
+
+    # Low Latency Gaming: Download > 10 Mbps, Upload > 3 Mbps, Latency < 40 ms
+    gaming_ideal = download_mbps > 10.0 and upload_mbps > 3.0 and base_latency < 40.0
+    gaming_stress = download_mbps > 10.0 and upload_mbps > 3.0 and max_loaded_latency < 40.0
+
+    def fmt_check(val):
+        return "✅" if val else "❎"
+
+    service_name = target.get("service", "Servicio")
+    endpoint_name = target.get("endpointName", "endpoint")
+
+    log_message("============================================================")
+    log_message(f"CALIFICACIÓN DE BUFFERBLOAT ({service_name}/{endpoint_name})")
+    log_message(f"GRADO: {grade}")
+    log_message(desc)
+    log_message("")
+    log_message("TU CONEXIÓN")
+    log_message("Caso de Uso             Ideal   Con Bufferbloat")
+    log_message(f"Navegación Web            {fmt_check(web_ideal)}          {fmt_check(web_stress)}")
+    log_message(f"Llamadas de Audio         {fmt_check(audio_ideal)}          {fmt_check(audio_stress)}")
+    log_message(f"Streaming Video 4K        {fmt_check(video_4k_ideal)}          {fmt_check(video_4k_stress)}")
+    log_message(f"Videoconferencias         {fmt_check(conf_ideal)}          {fmt_check(conf_stress)}")
+    log_message(f"Juegos Baja Latencia      {fmt_check(gaming_ideal)}          {fmt_check(gaming_stress)}")
+    log_message("")
+    log_message("LATENCIA")
+    log_message(f"Base (Sin Carga): {round(base_latency, 2)} ms")
+    log_message(f"Descarga Activa: +{round(dl_latency_increase, 2)} ms (Total: {round(dl_loaded_latency, 2)} ms)")
+    log_message(f"Subida Activa:   +{round(ul_latency_increase, 2)} ms (Total: {round(ul_loaded_latency, 2)} ms)")
+    log_message(f"Pérdida Paquetes: {round(packet_loss, 2)}%")
+    log_message(f"Router (Gateway): {f'{round(gw_latency, 2)} ms' if gw_latency > 0 else 'Desconocido'}")
+    log_message("")
+    log_message("VELOCIDAD")
+    log_message(f"↓ Descarga: {round(download_mbps, 2)} Mbps")
+    log_message(f"↑ Subida:   {round(upload_mbps, 2)} Mbps")
+    log_message("============================================================")
 
 
-# ---------------------------------------------------------------------------
-# Speed Test: burst
-# ---------------------------------------------------------------------------
 def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], tools: Dict[str, Path]) -> Dict[str, Any]:
     """Perform burst traffic speed test using standard HTTP Range requests."""
     download_url = get_optional_str(target, "downloadUrl", get_optional_str(target, "url"))
@@ -1460,6 +1720,17 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
         num_connections = max(1, get_optional_int(target, "parallelConnections", get_optional_int(probe_run, "parallelConnections", 1)))
         verify_tls = bool(probe_run.get("verifyTls", True))
 
+        ref_host = get_optional_str(probe_run, "bufferbloatReferenceHost", "1.1.1.1")
+        ref_base_stats = get_ping_burst_stats(ref_host, count=10, timeout_ms=800)
+        ref_base_latency = ref_base_stats["LatencyMs"]
+        packet_loss = ref_base_stats["PacketLossPercentage"]
+
+        gw_ip = get_default_gateway()
+        gw_latency = 0.0
+        if gw_ip:
+            gw_stats = get_ping_burst_stats(gw_ip, count=5, timeout_ms=500)
+            gw_latency = gw_stats["LatencyMs"]
+
         error_class = ""
         error_detail = ""
         download_duration_ms = 0.0
@@ -1469,10 +1740,11 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
 
         start_time = time.perf_counter()
 
+        dl_latencies = []
         try:
-            download_duration_ms, download_bytes, err_det = download_parallel_chunks(
+            download_duration_ms, download_bytes, err_det, dl_latencies = download_parallel_chunks(
                 download_url, transfer_dir, target_bytes, num_connections,
-                timeout, user_agent=ua, verify_tls=verify_tls
+                timeout, user_agent=ua, verify_tls=verify_tls, ping_host=ref_host
             )
             if err_det:
                 error_class = "download_error"
@@ -1483,6 +1755,7 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
 
         download_mbps = get_mbps_from_bytes_duration(download_bytes, download_duration_ms)
         upload_mbps = 0.0
+        ul_latencies = []
 
         # Upload
         upload_url = get_optional_str(target, "uploadUrl")
@@ -1496,9 +1769,9 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
                     error_class = "timeout"
                     error_detail = "burst upload timed out before starting."
                 else:
-                    upload_duration_ms, uploaded_bytes, err_det = upload_parallel_chunks(
+                    upload_duration_ms, uploaded_bytes, err_det, ul_latencies = upload_parallel_chunks(
                         upload_url, transfer_dir, payload_bytes, num_connections,
-                        upload_method, remaining_seconds, user_agent=ua, verify_tls=verify_tls
+                        upload_method, remaining_seconds, user_agent=ua, verify_tls=verify_tls, ping_host=ref_host
                     )
                     if err_det:
                         error_class = "upload_error"
@@ -1508,6 +1781,12 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
             except Exception as e:
                 error_class = "upload_error"
                 error_detail = str(e)
+
+        dl_loaded_latency = sum(dl_latencies) / len(dl_latencies) if dl_latencies else 0.0
+        ul_loaded_latency = sum(ul_latencies) / len(ul_latencies) if ul_latencies else 0.0
+
+        bb_dl = max(0.0, round(dl_loaded_latency - ref_base_latency, 2)) if dl_loaded_latency > 0 and ref_base_latency > 0 else 0.0
+        bb_ul = max(0.0, round(ul_loaded_latency - ref_base_latency, 2)) if ul_loaded_latency > 0 and ref_base_latency > 0 else 0.0
 
         host = get_target_host(target)
         ping_stats = get_ping_burst_stats(host)
@@ -1528,9 +1807,13 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
             "RawStdOut": f"download_connections={num_connections};download_bytes={int(download_bytes)};target_transfer_bytes={target_bytes};download_url={download_url}",
             "RawStdErr": "",
             "RunDurationMs": download_duration_ms + upload_duration_ms,
-            "Available": (error_class == "" and (download_bytes > 0 or upload_mbps > 0))
+            "Available": (error_class == "" and (download_bytes > 0 or upload_mbps > 0)),
+            "PacketLossPercentage": packet_loss,
+            "GatewayLatencyMs": gw_latency,
+            "BufferbloatDownloadMs": bb_dl,
+            "BufferbloatUploadMs": bb_ul,
+            "RefBaseLatencyMs": ref_base_latency
         }
-
     finally:
         if transfer_dir.exists():
             shutil.rmtree(transfer_dir)
@@ -1575,6 +1858,12 @@ def run_speedtest_target_wrapper(
                 upload_tool = supp["Tool"]
                 if supp["UploadMbps"] > 0 and not supp["ErrorClass"]:
                     res["UploadMbps"] = supp["UploadMbps"]
+                    # Update bufferbloat upload if supplement provided latencies
+                    ul_latencies = supp.get("Latencies", [])
+                    if ul_latencies:
+                        ref_base_latency = res.get("RefBaseLatencyMs", 0.0)
+                        ul_loaded_latency = sum(ul_latencies) / len(ul_latencies)
+                        res["BufferbloatUploadMs"] = max(0.0, round(ul_loaded_latency - ref_base_latency, 2)) if ref_base_latency > 0 else 0.0
                 else:
                     upload_err_class = supp["ErrorClass"] or "upload_unavailable"
                     upload_err_detail = supp["ErrorDetail"] or "Upload supplement did not return throughput."
@@ -1585,6 +1874,18 @@ def run_speedtest_target_wrapper(
 
     isp = get_target_isp(target, config.get("probe", {}))
     measurement_name = get_optional_str(probe_run, "realMetricsMeasurement", "qoe_real_metrics")
+
+    packet_loss = res.get("PacketLossPercentage", 0.0)
+    gw_latency = res.get("GatewayLatencyMs", 0.0)
+    bb_dl = res.get("BufferbloatDownloadMs", 0.0)
+    bb_ul = res.get("BufferbloatUploadMs", 0.0)
+    ref_base_latency = res.get("RefBaseLatencyMs", 0.0)
+
+    # Call log_bufferbloat_diagnostic on success
+    if res["Available"] and res["ErrorClass"] == "":
+        log_bufferbloat_diagnostic(
+            target, res["DownloadMbps"], res["UploadMbps"], ref_base_latency, bb_dl, bb_ul, packet_loss, gw_latency
+        )
 
     fields = {
         "download_speed": res["DownloadMbps"],
@@ -1603,7 +1904,11 @@ def run_speedtest_target_wrapper(
         "source_host": res["SourceHost"],
         "error_class": res["ErrorClass"],
         "error_detail": res["ErrorDetail"],
-        "run_duration_ms": res["RunDurationMs"]
+        "run_duration_ms": res["RunDurationMs"],
+        "packet_loss_percentage": packet_loss,
+        "gateway_latency_ms": gw_latency,
+        "bufferbloat_download_ms": bb_dl,
+        "bufferbloat_upload_ms": bb_ul
     }
 
     probe_cfg = config.get("probe", {})
@@ -1634,15 +1939,19 @@ def run_speedtest_target_wrapper(
         "source_host": res["SourceHost"],
         "error_class": res["ErrorClass"],
         "error_detail": res["ErrorDetail"],
-        "run_duration_ms": res["RunDurationMs"]
+        "run_duration_ms": res["RunDurationMs"],
+        "packet_loss_percentage": packet_loss,
+        "gateway_latency_ms": gw_latency,
+        "bufferbloat_download_ms": bb_dl,
+        "bufferbloat_upload_ms": bb_ul
     }
 
     # Format log message
     if res["Available"]:
+        log_msg = f"Target {target['service']}/{target['endpointName']} completed with download {res['DownloadMbps']} Mbps, upload {res['UploadMbps']} Mbps via {upload_tool}, latency {res['LatencyMs']} ms, jitter {res['JitterMs']} ms, rpm {res['RpmResponsiveness']}, tool {res['Tool']}"
+        log_msg += f", loss {packet_loss}%, gateway_latency {gw_latency} ms, bufferbloat_dl {bb_dl} ms, bufferbloat_ul {bb_ul} ms"
         if upload_err_class:
-            log_msg = f"Target {target['service']}/{target['endpointName']} completed with download {res['DownloadMbps']} Mbps, upload {res['UploadMbps']} Mbps via {upload_tool}, latency {res['LatencyMs']} ms, jitter {res['JitterMs']} ms, rpm {res['RpmResponsiveness']}, tool {res['Tool']}, upload_error_class {upload_err_class}: {upload_err_detail}"
-        else:
-            log_msg = f"Target {target['service']}/{target['endpointName']} completed with download {res['DownloadMbps']} Mbps, upload {res['UploadMbps']} Mbps via {upload_tool}, latency {res['LatencyMs']} ms, jitter {res['JitterMs']} ms, rpm {res['RpmResponsiveness']}, tool {res['Tool']}"
+            log_msg += f", upload_error_class {upload_err_class}: {upload_err_detail}"
     else:
         log_msg = f"Target {target['service']}/{target['endpointName']} completed with error_class {res['ErrorClass'] or 'unavailable'}: {res['ErrorDetail'] or 'No additional detail was provided.'}"
 
@@ -1680,7 +1989,11 @@ def get_speedtest_failure_target_result(target: Dict[str, Any], config: Dict[str
         "source_host": host,
         "error_class": "probe_exception",
         "error_detail": error_msg,
-        "run_duration_ms": duration_ms
+        "run_duration_ms": duration_ms,
+        "packet_loss_percentage": 0.0,
+        "gateway_latency_ms": 0.0,
+        "bufferbloat_download_ms": 0.0,
+        "bufferbloat_upload_ms": 0.0
     }
 
     probe_cfg = config.get("probe", {})
@@ -1711,7 +2024,11 @@ def get_speedtest_failure_target_result(target: Dict[str, Any], config: Dict[str
         "source_host": host,
         "error_class": "probe_exception",
         "error_detail": error_msg,
-        "run_duration_ms": duration_ms
+        "run_duration_ms": duration_ms,
+        "packet_loss_percentage": 0.0,
+        "gateway_latency_ms": 0.0,
+        "bufferbloat_download_ms": 0.0,
+        "bufferbloat_upload_ms": 0.0
     }
 
     return {
