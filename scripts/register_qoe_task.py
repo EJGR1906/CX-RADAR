@@ -221,11 +221,6 @@ def register_macos_launchd(
     <string>{log_dir}/launchd-{label}-stdout.log</string>
     <key>StandardErrorPath</key>
     <string>{log_dir}/launchd-{label}-stderr.log</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>INFLUXDB_TOKEN</key>
-        <string>{os.environ.get("INFLUXDB_TOKEN", "")}</string>
-    </dict>
 </dict>
 </plist>
 """
