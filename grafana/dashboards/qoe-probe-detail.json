@@ -71,6 +71,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "thresholds"
                 },
@@ -161,6 +162,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "thresholds"
                 },
@@ -249,6 +251,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "thresholds"
                 },
@@ -337,6 +340,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "thresholds"
                 },
@@ -425,6 +429,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "thresholds"
                 },
@@ -513,6 +518,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "palette-classic"
                 },
@@ -715,6 +721,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "palette-classic"
                 },
@@ -917,6 +924,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "palette-classic"
                 },
@@ -1118,6 +1126,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "palette-classic"
                 },
@@ -1319,6 +1328,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "thresholds"
                 },
@@ -1460,6 +1470,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "palette-classic"
                 },
@@ -1586,6 +1597,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "thresholds"
                 },
@@ -1674,6 +1686,7 @@
           "spec": {
             "fieldConfig": {
               "defaults": {
+                "noValue": "Sin datos",
                 "color": {
                   "mode": "thresholds"
                 },
