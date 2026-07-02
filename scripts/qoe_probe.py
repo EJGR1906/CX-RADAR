@@ -754,11 +754,18 @@ def run_python_http_probe(target: Dict[str, Any], probe_run: Dict[str, Any]) -> 
 # ---------------------------------------------------------------------------
 # HTTP Request & Download Helpers
 # ---------------------------------------------------------------------------
+def validate_url_scheme(url: str) -> None:
+    """Ensure the URL uses a secure scheme (http or https) to prevent SSRF/LFI."""
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme: {url}. Only HTTP and HTTPS are permitted.")
+
+
 def download_url_to_file(
     url: str, output_path: Path, timeout: float, headers: Optional[dict] = None,
     user_agent: Optional[str] = None, verify_tls: bool = True
 ) -> float:
     """Download a URL directly to output_path using stdlib, measuring time elapsed."""
+    validate_url_scheme(url)
     req = urllib.request.Request(url)
     if headers:
         for k, v in headers.items():
@@ -792,6 +799,7 @@ def upload_file_to_url(
     user_agent: Optional[str] = None, verify_tls: bool = True
 ) -> float:
     """Upload a local file content to a URL, measuring time elapsed."""
+    validate_url_scheme(url)
     start_time = time.perf_counter()
     with open(file_path, "rb") as f:
         data = f.read()
@@ -834,6 +842,7 @@ def download_parallel_chunks(
     timeout: float, user_agent: Optional[str] = None, verify_tls: bool = True
 ) -> Tuple[float, float, str]:
     """Download chunks of target_bytes in parallel using ThreadPoolExecutor and HTTP Range headers."""
+    validate_url_scheme(url)
     # Attempt to resolve the real file content length using a lightweight 1-byte GET request
     file_size = target_bytes
     try:
@@ -1738,6 +1747,7 @@ def get_speedtest_failure_target_result(target: Dict[str, Any], config: Dict[str
 # ---------------------------------------------------------------------------
 def write_to_influx(url: str, token: str, payload: str, timeout: float) -> bool:
     """Send line protocol payload to InfluxDB API via HTTP POST request."""
+    validate_url_scheme(url)
     req = urllib.request.Request(
         url,
         data=payload.encode("utf-8"),
