@@ -65,7 +65,7 @@ def register_windows(
     ps_script = """
     $ErrorActionPreference = 'Stop'
     $action = New-ScheduledTaskAction -Execute $env:TASK_EXEC -Argument "`"$env:TASK_SCRIPT`" --config-path `"$env:TASK_CONFIG`""
-    $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).Date) -RepetitionInterval (New-TimeSpan -Minutes ([int]$env:TASK_INTERVAL))
+    $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).Date) -RepetitionInterval (New-TimeSpan -Minutes ([int]$env:TASK_INTERVAL)) -RepetitionDuration ([TimeSpan]::MaxValue)
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -RunOnlyIfNetworkAvailable -StartWhenAvailable
     $currentUserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
     $principal = New-ScheduledTaskPrincipal -UserId $currentUserName -LogonType $env:TASK_LOGON -RunLevel Limited

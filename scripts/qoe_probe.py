@@ -46,15 +46,15 @@ class InsecureRequestWarning(Warning):
 log_path_global: Optional[Path] = None
 
 def log_message(message: str, level: str = "INFO") -> None:
-    """Write an ISO 8601 timestamped log line to file and stderr."""
+    """Write an ISO 8601 timestamped log line to file and stdout."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     line = f"[{timestamp}] [{level}] {message}"
     try:
-        print(line, file=sys.stderr, flush=True)
+        print(line, flush=True)
     except UnicodeEncodeError:
         try:
-            sys.stderr.write(line.encode(sys.stderr.encoding or 'ascii', errors='replace').decode(sys.stderr.encoding or 'ascii') + '\n')
-            sys.stderr.flush()
+            sys.stdout.write(line.encode(sys.stdout.encoding or 'ascii', errors='replace').decode(sys.stdout.encoding or 'ascii') + '\n')
+            sys.stdout.flush()
         except Exception:
             pass
     if log_path_global:
@@ -2421,16 +2421,7 @@ def main() -> None:
         # Append to line list for local reports
         lines.append(summary_line)
 
-        # Print all collected InfluxDB line protocol lines to stdout for Telegraf
-        for line in lines:
-            try:
-                print(line, flush=True)
-            except UnicodeEncodeError:
-                try:
-                    sys.stdout.write(line.encode(sys.stdout.encoding or 'ascii', errors='replace').decode(sys.stdout.encoding or 'ascii') + '\n')
-                    sys.stdout.flush()
-                except Exception:
-                    pass
+        # InfluxDB line protocol lines are collected and sent directly to InfluxDB; no print loop is required
 
         log_message(f"QoE probe finished. Success={success_count}, Failure={failure_count}, Duration={probe_run_duration} ms")
 
