@@ -1610,7 +1610,8 @@ def run_networkquality_measurement(
         "RunDurationMs": duration_ms,
         "Available": (err_class == "" and exit_code == 0)
     }
-def log_bufferbloat_diagnostic(
+
+def log_bufferbloat_diagnostic(
     target: Dict[str, Any],
     download_mbps: float,
     upload_mbps: float,
