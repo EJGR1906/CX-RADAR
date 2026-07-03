@@ -107,6 +107,8 @@ def _make_ssl_context() -> ssl.SSLContext:
 
 def _download(url: str, dest: Path, *, label: str = "") -> None:
     """Download *url* to *dest* with a progress indicator."""
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme. Only HTTP and HTTPS are allowed: {url}")
     tag = label or dest.name
     print(f"  Downloading {tag} ...")
     print(f"    {url}")

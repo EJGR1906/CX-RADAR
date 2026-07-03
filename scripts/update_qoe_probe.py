@@ -95,6 +95,8 @@ def download_file(
     url: str, dest_path: Path, verify_ssl: bool
 ) -> bool:
     """Download url to dest_path using urllib, fallback to curl on failure."""
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme. Only HTTP and HTTPS are allowed: {url}")
     # Create ssl context
     import ssl
     ctx = ssl.create_default_context()
