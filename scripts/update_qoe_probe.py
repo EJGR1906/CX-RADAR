@@ -33,7 +33,6 @@ from typing import Any, Dict, List, Optional, Tuple
 UPDATER_VERSION = "0.1.0"
 GITHUB_RAW_BASE = "https://raw.githubusercontent.com/EJGR1906/CX-RADAR/main/scripts"
 FILES_TO_UPDATE = [
-    "auto_pr_reviewer.py",
     "install.py",
     "qoe_probe.py",
     "register_qoe_task.py",
