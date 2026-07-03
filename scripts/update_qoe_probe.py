@@ -32,7 +32,20 @@ from typing import Any, Dict, List, Optional, Tuple
 
 UPDATER_VERSION = "0.1.0"
 GITHUB_RAW_BASE = "https://raw.githubusercontent.com/EJGR1906/CX-RADAR/main/scripts"
-FILES_TO_UPDATE = ["qoe_probe.py", "validate_qoe_probe.py"]
+FILES_TO_UPDATE = [
+    "auto_pr_reviewer.py",
+    "install.py",
+    "qoe_probe.py",
+    "register_qoe_task.py",
+    "run_qoe_certification.py",
+    "set_influx_token.py",
+    "setup_portable.py",
+    "test_qoe_probe.py",
+    "test_setup_portable.py",
+    "test_update_qoe_probe.py",
+    "update_qoe_probe.py",
+    "validate_qoe_probe.py"
+]
 
 
 def is_windows() -> bool:
@@ -63,14 +76,14 @@ def run_cmd(args: List[str], env: Optional[Dict[str, str]] = None) -> Tuple[int,
 
 
 def compute_sha256(file_path: Path) -> str:
-    """Compute the SHA-256 checksum of a file."""
+    """Compute the SHA-256 checksum of a file, normalizing CRLF to LF."""
     if not file_path.is_file():
         return ""
     h = hashlib.sha256()
     try:
-        with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(65536), b""):
-                h.update(chunk)
+        content = file_path.read_bytes()
+        normalized = content.replace(b"\r\n", b"\n")
+        h.update(normalized)
         return h.hexdigest()
     except Exception:
         return ""
