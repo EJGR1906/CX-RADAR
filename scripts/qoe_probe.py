@@ -46,16 +46,15 @@ class InsecureRequestWarning(Warning):
 log_path_global: Optional[Path] = None
 
 def log_message(message: str, level: str = "INFO") -> None:
-    """Write an ISO 8601 timestamped log line to file and stdout."""
+    """Write an ISO 8601 timestamped log line to file and stderr."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     line = f"[{timestamp}] [{level}] {message}"
     try:
-        print(line, flush=True)
+        print(line, file=sys.stderr, flush=True)
     except UnicodeEncodeError:
         try:
-            import sys
-            sys.stdout.write(line.encode(sys.stdout.encoding or 'ascii', errors='replace').decode(sys.stdout.encoding or 'ascii') + '\n')
-            sys.stdout.flush()
+            sys.stderr.write(line.encode(sys.stderr.encoding or 'ascii', errors='replace').decode(sys.stderr.encoding or 'ascii') + '\n')
+            sys.stderr.flush()
         except Exception:
             pass
     if log_path_global:
@@ -2420,13 +2419,25 @@ def main() -> None:
 
         # Append to line list for local reports
         lines.append(summary_line)
+
+        # Print all collected InfluxDB line protocol lines to stdout for Telegraf
+        for line in lines:
+            try:
+                print(line, flush=True)
+            except UnicodeEncodeError:
+                try:
+                    sys.stdout.write(line.encode(sys.stdout.encoding or 'ascii', errors='replace').decode(sys.stdout.encoding or 'ascii') + '\n')
+                    sys.stdout.flush()
+                except Exception:
+                    pass
+
         log_message(f"QoE probe finished. Success={success_count}, Failure={failure_count}, Duration={probe_run_duration} ms")
 
     except Exception as e:
         threw = True
         fatal_error_message = str(e)
         log_message(f"Fatal exception: {e}", "ERROR")
-        raise e
+        sys.exit(1)
 
     finally:
         # Write Run Report JSON if path is provided
