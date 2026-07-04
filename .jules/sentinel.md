@@ -24,3 +24,7 @@
 **Vulnerability:** The macOS task registration script (`scripts/register_qoe_task.py`) wrote the `INFLUXDB_TOKEN` secret directly into the `EnvironmentVariables` section of a generated launchd `.plist` configuration file.
 **Learning:** Writing secrets directly into unencrypted macOS launchd `.plist` files is a critical credential exposure risk, especially because these files may reside in shared directories. While systemd supports `EnvironmentFile` for secure loading, launchd does not support an equivalent mechanism.
 **Prevention:** Never hardcode credentials in macOS launchd `.plist` configuration files. Omit the token from the plist entirely and ensure the core executing script handles resolving credentials securely from local `.env` files.
+## 2024-06-12 - SSRF Prevention via Strict URL Scheme Validation
+**Vulnerability:** Unrestricted use of `urllib.request.urlopen` allowing potentially dangerous schemes like `file://` or `ftp://` which could lead to SSRF or LFI.
+**Learning:** `urlopen` implicitly accepts several schemes if not strictly constrained, making dynamic URL passing risky. It also flagged Bandit B310.
+**Prevention:** To prevent Server-Side Request Forgery (SSRF) and Local File Inclusion (LFI) vulnerabilities (e.g., Bandit B310), always explicitly validate that URLs start with 'http://' or 'https://' (case-insensitive) before passing them to 'urllib.request.urlopen', and use `# nosec B310` to safely silence the linter.
