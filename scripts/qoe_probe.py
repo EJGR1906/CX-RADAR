@@ -862,6 +862,8 @@ def download_url_to_file(
     user_agent: Optional[str] = None, verify_tls: bool = True
 ) -> float:
     """Download a URL directly to output_path using stdlib, measuring time elapsed."""
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme in {url}. Only HTTP and HTTPS are permitted.")
     req = urllib.request.Request(url)
     if headers:
         for k, v in headers.items():
@@ -881,7 +883,7 @@ def download_url_to_file(
         ctx.verify_mode = ssl.CERT_NONE  # nosec B501
 
     start_time = time.perf_counter()
-    with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:
+    with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:  # nosec B310
         with open(output_path, "wb") as f:
             # ⚡ Bolt: Increase copy buffer to 1MB to significantly reduce syscall overhead
             # during high-throughput speed test file downloads (default is too small, ~16KB/64KB).
@@ -895,6 +897,8 @@ def upload_file_to_url(
     user_agent: Optional[str] = None, verify_tls: bool = True
 ) -> float:
     """Upload a local file content to a URL, measuring time elapsed."""
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme in {url}. Only HTTP and HTTPS are permitted.")
     start_time = time.perf_counter()
     with open(file_path, "rb") as f:
         data = f.read()
@@ -915,7 +919,7 @@ def upload_file_to_url(
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE  # nosec B501
 
-    with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:
+    with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:  # nosec B310
         response.read()
 
     return (time.perf_counter() - start_time) * 1000
@@ -947,6 +951,8 @@ def download_parallel_chunks(
     # Attempt to resolve the real file content length using a lightweight 1-byte GET request
     file_size = target_bytes
     try:
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"Invalid URL scheme in {url}. Only HTTP and HTTPS are permitted.")
         req = urllib.request.Request(url)
         req.add_header("Range", "bytes=0-0")
         if user_agent:
@@ -961,7 +967,7 @@ def download_parallel_chunks(
             )
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE  # nosec B501
-        with urllib.request.urlopen(req, context=ctx, timeout=5) as resp:
+        with urllib.request.urlopen(req, context=ctx, timeout=5) as resp:  # nosec B310
             cr = resp.getheader("Content-Range")
             if cr and "/" in cr:
                 file_size = int(cr.split("/")[-1])
@@ -2046,6 +2052,8 @@ def get_speedtest_failure_target_result(target: Dict[str, Any], config: Dict[str
 # ---------------------------------------------------------------------------
 def write_to_influx(url: str, token: str, payload: str, timeout: float) -> bool:
     """Send line protocol payload to InfluxDB API via HTTP POST request."""
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme in {url}. Only HTTP and HTTPS are permitted.")
     req = urllib.request.Request(
         url,
         data=payload.encode("utf-8"),
@@ -2056,7 +2064,7 @@ def write_to_influx(url: str, token: str, payload: str, timeout: float) -> bool:
         method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:  # nosec B310
             response.read()
         return True
     except urllib.error.HTTPError as e:
