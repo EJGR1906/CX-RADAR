@@ -880,8 +880,11 @@ def download_url_to_file(
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE  # nosec B501
 
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme. Only HTTP and HTTPS are allowed: {url}")
+
     start_time = time.perf_counter()
-    with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:
+    with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:  # nosec B310
         with open(output_path, "wb") as f:
             # ⚡ Bolt: Increase copy buffer to 1MB to significantly reduce syscall overhead
             # during high-throughput speed test file downloads (default is too small, ~16KB/64KB).
@@ -915,7 +918,10 @@ def upload_file_to_url(
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE  # nosec B501
 
-    with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme. Only HTTP and HTTPS are allowed: {url}")
+
+    with urllib.request.urlopen(req, context=ctx, timeout=timeout) as response:  # nosec B310
         response.read()
 
     return (time.perf_counter() - start_time) * 1000
@@ -961,7 +967,11 @@ def download_parallel_chunks(
             )
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE  # nosec B501
-        with urllib.request.urlopen(req, context=ctx, timeout=5) as resp:
+
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"Invalid URL scheme. Only HTTP and HTTPS are allowed: {url}")
+
+        with urllib.request.urlopen(req, context=ctx, timeout=5) as resp:  # nosec B310
             cr = resp.getheader("Content-Range")
             if cr and "/" in cr:
                 file_size = int(cr.split("/")[-1])
@@ -2046,6 +2056,9 @@ def get_speedtest_failure_target_result(target: Dict[str, Any], config: Dict[str
 # ---------------------------------------------------------------------------
 def write_to_influx(url: str, token: str, payload: str, timeout: float) -> bool:
     """Send line protocol payload to InfluxDB API via HTTP POST request."""
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme. Only HTTP and HTTPS are allowed: {url}")
+
     req = urllib.request.Request(
         url,
         data=payload.encode("utf-8"),
@@ -2056,7 +2069,7 @@ def write_to_influx(url: str, token: str, payload: str, timeout: float) -> bool:
         method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:  # nosec B310
             response.read()
         return True
     except urllib.error.HTTPError as e:
