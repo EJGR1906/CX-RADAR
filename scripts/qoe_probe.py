@@ -166,20 +166,12 @@ def get_mbps_from_bytes_duration(bytes_count: float, duration_ms: float) -> floa
 # ---------------------------------------------------------------------------
 def escape_tag(value: str) -> str:
     """Escape backslash, space, comma, and equals sign for InfluxDB tags/keys."""
-    val = str(value)
-    val = val.replace('\\', '\\\\')
-    val = val.replace(' ', '\\ ')
-    val = val.replace(',', '\\,')
-    val = val.replace('=', '\\=')
-    return val
+    return str(value).replace('\\', '\\\\').replace(' ', '\\ ').replace(',', '\\,').replace('=', '\\=')
 
 
 def escape_field_string(value: str) -> str:
     """Escape backslash and double quotes for string field values."""
-    val = str(value)
-    val = val.replace('\\', '\\\\')
-    val = val.replace('"', '\\"')
-    return val
+    return str(value).replace('\\', '\\\\').replace('"', '\\"')
 
 
 # ⚡ Bolt: Extracted to module-level frozenset to prevent O(N) allocation on every metric format call
