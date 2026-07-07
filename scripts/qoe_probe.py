@@ -382,8 +382,22 @@ def run_external_process(
 # ---------------------------------------------------------------------------
 # Ping Stats implementation
 # ---------------------------------------------------------------------------
+# Pre-compiled regular expressions for parsing loop optimization.
+# Compiling at the module level prevents repeatedly checking the `re` module's
+# internal cache and avoids recompilation overhead inside frequently called parsing
+# functions, reducing CPU overhead during latency or throughput measurement loops.
 # Regex matching English and Spanish time: time=12ms, tiempo=12ms, time<1ms, tiempo<1ms
 PING_TIME_REGEX = re.compile(r'(?:time|tiempo)\s*[=<]\s*(\d+(?:\.\d+)?)\s*ms', re.IGNORECASE)
+IPV4_REGEX = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
+
+NQ_DL_REGEX = re.compile(r'Download(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+NQ_DL_FB_REGEX = re.compile(r'Down(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+NQ_UL_REGEX = re.compile(r'Upload(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+NQ_UL_FB_REGEX = re.compile(r'Up(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', re.IGNORECASE)
+NQ_LAT_REGEX = re.compile(r'(?:Idle\s+)?Latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.IGNORECASE)
+NQ_LAT_FB_REGEX = re.compile(r'Round\s*trip\s*latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.IGNORECASE)
+NQ_RPM_REGEX = re.compile(r'Responsiveness\s*:\s*.*?\(([0-9]+(?:\.[0-9]+)?)\s*RPM\)', re.IGNORECASE)
+NQ_RPM_FB_REGEX = re.compile(r'RPM(?:\s+Responsiveness)?\s*:\s*([0-9]+(?:\.[0-9]+)?)', re.IGNORECASE)
 
 def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> Dict[str, Any]:
     """Compute RTT latency and Mean Absolute Successive Jitter using ping."""
@@ -461,7 +475,7 @@ def get_default_gateway() -> str:
             if proc.returncode == 0:
                 for line in stdout.splitlines():
                     ip = line.strip()
-                    if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', ip):
+                    if IPV4_REGEX.match(ip):
                         return ip
             
             # Fallback to route print
@@ -471,7 +485,7 @@ def get_default_gateway() -> str:
                 parts = line.strip().split()
                 if len(parts) >= 4 and parts[0] == "0.0.0.0":
                     gw = parts[2]
-                    if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', gw):
+                    if IPV4_REGEX.match(gw):
                         return gw
         elif platform.system() == "Darwin":
             proc = subprocess.Popen(["route", "-n", "get", "default"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -479,7 +493,7 @@ def get_default_gateway() -> str:
             for line in stdout.splitlines():
                 if "gateway:" in line.lower():
                     gw = line.split(":")[-1].strip()
-                    if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', gw) or ":" in gw:
+                    if IPV4_REGEX.match(gw) or ":" in gw:
                         return gw
         else:
             # Linux: read /proc/net/route or parse ip route
@@ -1555,30 +1569,30 @@ def run_networkquality_measurement(
             # Fallback regex parsing on stdout text
             combined = stdout + "\n" + stderr
             # Download
-            m_dl = re.search(r'Download(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+            m_dl = NQ_DL_REGEX.search(combined)
             if not m_dl:
-                m_dl = re.search(r'Down(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+                m_dl = NQ_DL_FB_REGEX.search(combined)
             if m_dl:
                 download_speed = float(m_dl.group(1))
 
             # Upload
-            m_ul = re.search(r'Upload(?:\s+capacity)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+            m_ul = NQ_UL_REGEX.search(combined)
             if not m_ul:
-                m_ul = re.search(r'Up(?:link)?(?:\s+bandwidth)?\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z/]+)', combined, re.I)
+                m_ul = NQ_UL_FB_REGEX.search(combined)
             if m_ul:
                 upload_speed = float(m_ul.group(1))
 
             # Latency
-            m_lat = re.search(r'(?:Idle\s+)?Latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', combined, re.I)
+            m_lat = NQ_LAT_REGEX.search(combined)
             if not m_lat:
-                m_lat = re.search(r'Round\s*trip\s*latency\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*ms', combined, re.I)
+                m_lat = NQ_LAT_FB_REGEX.search(combined)
             if m_lat:
                 latency = float(m_lat.group(1))
 
             # RPM
-            m_rpm = re.search(r'Responsiveness\s*:\s*.*?\(([0-9]+(?:\.[0-9]+)?)\s*RPM\)', combined, re.I)
+            m_rpm = NQ_RPM_REGEX.search(combined)
             if not m_rpm:
-                m_rpm = re.search(r'RPM(?:\s+Responsiveness)?\s*:\s*([0-9]+(?:\.[0-9]+)?)', combined, re.I)
+                m_rpm = NQ_RPM_FB_REGEX.search(combined)
             if m_rpm:
                 rpm_responsiveness = float(m_rpm.group(1))
 
