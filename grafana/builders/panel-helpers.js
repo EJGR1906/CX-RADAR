@@ -116,7 +116,7 @@ function barGaugePanel(id, title, desc, flux, unit, thresholds, opts = {}) {
   }];
 }
 
-function tablePanel(id, title, desc, flux, overrides = []) {
+function tablePanel(id, title, desc, flux, overrides = [], opts = {}) {
   return [id, {
     kind: 'Panel', spec: {
       data: { kind: 'QueryGroup', spec: { queries: [query(flux)], queryOptions: {}, transformations: [] } },
@@ -132,7 +132,7 @@ function tablePanel(id, title, desc, flux, overrides = []) {
               thresholds: { mode: 'absolute', steps: [{ color: 'green', value: 0 }] }
             }, overrides
           },
-          options: { cellHeight: 'sm', showHeader: true, sortBy: [{ displayName: 'Sitio' }] }
+          options: { cellHeight: 'sm', showHeader: true, sortBy: opts.sortBy || [] }
         }
       }
     }

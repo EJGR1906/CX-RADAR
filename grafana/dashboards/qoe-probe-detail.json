@@ -1305,7 +1305,7 @@
                     "group": "influxdb",
                     "kind": "DataQuery",
                     "spec": {
-                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_real_metrics\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> filter(fn: (r) => r._field =~ /available|endpoint_name|error_class/)\n  |> group(columns: [\"probe_id\", \"service\", \"_field\"])\n  |> last()\n  |> toString()\n  |> pivot(rowKey: [\"probe_id\", \"service\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({\n      \"Estado\": if exists r.available and r.available == \"true\" then \"Disponible\" else \"Caido\",\n      \"Servicio\": r.service,\n      \"URL\": if exists r.endpoint_name then r.endpoint_name else \"\",\n      \"Error\": if exists r.error_class then r.error_class else \"\"\n    }))\n  |> group()\n  |> sort(columns: [\"Servicio\"])",
+                      "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_real_metrics\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> filter(fn: (r) => r._field =~ /available|endpoint_name|error_class/)\n  |> group(columns: [\"probe_id\", \"service\", \"_field\"])\n  |> last()\n  |> toString()\n  |> pivot(rowKey: [\"probe_id\", \"service\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({\n      \"Estado\": if exists r.available and r.available == \"true\" then \"Disponible\" else \"Caído\",\n      \"Servicio\": r.service,\n      \"Endpoint\": if exists r.endpoint_name then r.endpoint_name else \"\",\n      \"Error\": if exists r.error_class then r.error_class else \"\"\n    }))\n  |> group()\n  |> sort(columns: [\"Servicio\"])",
                       "range": false
                     },
                     "version": "v0"
@@ -1375,7 +1375,7 @@
                               "color": "green",
                               "index": 0
                             },
-                            "Caido": {
+                            "Caído": {
                               "color": "red",
                               "index": 1
                             }
@@ -1386,6 +1386,10 @@
                     {
                       "id": "custom.width",
                       "value": 110
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": true
                     }
                   ]
                 },
@@ -1398,6 +1402,22 @@
                     {
                       "id": "custom.width",
                       "value": 140
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": true
+                    }
+                  ]
+                },
+                {
+                  "matcher": {
+                    "id": "byName",
+                    "options": "Endpoint"
+                  },
+                  "properties": [
+                    {
+                      "id": "custom.filterable",
+                      "value": true
                     }
                   ]
                 },
@@ -1410,6 +1430,10 @@
                     {
                       "id": "custom.width",
                       "value": 300
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": true
                     }
                   ]
                 }
@@ -1418,11 +1442,7 @@
             "options": {
               "cellHeight": "sm",
               "showHeader": true,
-              "sortBy": [
-                {
-                  "displayName": "Sitio"
-                }
-              ]
+              "sortBy": []
             }
           }
         }

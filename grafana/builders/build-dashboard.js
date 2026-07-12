@@ -18,7 +18,7 @@ function buildElement(def) {
     case 'bargauge':
       return barGaugePanel(cfg.id, cfg.title, cfg.desc, cfg.flux, cfg.unit, cfg.thresholds, cfg);
     case 'table':
-      return tablePanel(cfg.id, cfg.title, cfg.desc, cfg.flux, cfg.overrides || []);
+      return tablePanel(cfg.id, cfg.title, cfg.desc, cfg.flux, cfg.overrides || [], cfg);
     case 'state-timeline':
       return stateTimelinePanel(cfg.id, cfg.title, cfg.desc, cfg.flux);
     case 'geomap':
