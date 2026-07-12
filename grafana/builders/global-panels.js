@@ -143,11 +143,13 @@ union(tables: [allProbes, activeProbes])
     }))
   |> group()
   |> sort(columns: ["Sitio", "Sonda"])`,
+    sortBy: [{ displayName: 'Sitio' }],
     overrides: [
       { matcher: { id: 'byName', options: 'Estado' }, properties: [
         { id: 'custom.cellOptions', value: { type: 'color-background' } },
         { id: 'mappings', value: [{ type: 'value', options: { Activa: { color: 'green', index: 0, text: 'Activa' }, Inactiva: { color: 'red', index: 1, text: 'Inactiva' } } }] },
-        { id: 'custom.width', value: 100 }
+        { id: 'custom.width', value: 100 },
+        { id: 'custom.filterable', value: true }
       ]},
       { matcher: { id: 'byName', options: 'Sonda' }, properties: [{ id: 'custom.width', value: 200 }, { id: 'custom.filterable', value: true }] },
       { matcher: { id: 'byName', options: 'Sitio' }, properties: [{ id: 'custom.width', value: 140 }, { id: 'custom.filterable', value: true }] },

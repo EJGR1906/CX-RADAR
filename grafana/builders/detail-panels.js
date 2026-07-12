@@ -178,9 +178,9 @@ exports.panels = [
   |> toString()
   |> pivot(rowKey: ["probe_id", "service"], columnKey: ["_field"], valueColumn: "_value")
   |> map(fn: (r) => ({
-      "Estado": if exists r.available and r.available == "true" then "Disponible" else "Caido",
+      "Estado": if exists r.available and r.available == "true" then "Disponible" else "Caído",
       "Servicio": r.service,
-      "URL": if exists r.endpoint_name then r.endpoint_name else "",
+      "Endpoint": if exists r.endpoint_name then r.endpoint_name else "",
       "Error": if exists r.error_class then r.error_class else ""
     }))
   |> group()
@@ -188,11 +188,13 @@ exports.panels = [
     overrides: [
       { matcher: { id: 'byName', options: 'Estado' }, properties: [
         { id: 'custom.cellOptions', value: { type: 'color-background' } },
-        { id: 'mappings', value: [{ type: 'value', options: { Disponible: { color: 'green', index: 0 }, Caido: { color: 'red', index: 1 } } }] },
-        { id: 'custom.width', value: 110 }
+        { id: 'mappings', value: [{ type: 'value', options: { Disponible: { color: 'green', index: 0 }, "Caído": { color: 'red', index: 1 } } }] },
+        { id: 'custom.width', value: 110 },
+        { id: 'custom.filterable', value: true }
       ]},
-      { matcher: { id: 'byName', options: 'Servicio' }, properties: [{ id: 'custom.width', value: 140 }] },
-      { matcher: { id: 'byName', options: 'Error' }, properties: [{ id: 'custom.width', value: 300 }] }
+      { matcher: { id: 'byName', options: 'Servicio' }, properties: [{ id: 'custom.width', value: 140 }, { id: 'custom.filterable', value: true }] },
+      { matcher: { id: 'byName', options: 'Endpoint' }, properties: [{ id: 'custom.filterable', value: true }] },
+      { matcher: { id: 'byName', options: 'Error' }, properties: [{ id: 'custom.width', value: 300 }, { id: 'custom.filterable', value: true }] }
     ]
   }],
 
