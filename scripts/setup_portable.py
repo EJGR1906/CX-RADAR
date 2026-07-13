@@ -107,12 +107,14 @@ def _make_ssl_context() -> ssl.SSLContext:
 
 def _download(url: str, dest: Path, *, label: str = "") -> None:
     """Download *url* to *dest* with a progress indicator."""
+    if not url.lower().startswith(('http://', 'https://')):
+        raise ValueError("Invalid URL scheme. Only HTTP and HTTPS are allowed.")
     tag = label or dest.name
     print(f"  Downloading {tag} ...")
     print(f"    {url}")
     ctx = _make_ssl_context()
     req = Request(url, headers={"User-Agent": "CX-Radar-setup/1.0"})
-    with urlopen(req, context=ctx) as resp:
+    with urlopen(req, context=ctx) as resp:  # nosec B310
         dest.parent.mkdir(parents=True, exist_ok=True)
         with dest.open("wb") as f:
             total = 0
