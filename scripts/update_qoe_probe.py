@@ -118,11 +118,14 @@ def download_file(
     
     # Try urllib first
     try:
+        if not url.lower().startswith(("http://", "https://")):
+            raise ValueError(f"Invalid URL scheme in {url}. Only HTTP and HTTPS are allowed.")
+
         req = urllib.request.Request(
             url,
             headers={"User-Agent": f"CX-Radar-Updater/{UPDATER_VERSION}"}
         )
-        with urllib.request.urlopen(req, context=ctx, timeout=30) as response:
+        with urllib.request.urlopen(req, context=ctx, timeout=30) as response:  # nosec B310
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             with open(dest_path, "wb") as f:
                 shutil.copyfileobj(response, f)
