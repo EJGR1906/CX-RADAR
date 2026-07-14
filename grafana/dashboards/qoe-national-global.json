@@ -726,12 +726,7 @@
             },
             "options": {
               "cellHeight": "sm",
-              "showHeader": true,
-              "sortBy": [
-                {
-                  "displayName": "Sitio"
-                }
-              ]
+              "showHeader": true
             }
           }
         }
