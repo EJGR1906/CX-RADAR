@@ -112,7 +112,11 @@ def _download(url: str, dest: Path, *, label: str = "") -> None:
     print(f"    {url}")
     ctx = _make_ssl_context()
     req = Request(url, headers={"User-Agent": "CX-Radar-setup/1.0"})
-    with urlopen(req, context=ctx) as resp:
+
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Invalid URL scheme in {url}. Only HTTP and HTTPS are allowed.")
+
+    with urlopen(req, context=ctx) as resp:  # nosec B310
         dest.parent.mkdir(parents=True, exist_ok=True)
         with dest.open("wb") as f:
             total = 0
