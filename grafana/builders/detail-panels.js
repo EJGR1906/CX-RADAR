@@ -189,9 +189,10 @@ exports.panels = [
       { matcher: { id: 'byName', options: 'Estado' }, properties: [
         { id: 'custom.cellOptions', value: { type: 'color-background' } },
         { id: 'mappings', value: [{ type: 'value', options: { Disponible: { color: 'green', index: 0 }, Caido: { color: 'red', index: 1 } } }] },
-        { id: 'custom.width', value: 110 }
+        { id: 'custom.width', value: 110 },
+        { id: 'custom.filterable', value: true }
       ]},
-      { matcher: { id: 'byName', options: 'Servicio' }, properties: [{ id: 'custom.width', value: 140 }] },
+      { matcher: { id: 'byName', options: 'Servicio' }, properties: [{ id: 'custom.width', value: 140 }, { id: 'custom.filterable', value: true }] },
       { matcher: { id: 'byName', options: 'Error' }, properties: [{ id: 'custom.width', value: 300 }] }
     ]
   }],
