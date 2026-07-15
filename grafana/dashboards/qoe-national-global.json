@@ -671,6 +671,10 @@
                     {
                       "id": "custom.width",
                       "value": 100
+                    },
+                    {
+                      "id": "custom.filterable",
+                      "value": true
                     }
                   ]
                 },
@@ -726,12 +730,7 @@
             },
             "options": {
               "cellHeight": "sm",
-              "showHeader": true,
-              "sortBy": [
-                {
-                  "displayName": "Sitio"
-                }
-              ]
+              "showHeader": true
             }
           }
         }
