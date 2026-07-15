@@ -132,7 +132,7 @@ function tablePanel(id, title, desc, flux, overrides = []) {
               thresholds: { mode: 'absolute', steps: [{ color: 'green', value: 0 }] }
             }, overrides
           },
-          options: { cellHeight: 'sm', showHeader: true, sortBy: [{ displayName: 'Sitio' }] }
+          options: { cellHeight: 'sm', showHeader: true }
         }
       }
     }
