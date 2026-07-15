@@ -107,6 +107,9 @@ def download_file(
     url: str, dest_path: Path, verify_ssl: bool
 ) -> bool:
     """Download url to dest_path using urllib, fallback to curl on failure."""
+    if not (url.lower().startswith("http://") or url.lower().startswith("https://")):
+        raise ValueError("URL must start with http:// or https://")
+
     # Create ssl context
     import ssl
     ctx = ssl.create_default_context()
@@ -122,7 +125,7 @@ def download_file(
             url,
             headers={"User-Agent": f"CX-Radar-Updater/{UPDATER_VERSION}"}
         )
-        with urllib.request.urlopen(req, context=ctx, timeout=30) as response:
+        with urllib.request.urlopen(req, context=ctx, timeout=30) as response:  # nosec B310
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             with open(dest_path, "wb") as f:
                 shutil.copyfileobj(response, f)

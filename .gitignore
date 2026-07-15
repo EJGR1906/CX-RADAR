@@ -41,3 +41,4 @@ __pycache__/
 scripts/auto_pr_reviewer.py
 pr_review_report.md
 scripts/cx__report.py
+testenv/
