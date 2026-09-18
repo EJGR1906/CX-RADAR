@@ -964,11 +964,12 @@ def download_parallel_chunks(
         with urllib.request.urlopen(req, context=ctx, timeout=5) as resp:
             cr = resp.getheader("Content-Range")
             if cr and "/" in cr:
-                file_size = int(cr.split("/")[-1])
+                remote_size = int(cr.split("/")[-1])
+                file_size = min(target_bytes, remote_size)
             else:
                 cl = resp.getheader("Content-Length")
                 if cl:
-                    file_size = int(cl)
+                    file_size = min(target_bytes, int(cl))
     except Exception:
         pass
 

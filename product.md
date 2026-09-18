@@ -1,43 +1,43 @@
-# CX-Radar Product Context
+# Contexto de Producto CX-Radar
 
-CX-Radar is an automated Quality of Experience (QoE) monitoring solution designed to run continuously on local network probes. It measures, records, and alerts on the performance of key web services (Netflix, YouTube, Microsoft, Disney+, Amazon) from the local network's perspective.
-
----
-
-## 🎯 Product Goals
-
-1. **Preemptive Alerting & Monitoring**: Detect response latencies, download/upload throughput drop-offs, and service outages before the end-users report them.
-2. **Objective Network Performance Data**: Capture concrete indicators (latency in ms, jitter, and transfer rates in Mbps) to facilitate service level agreement (SLA) verification and ISP troubleshooting.
-3. **Trend Analysis**: Provide persistent historical records to identify daily/weekly performance degradation patterns.
-4. **Zero OS Contamination**: Use isolated, portable binary tools (`node`, `fast-cli`, `yt-dlp`, `curl`) to ensure the host operating system's global files, variables, or system settings remain unchanged.
-5. **Cross-Platform Adaptability**: Support modern and legacy environments (Windows, Windows Server 2012 R2, Linux, and macOS) from a single cross-platform code base.
+CX-Radar es una solución automatizada de monitoreo de Calidad de Experiencia (QoE) diseñada para ejecutarse de forma continua en sondas de red local. Mide, registra y emite alertas sobre el rendimiento de servicios web clave (Microsoft, YouTube, Netflix, Disney+, Amazon) desde la perspectiva de la infraestructura local.
 
 ---
 
-## 🚫 Non-Goals & Scope Exclusions
+## Objetivos del Producto
 
-- **High-Throughput Benchmarks**: This tool is designed for synthetic HTTP lane monitoring. Dedicated speed tests (like LibreSpeed or WebPageTest integrations) are kept strictly separate from the active probe lane.
-- **Graphical User Configuration**: All configurations are handled via file-based inputs (`config/probe-catalog.json`). No interactive GUI is planned for setting up probe details.
-- **Native OS Installers**: System installation relies entirely on native task schedulers (Windows Task Scheduler, systemd, cron, launchd) registered via helper scripts.
-
----
-
-## 👥 Target Personas
-
-### 1. Network Operations (NetOps) & SREs
-* **Needs**: Stable, accurate, and lightweight probes that do not leak memory or exhaust local resources. They need structured raw metrics in a time-series database (InfluxDB) and customizable, clear dashboards (Grafana).
-* **Pain Points**: Flaky scripts that crash silently, or complex dependencies that require manual upgrades on dozens of remote machines.
-
-### 2. IT Support / Helpdesk Managers
-* **Needs**: Early notification when a major CDN or web service (e.g., Microsoft Office 365, YouTube) starts responding slowly, allowing them to troubleshoot locally before receiving high tickets.
-* **Pain Points**: "It feels slow" reports from users without quantitative data to verify if it is an ISP issue, a local Wi-Fi bottleneck, or an outage.
+1. **Monitoreo y Alertamiento Proactivo**: Detectar latencias de respuesta, caídas en velocidades de descarga/subida e interrupciones de servicio antes de que los usuarios finales las reporten.
+2. **Datos Objetivos de Rendimiento**: Capturar indicadores cuantitativos concretos (latencia en milisegundos, jitter y tasas de transferencia en Mbps) para facilitar la verificación de acuerdos de nivel de servicio (SLA) y la resolución de problemas con proveedores de internet (ISP).
+3. **Análisis de Tendencias**: Proporcionar registros históricos persistentes para identificar patrones diarios o semanales de degradación del rendimiento.
+4. **Cero Contaminación del Sistema Operativo**: Utilizar herramientas portables y aisladas (`node`, `fast-cli`, `yt-dlp`, `curl`) para garantizar que los archivos globales, variables o configuraciones del sistema anfitrión no se modifiquen.
+5. **Adaptabilidad Multiplataforma**: Compatible con entornos modernos y heredados (Windows, Windows Server 2012 R2, Linux y macOS) a partir de una única base de código.
 
 ---
 
-## ✨ Core Features
+## Alcance y Exclusiones
 
-- **Multi-Service Probe Execution**: Continuous checking of latency, jitter, download speeds (using fast-cli for Netflix CDN and yt-dlp for YouTube CDN), and HTTP status codes.
-- **Secure Configuration Storage**: Restricts local secrets (.env file) to OS-level secure permissions.
-- **Resilient Network Architecture**: Gracefully handles DNS failures, database timeouts, and invalid API endpoints without crashing the probe thread.
-- **Self-Maintenance Routine**: Automatically cleans up its temporary files and older logs to prevent disk space exhaustion.
-- **Atomic Updater**: Compares local SHA-256 hashes against the central GitHub repository and applies updates atomically.
+- **Pruebas de Ancho de Banda Masivo**: La herramienta está optimizada para el monitoreo sintético de vías HTTP. Las pruebas dedicadas de velocidad masiva (como integraciones con LibreSpeed o WebPageTest) se mantienen separadas del flujo activo de la sonda.
+- **Configuración Gráfica de Usuario**: Toda la configuración se gestiona mediante archivos de entrada estructurados (`config/probe-catalog.json`). No se incluye una interfaz gráfica interactiva para la configuración de la sonda.
+- **Instaladores Nativos del Sistema**: La instalación se apoya en los planificadores de tareas nativos del sistema operativo (Task Scheduler de Windows, systemd, cron, launchd).
+
+---
+
+## Perfiles de Usuario Destinados
+
+### 1. Operadores de Red (NetOps) e Ingenieros SRE
+- **Necesidades**: Sondas estables, precisas y ligeras que no agoten los recursos locales. Requieren métricas estructuradas en una base de datos de series temporales (InfluxDB) y tableros personalizables en Grafana.
+- **Puntos de Dolor**: Scripts inestables que fallan sin notificación o dependencias complejas que exigen actualizaciones manuales en múltiples equipos remotos.
+
+### 2. Gerentes de Soporte de TI y Helpdesk
+- **Necesidades**: Notificación temprana cuando un servicio principal (como Microsoft Office 365 o YouTube) comienza a responder con lentitud, permitiendo tomar medidas antes de recibir un alto volumen de incidentes.
+- **Puntos de Dolor**: Reportes subjetivos de lentitud por parte de usuarios sin datos cuantitativos para determinar si el origen es del proveedor de internet, la red Wi-Fi local o el servicio externo.
+
+---
+
+## Funcionalidades Principales
+
+- **Ejecución de Sonda Multiservicio**: Evaluación continua de latencia, jitter, velocidad de descarga (usando `fast-cli` para Netflix y `yt-dlp` para YouTube) y códigos de estado HTTP.
+- **Almacenamiento Seguro de Configuración**: Restricción de permisos en archivos locales de credenciales (`.env`).
+- **Arquitectura de Red Resiliente**: Manejo transparente de fallas de DNS, tiempos de espera en base de datos y endpoints no disponibles sin interrumpir el ciclo de prueba.
+- **Rutina de Automantenimiento**: Eliminación automática de archivos temporales y rotación de logs para prevenir la saturación del espacio en disco.
+- **Actualizador Atómico**: Verificación de firmas digitales SHA-256 contra el repositorio central e instalación atómica de actualizaciones.
