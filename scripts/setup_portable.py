@@ -413,8 +413,8 @@ def main() -> None:
     parser.add_argument(
         "--node-version",
         type=str,
-        default="v20.20.2",
-        help="Node.js version to download (default: v20.20.2).",
+        default="v24.22.1",
+        help="Node.js version to download (default: v24.22.1).",
     )
     parser.add_argument(
         "--yt-dlp-url",
@@ -437,7 +437,7 @@ def main() -> None:
 
     # Automatically downgrade Node version and fast-cli version for legacy Windows platforms (Server 2012 / Win 7/8)
     if _is_legacy_windows():
-        if args.node_version == "v20.20.2":
+        if args.node_version == "v24.22.1":
             print("[System Info] Legacy Windows detected. Falling back to Node.js v16.20.2 for compatibility.")
             args.node_version = "v16.20.2"
         if args.fast_cli_version == "5.2.0":
