@@ -1,7 +1,7 @@
 # Notas de Endurecimiento
 
 > [!NOTE]
-> **Nota de Migración:** Los scripts de PowerShell detallados aquí se consideran legados. El proyecto ha migrado a Python 3. Consulta la [Guía de Migración](file:///c:/Users/Eduar/Documents/CX-RADAR/docs/MIGRATION.md) para conocer las nuevas instrucciones multiplataforma y de almacenamiento de secretos mediante archivos `.env`.
+> **Nota de Migración:** Los scripts de PowerShell detallados aquí se consideran legados. El proyecto ha migrado a Python 3. Consulta la [Guía de Migración](../MIGRATION.md) para conocer las nuevas instrucciones multiplataforma y de almacenamiento de secretos mediante archivos `.env`.
 
 ## Manejo de secretos
 

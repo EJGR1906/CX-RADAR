@@ -8,8 +8,8 @@ description: "Grafana Cloud dashboards, Flux queries for InfluxDB, alert rules, 
 Use this skill when designing or modifying Grafana Cloud dashboards, writing Flux queries for InfluxDB, or setting up alert rules for metric degradation.
 
 ## Observability Context
-- **Grafana Configs**: [grafana/](file:///c:/Users/Eduar/Documents/CX-RADAR/grafana)
-- **Setup Guide**: [docs/observability/grafana-cloud-setup.md](file:///c:/Users/Eduar/Documents/CX-RADAR/docs/observability/grafana-cloud-setup.md)
+- **Grafana Configs**: [grafana/](../../../grafana)
+- **Setup Guide**: [docs/observability/grafana-cloud-setup.md](../../../docs/observability/grafana-cloud-setup.md)
 
 ## Flux Query Standards
 - Read from the `qoe_metrics` bucket (as configured in InfluxDB Cloud).

@@ -1,7 +1,7 @@
 # CX-Radar Agent Guide
 
 > [!NOTE]
-> **Aviso de Migración**: Este repositorio ha sido migrado de PowerShell a Python 3 (Multiplataforma) para soportar ejecuciones universales en Windows, Linux y macOS sin dependencias externas. Para más detalles sobre las decisiones de diseño y equivalencia de archivos, consulte la [Guía de Migración](file:///c:/Users/Eduar/Documents/CX-RADAR/docs/MIGRATION.md).
+> **Aviso de Migración**: Este repositorio ha sido migrado de PowerShell a Python 3 (Multiplataforma) para soportar ejecuciones universales en Windows, Linux y macOS sin dependencias externas. Para más detalles sobre las decisiones de diseño y equivalencia de archivos, consulte la [Guía de Migración](docs/MIGRATION.md).
 
 ## Scope
 
