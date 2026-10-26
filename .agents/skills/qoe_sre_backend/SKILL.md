@@ -8,12 +8,12 @@ description: "Automation, configuration, and execution of the Python 3 QoE probe
 Use this skill when modifying probe logic, ingestion flow, configuration parsing, or registry/daemon setup on the host system.
 
 ## Key Targets & Context
-- **Primary Script**: [qoe_probe.py](file:///c:/Users/Eduar/Documents/CX-RADAR/scripts/qoe_probe.py)
-- **Configuration File**: [probe-catalog.json](file:///c:/Users/Eduar/Documents/CX-RADAR/config/probe-catalog.json)
+- **Primary Script**: [qoe_probe.py](../../../scripts/qoe_probe.py)
+- **Configuration File**: [probe-catalog.json](../../../config/probe-catalog.json)
 - **Native Daemons**:
-  - Windows: [register_qoe_task.py](file:///c:/Users/Eduar/Documents/CX-RADAR/scripts/register_qoe_task.py)
-  - Linux Systemd: [cx-radar-qoe-probe.service](file:///c:/Users/Eduar/Documents/CX-RADAR/orchestration/cx-radar-qoe-probe.service)
-  - macOS: [com.cx-radar.qoe-probe.plist](file:///c:/Users/Eduar/Documents/CX-RADAR/orchestration/com.cx-radar.qoe-probe.plist)
+  - Windows: [register_qoe_task.py](../../../scripts/register_qoe_task.py)
+  - Linux Systemd: [cx-radar-qoe-probe.service](../../../orchestration/cx-radar-qoe-probe.service)
+  - macOS: [com.cx-radar.qoe-probe.plist](../../../orchestration/com.cx-radar.qoe-probe.plist)
 
 ## InfluxDB Line Protocol Guidelines
 When writing or formatting metrics for InfluxDB Cloud:
@@ -25,4 +25,4 @@ When writing or formatting metrics for InfluxDB Cloud:
 ## Operating System Scheduler Registration
 - To register or update the scheduled task on Windows:
   `python scripts/register_qoe_task.py`
-- On Linux, use Systemd Timer or Crontab (see [docs/operations/task-scheduler-runbook.md](file:///c:/Users/Eduar/Documents/CX-RADAR/docs/operations/task-scheduler-runbook.md)).
+- On Linux, use Systemd Timer or Crontab (see [docs/operations/task-scheduler-runbook.md](../../../docs/operations/task-scheduler-runbook.md)).

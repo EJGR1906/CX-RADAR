@@ -8,9 +8,9 @@ description: "Quality assurance, certification, performance testing, fault toler
 Use this skill when verifying probe accuracy, running certification checks, performing resilience testing, and doing QA audits before rolling out changes.
 
 ## Key Targets & Context
-- **Certification Runner**: [run_qoe_certification.py](file:///c:/Users/Eduar/Documents/CX-RADAR/scripts/run_qoe_certification.py)
-- **Checklist Guide**: [docs/qa/certification-checklist.md](file:///c:/Users/Eduar/Documents/CX-RADAR/docs/qa/certification-checklist.md)
-- **Validation Runbook**: [docs/qa/validation-runbook.md](file:///c:/Users/Eduar/Documents/CX-RADAR/docs/qa/validation-runbook.md)
+- **Certification Runner**: [run_qoe_certification.py](../../../scripts/run_qoe_certification.py)
+- **Checklist Guide**: [docs/qa/certification-checklist.md](../../../docs/qa/certification-checklist.md)
+- **Validation Runbook**: [docs/qa/validation-runbook.md](../../../docs/qa/validation-runbook.md)
 
 ## Validation Workflow
 When introducing any changes to the probe scripts, configuration, or telemetry path, always perform validation in the following order:

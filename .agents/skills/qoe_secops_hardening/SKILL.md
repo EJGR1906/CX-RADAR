@@ -8,8 +8,8 @@ description: "Security hardening of the QoE probe, safe credential/token storage
 Use this skill when managing credentials, configuring tokens, setting environment variables, hardening execution context, or reviewing rate limit / IP reputation risks.
 
 ## Key Targets & Context
-- **Token Management**: [set_influx_token.py](file:///c:/Users/Eduar/Documents/CX-RADAR/scripts/set_influx_token.py)
-- **Hardening Guide**: [docs/security/hardening.md](file:///c:/Users/Eduar/Documents/CX-RADAR/docs/security/hardening.md)
+- **Token Management**: [set_influx_token.py](../../../scripts/set_influx_token.py)
+- **Hardening Guide**: [docs/security/hardening.md](../../../docs/security/hardening.md)
 
 ## Credential Hardening Rules
 - **No Plaintext Secrets**: Never store the InfluxDB token or API keys directly in files tracked by git.

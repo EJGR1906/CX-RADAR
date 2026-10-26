@@ -1,7 +1,7 @@
 # Lista de Verificación de Certificación de QA
 
 > [!NOTE]
-> **Aviso de Migración**: Esta lista de verificación ha sido actualizada para la nueva implementación en Python 3 (Multiplataforma). Para más detalles sobre las decisiones de diseño y equivalencia de archivos, consulte la [Guía de Migración](file:///c:/Users/Eduar/Documents/CX-RADAR/docs/MIGRATION.md).
+> **Aviso de Migración**: Esta lista de verificación ha sido actualizada para la nueva implementación en Python 3 (Multiplataforma). Para más detalles sobre las decisiones de diseño y equivalencia de archivos, consulte la [Guía de Migración](../MIGRATION.md).
 
 ## Alcance
 
@@ -46,4 +46,4 @@ El MVP no está listo para producción hasta que:
 2. Se observe una escritura exitosa en InfluxDB.
 3. Se observe una consulta exitosa en un dashboard.
 4. Se complete al menos un periodo de soak después de programar.
-5. El runbook de QA en [docs/qa/validation-runbook.md](file:///c:/Users/Eduar/Documents/CX-RADAR/docs/qa/validation-runbook.md) se haya ejecutado y adjuntado como evidencia de lanzamiento.
+5. El runbook de QA en [docs/qa/validation-runbook.md](validation-runbook.md) se haya ejecutado y adjuntado como evidencia de lanzamiento.
