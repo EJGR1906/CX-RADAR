@@ -83,7 +83,7 @@ const annotations = [{
   }
 }];
 
-const baseDashboard = (title, desc, elements, layout, vars = []) => ({
+const baseDashboard = (title, desc, elements, layout, vars = [], timeFrom = 'now-1h') => ({
   annotations,
   cursorSync: 'Crosshair',
   description: desc,
@@ -97,10 +97,27 @@ const baseDashboard = (title, desc, elements, layout, vars = []) => ({
   timeSettings: {
     autoRefresh: '1m',
     autoRefreshIntervals: ['5s', '10s', '30s', '1m', '5m', '15m', '30m', '1h', '2h', '1d'],
-    fiscalYearStartMonth: 0, from: 'now-1h', hideTimepicker: false, timezone: 'browser', to: 'now'
+    fiscalYearStartMonth: 0, from: timeFrom, hideTimepicker: false, timezone: 'browser', to: 'now'
   },
   title,
   variables: vars
+});
+
+// --- Recurso completo para Grafana (esquema v2) ---
+// Grafana rechaza un JSON que solo trae el spec ("The required property `metadata`
+// is missing"). metadata.name es el uid del tablero: debe coincidir con el de
+// Grafana Cloud para que al importar se sobrescriba el tablero existente (misma URL)
+// en lugar de crear uno nuevo.
+const DASHBOARD_UIDS = {
+  global: 'ed9zkjq',
+  detail: 'cx-radar-qoe-http-overview'
+};
+
+const asResource = (name, spec) => ({
+  apiVersion: 'dashboard.grafana.app/v2',
+  kind: 'Dashboard',
+  metadata: { name },
+  spec
 });
 
 // --- Write output dashboards ---
@@ -121,7 +138,7 @@ const globalDashboard = baseDashboard(
   [] // No Sonda variable for global view
 );
 const globalPath = path.join(dashboardsDir, 'qoe-national-global.json');
-fs.writeFileSync(globalPath, JSON.stringify(globalDashboard, null, 2), 'utf8');
+fs.writeFileSync(globalPath, JSON.stringify(asResource(DASHBOARD_UIDS.global, globalDashboard), null, 2), 'utf8');
 console.log(`Global Dashboard written to: ${globalPath}`);
 console.log(`  Elements: ${Object.keys(globalElements).length} panels`);
 
@@ -136,10 +153,11 @@ const detailDashboard = baseDashboard(
   'Vista Detallada por sonda de QoE para CX-Radar. Permite analizar el rendimiento especifico de una sonda.',
   detailElements,
   detailLayout,
-  variables // probe_id variable is enabled here
+  variables, // probe_id variable is enabled here
+  'now-30d' // rango por defecto que usa el tablero en Grafana Cloud
 );
 const detailPath = path.join(dashboardsDir, 'qoe-probe-detail.json');
-fs.writeFileSync(detailPath, JSON.stringify(detailDashboard, null, 2), 'utf8');
+fs.writeFileSync(detailPath, JSON.stringify(asResource(DASHBOARD_UIDS.detail, detailDashboard), null, 2), 'utf8');
 console.log(`Detail Dashboard written to: ${detailPath}`);
 console.log(`  Elements: ${Object.keys(detailElements).length} panels`);
 

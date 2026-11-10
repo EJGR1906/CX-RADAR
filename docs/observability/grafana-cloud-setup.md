@@ -39,7 +39,16 @@ Valores predeterminados recomendados para la fuente de datos de Grafana:
 
 ## Importar los paneles
 
-Se proporcionan dos dashboards. Implóralos en orden:
+Se proporcionan dos dashboards. Impórtalos en orden.
+
+Los JSON se generan con `node grafana/builders/build-dashboard.js` y salen como
+recurso completo del esquema v2 (`apiVersion`, `kind`, `metadata`, `spec`).
+`metadata.name` es el uid del tablero en Grafana Cloud (`ed9zkjq` para la Vista
+Global y `cx-radar-qoe-http-overview` para el Detalle): al importar un tablero
+que ya existe, Grafana pide confirmar y lo sobrescribe en la misma URL. Las
+versiones anteriores quedan en Settings > Versions. Los paneles apuntan al
+datasource con uid `dfkh6j26t6gw0c` (`DS` en `grafana/builders/panel-helpers.js`);
+en otra instancia hay que cambiar ese valor y regenerar.
 
 ### 1. Vista Global Nacional (`qoe-national-global.json`)
 
