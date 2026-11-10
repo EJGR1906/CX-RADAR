@@ -148,8 +148,10 @@ de Inter, a Cloudflare, Google y fast.com, y resuelve DNS. Clasifica:
 | `caida_router_local` | No responde el router de la sonda: falla del punto de medición. |
 
 Avisa por Telegram con 2 corridas malas seguidas (2 minutos), avisa si empeora
-y avisa la recuperación con la duración. Si la caída impide enviar el mensaje,
-lo guarda y lo envía al volver la conexión, con la hora real de la falla. Las
+y avisa la recuperación con la duración. Si la caída impide enviar el aviso de
+falla, no lo manda atrasado: al volver la conexión envía un solo mensaje
+RECUPERADO con el diagnóstico (acceso, tránsito o router local), la hora de
+inicio y la duración. Las
 métricas que no se pudieron escribir se reenvían, así que Grafana muestra la
 ventana completa.
 
@@ -157,11 +159,37 @@ Umbrales en la sección `heartbeat` del catálogo: `maxLatencyMs` (40 ms para
 Inter, 150 ms para externos), `maxLossPercentage`, `failThreshold` y
 `recoverThreshold`.
 
-Mientras el acceso está caído la sonda no puede avisar en el momento. Para
-recibir la alerta durante la caída hace falta una alerta "sin datos" en
-Grafana Cloud sobre `qoe_heartbeat_status`: si no llegan datos en 3 minutos,
-notificar al mismo bot de Telegram (contact point de tipo Telegram con el
-mismo token y chat id).
+### Aviso inmediato durante la caída (Grafana Cloud)
+
+Sin internet la sonda no puede llegar a Telegram, así que el aviso en el momento
+lo da Grafana Cloud. La regla `CX-Radar: sonda sin reportar` revisa cada minuto
+hace cuánto llegó el último `qoe_heartbeat_status` de cada sonda. Si pasan más
+de 3 minutos, avisa por el mismo bot de Telegram (una alerta por sonda) y, cuando
+la sonda vuelve a reportar, manda el aviso de resuelto.
+
+Mensajes de una caída de acceso:
+
+1. Grafana, unos 3 a 4 minutos después del corte: `SIN CONEXIÓN: no reporta hace N min`.
+2. Grafana, al volver: `La sonda volvió a reportar`.
+3. La sonda, al volver: `RECUPERADO` con el diagnóstico, la hora de inicio y la duración.
+
+Grafana no distingue entre una sonda sin internet y un equipo apagado o
+suspendido: avisa en los dos casos. Una sonda que no reporta en 7 días sale de
+la consulta y su alerta se cierra sola.
+
+Crear o actualizar la regla (idempotente):
+
+```bash
+python scripts/setup_grafana_alert.py --grafana-url https://<stack>.grafana.net --dry-run
+python scripts/setup_grafana_alert.py --grafana-url https://<stack>.grafana.net
+```
+
+Necesita `GRAFANA_TOKEN` (service account con rol Editor o Admin) y las mismas
+`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` de la sonda, en el entorno o en `.env`.
+Crea el contact point `CX-Radar Telegram`, la carpeta `CX-Radar`, la regla y una
+ruta `app=cx-radar` en la política de notificaciones, sin tocar las demás rutas.
+Opciones: `--minutes` (umbral) y `--datasource-uid` (si hay más de un datasource
+InfluxDB con Flux).
 
 ## Reporte diario de ONUs (`onu_report.py`)
 

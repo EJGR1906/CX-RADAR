@@ -2,6 +2,19 @@
 
 All notable changes to CX-Radar are documented here.
 
+## [Unreleased] — 2026-11-10
+
+### Alertas de caída
+
+#### Aviso inmediato desde Grafana Cloud (`scripts/setup_grafana_alert.py`)
+- **Problema:** Sin internet, la sonda no puede llegar a Telegram. El aviso de falla quedaba guardado y llegaba "(enviado con retraso)" al volver el servicio (caso HUB_BTO del 10/11: caída de 14:27 a 14:33, avisos a las 14:47).
+- **Solución:** El script crea en Grafana Cloud la regla `CX-Radar: sonda sin reportar` (más de 3 min sin `qoe_heartbeat_status`, una alerta por sonda), el contact point de Telegram y su ruta de notificación. Grafana avisa durante la caída y cuando la sonda vuelve.
+
+#### Un solo resumen al volver (`scripts/qoe_heartbeat.py`)
+- Un aviso de falla que no se pudo enviar ya no se manda atrasado. Al recuperarse, la sonda envía un único RECUPERADO con el diagnóstico, la hora de inicio y la duración.
+
+---
+
 ## [Unreleased] — 2026-05-22
 
 ### Mejoras de Confiabilidad
