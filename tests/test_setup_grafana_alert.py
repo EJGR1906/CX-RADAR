@@ -67,18 +67,19 @@ class TestApply(unittest.TestCase):
         self.assertIn(("POST", "/api/v1/provisioning/contact-points"), writes)
 
         g = FakeGrafana({
-            f"/api/folders/{ga.FOLDER_UID}": {"uid": ga.FOLDER_UID},
+            "/api/folders": [{"uid": "ftwbcl", "title": "CX-RADAR"}],
             "/api/v1/provisioning/contact-points": [{"uid": ga.CONTACT_UID, "name": ga.CONTACT_NAME}],
             "/api/v1/provisioning/policies": {"receiver": "default"},
             f"/api/v1/provisioning/alert-rules/{ga.RULE_UID}": {"uid": ga.RULE_UID},
-            f"/api/v1/provisioning/folder/{ga.FOLDER_UID}/rule-groups/{ga.RULE_GROUP}": {"interval": 300},
+            f"/api/v1/provisioning/folder/ftwbcl/rule-groups/{ga.RULE_GROUP}": {"interval": 300},
         })
         ga.apply(g, ga.build_rule("ds", "b", 3), ga.build_contact_point("t", "c"), dry_run=False)
         writes = {(m, p): b for m, p, b in g.calls if m != "GET"}
         self.assertIn(("PUT", f"/api/v1/provisioning/alert-rules/{ga.RULE_UID}"), writes)
         self.assertIn(("PUT", f"/api/v1/provisioning/contact-points/{ga.CONTACT_UID}"), writes)
         self.assertNotIn(("POST", "/api/folders"), writes)
-        group = writes[("PUT", f"/api/v1/provisioning/folder/{ga.FOLDER_UID}/rule-groups/{ga.RULE_GROUP}")]
+        self.assertEqual(writes[("PUT", f"/api/v1/provisioning/alert-rules/{ga.RULE_UID}")]["folderUID"], "ftwbcl")
+        group = writes[("PUT", f"/api/v1/provisioning/folder/ftwbcl/rule-groups/{ga.RULE_GROUP}")]
         self.assertEqual(group["interval"], 60)
 
 

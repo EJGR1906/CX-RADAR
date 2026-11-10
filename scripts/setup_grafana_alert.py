@@ -140,6 +140,14 @@ def merge_route(policy: Dict[str, Any], route: Dict[str, Any]) -> Dict[str, Any]
     return policy
 
 
+def find_folder_uid(folders: List[Dict[str, Any]]) -> Optional[str]:
+    """Usa la carpeta de CX-Radar que ya exista (por UID o por título, sin importar mayúsculas)."""
+    for f in folders:
+        if f.get("uid") == FOLDER_UID or str(f.get("title", "")).strip().lower() == FOLDER_TITLE.lower():
+            return f.get("uid")
+    return None
+
+
 def pick_datasource(datasources: List[Dict[str, Any]]) -> Dict[str, Any]:
     flux = [d for d in datasources if d.get("type") == "influxdb"
             and str((d.get("jsonData") or {}).get("version", "")).lower() == "flux"]
@@ -183,8 +191,11 @@ def apply(g: Grafana, rule: Dict[str, Any], contact: Dict[str, Any], dry_run: bo
         if not dry_run:
             g.request(method, path, body)
 
-    if g.request("GET", f"/api/folders/{FOLDER_UID}") is None:
+    folder_uid = find_folder_uid(g.request("GET", "/api/folders") or [])
+    if folder_uid is None:
+        folder_uid = FOLDER_UID
         step("crear carpeta", "POST", "/api/folders", {"uid": FOLDER_UID, "title": FOLDER_TITLE})
+    rule = {**rule, "folderUID": folder_uid}
 
     existing = g.request("GET", "/api/v1/provisioning/contact-points") or []
     same_name = [c for c in existing if c.get("name") == CONTACT_NAME]
@@ -204,12 +215,12 @@ def apply(g: Grafana, rule: Dict[str, Any], contact: Dict[str, Any], dry_run: bo
     else:
         step("actualizar regla", "PUT", f"/api/v1/provisioning/alert-rules/{RULE_UID}", rule)
 
-    group = g.request("GET", f"/api/v1/provisioning/folder/{FOLDER_UID}/rule-groups/{RULE_GROUP}")
+    group = g.request("GET", f"/api/v1/provisioning/folder/{folder_uid}/rule-groups/{RULE_GROUP}")
     if dry_run and group is None:
         done.append(f"PUT rule-groups/{RULE_GROUP}: evaluar cada 60 s")
     elif group is not None:
         group["interval"] = 60
-        step("evaluar cada 60 s", "PUT", f"/api/v1/provisioning/folder/{FOLDER_UID}/rule-groups/{RULE_GROUP}", group)
+        step("evaluar cada 60 s", "PUT", f"/api/v1/provisioning/folder/{folder_uid}/rule-groups/{RULE_GROUP}", group)
     return done
 
 
