@@ -17,8 +17,11 @@ Diagnóstico:
 
 Alertas: se avisa cuando el mismo problema se repite `failThreshold` corridas
 seguidas (por defecto 2 = 2 minutos) y se avisa la recuperación después de
-`recoverThreshold` corridas buenas. Si la caída impide enviar el mensaje, se
-guarda y se envía apenas vuelva la conexión, con la hora real de la falla.
+`recoverThreshold` corridas buenas. Si la caída impide enviar el aviso, no se
+manda atrasado: al volver la conexión se envía un solo mensaje de recuperación
+con el diagnóstico, la hora de inicio y la duración. El aviso en el momento de
+la caída lo da Grafana Cloud con la regla "sin datos" que crea
+`setup_grafana_alert.py`, porque la sonda sin internet no puede avisar.
 Las métricas que no se pudieron escribir en InfluxDB también se guardan y se
 reenvían, para que Grafana muestre la ventana completa de la caída.
 
@@ -35,7 +38,7 @@ import socket
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import qoe_config  # noqa: E402
@@ -140,6 +143,7 @@ def update_alert_state(state: Dict[str, Any], status: str, now_ms: int, fail_thr
         state["good_count"] = state.get("good_count", 0) + 1
         if state.get("alerted") and state["good_count"] >= recover_threshold:
             action = "recovery"
+            state["recovered_from"] = state.get("alert_status", "ok")
             state["alerted"] = False
             state["alert_status"] = "ok"
         if state["good_count"] >= recover_threshold or not state.get("alerted"):
@@ -153,8 +157,13 @@ def build_message(action: str, probe_id: str, site: str, status: str, summary: D
     header = f"CX-Radar | sonda {probe_id} ({site})"
     if action == "recovery":
         since = state.get("bad_since", now_ms)
-        return (f"{header}\nRECUPERADO a las {_fmt_time(now_ms)}\n"
-                f"Duración de la falla: {_fmt_duration(now_ms - since)} (desde {_fmt_time(since)})")
+        lines = [header, f"RECUPERADO a las {_fmt_time(now_ms)}"]
+        if state.get("alert_undelivered"):
+            diag = STATUS_TEXT.get(state.get("recovered_from", ""), "no documentado")
+            lines += ["La falla no se pudo avisar en el momento: la sonda estaba sin conexión.",
+                      f"Diagnóstico: {diag}"]
+        lines.append(f"Duración de la falla: {_fmt_duration(now_ms - since)} (desde {_fmt_time(since)})")
+        return "\n".join(lines)
     title = "FALLA" if action == "alert" else "EMPEORA"
     lines = [header, f"{title}: {STATUS_TEXT[status]}", f"Detectado: {_fmt_time(state.get('bad_since', now_ms))}"]
     for c in checks:
@@ -163,6 +172,30 @@ def build_message(action: str, probe_id: str, site: str, status: str, summary: D
         elif c["degraded"]:
             lines.append(f"- {c['name']}: {c['latency_ms']} ms (umbral {c['max_latency_ms']:.0f}), pérdida {c['loss_pct']} %")
     return "\n".join(lines)
+
+
+def notify(action: Optional[str], state: Dict[str, Any], build: Callable[[str], str],
+           send: Callable[[str], bool]) -> None:
+    """Envía el aviso de la corrida.
+
+    Un aviso de falla que no sale (la sonda está sin conexión) no se guarda para
+    mandarlo atrasado: se marca `alert_undelivered` y la recuperación lo resume.
+    Solo el mensaje de recuperación queda pendiente si tampoco se puede enviar.
+    """
+    if not action:
+        return
+    msg = build(action)
+    sent = send(msg)
+    if action in ("alert", "escalate"):
+        state["alert_undelivered"] = not sent
+        if not sent:
+            qoe_probe.log_message(f"Heartbeat: Telegram no disponible, se resumirá al recuperar: {qoe_telegram.LAST_ERROR}", "WARNING")
+        return
+    if not sent:
+        qoe_probe.log_message(f"Heartbeat: Telegram no disponible, la recuperación queda pendiente: {qoe_telegram.LAST_ERROR}", "WARNING")
+        state.setdefault("pending", []).append(msg)
+    state.pop("alert_undelivered", None)
+    state.pop("recovered_from", None)
 
 
 def flush_pending(state: Dict[str, Any], creds: Dict[str, str]) -> None:
@@ -267,11 +300,9 @@ def main() -> None:
         creds = qoe_telegram.get_credentials(repo_root / ".env")
         if qoe_telegram.is_configured(creds):
             flush_pending(state, creds)
-            if action:
-                msg = build_message(action, probe_id, site, status, summary, checks, state, now_ms)
-                if not qoe_telegram.send_message(msg, creds):
-                    qoe_probe.log_message(f"Heartbeat: Telegram no disponible, el aviso queda pendiente: {qoe_telegram.LAST_ERROR}", "WARNING")
-                    state.setdefault("pending", []).append(msg)
+            notify(action, state,
+                   lambda a: build_message(a, probe_id, site, status, summary, checks, state, now_ms),
+                   lambda m: qoe_telegram.send_message(m, creds))
 
     state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
     detail = ", ".join(f"{c['name']}={'%sms' % c['latency_ms'] if c['reachable'] else 'X'}" for c in checks)

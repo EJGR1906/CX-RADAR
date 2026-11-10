@@ -63,6 +63,43 @@ class TestAlertState(unittest.TestCase):
         state = {"bad_since": 0}
         msg = hb.build_message("recovery", "p1", "hub", "ok", {}, [], state, 30 * 60 * 1000)
         self.assertIn("30 min", msg)
+        self.assertNotIn("Diagnóstico", msg)
+
+
+class TestNotify(unittest.TestCase):
+    """Caso real HUB_BTO 10/11: caída de acceso 14:27-14:33 sin conexión para avisar."""
+
+    def outage(self, telegram_up):
+        state, sent = {}, []
+        for i, s in enumerate(["caida_acceso", "caida_acceso", "caida_acceso", "ok", "ok"]):
+            now = 1000 * 60 * i
+            action = hb.update_alert_state(state, s, now, 2, 2)
+            hb.notify(action, state,
+                      lambda a: hb.build_message(a, "HUB_BTO", "Server-HUB", s, {}, [], state, now),
+                      lambda m: (sent.append(m) or True) if telegram_up(s) else False)
+        return state, sent
+
+    def test_undelivered_alert_becomes_single_recovery_summary(self):
+        state, sent = self.outage(lambda s: s == "ok")
+        self.assertEqual(len(sent), 1)
+        self.assertIn("RECUPERADO", sent[0])
+        self.assertIn("no se pudo avisar", sent[0])
+        self.assertIn(hb.STATUS_TEXT["caida_acceso"], sent[0])
+        self.assertIn("4 min", sent[0])
+        self.assertEqual(state.get("pending", []), [])
+        self.assertNotIn("alert_undelivered", state)
+
+    def test_delivered_alert_keeps_normal_flow(self):
+        _, sent = self.outage(lambda s: True)
+        self.assertEqual(len(sent), 2)
+        self.assertIn("FALLA", sent[0])
+        self.assertNotIn("no se pudo avisar", sent[1])
+
+    def test_recovery_queued_if_telegram_still_down(self):
+        state, sent = self.outage(lambda s: False)
+        self.assertEqual(sent, [])
+        self.assertEqual(len(state["pending"]), 1)
+        self.assertIn("RECUPERADO", state["pending"][0])
 
 
 if __name__ == "__main__":
