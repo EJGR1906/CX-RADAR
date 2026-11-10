@@ -1,13 +1,7 @@
 // detail-panels.js — Panel definitions for the Detail (Per-Probe) tab
 const P = `r.probe_id == "\${probe_id}"`;
 
-const SVC_OVERRIDES = [
-  { matcher: { id: 'byRegexp', options: '/.*Netflix.*/' }, properties: [{ id: 'color', value: { fixedColor: '#E50914', mode: 'fixed' } }] },
-  { matcher: { id: 'byRegexp', options: '/.*Youtube.*/' }, properties: [{ id: 'color', value: { fixedColor: '#FF4444', mode: 'fixed' } }] },
-  { matcher: { id: 'byRegexp', options: '/.*Amazon.*/' }, properties: [{ id: 'color', value: { fixedColor: '#FF9900', mode: 'fixed' } }] },
-  { matcher: { id: 'byRegexp', options: '/.*Microsoft.*/' }, properties: [{ id: 'color', value: { fixedColor: '#00A4EF', mode: 'fixed' } }] },
-  { matcher: { id: 'byRegexp', options: '/.*Disney\\+.*/' }, properties: [{ id: 'color', value: { fixedColor: '#113CCF', mode: 'fixed' } }] },
-];
+const { SVC_OVERRIDES } = require('./panel-helpers');
 
 exports.panels = [
   // KPI Row
@@ -24,7 +18,7 @@ exports.panels = [
   |> mean()
   |> map(fn: (r) => ({_time: now(), _field: "Disponibilidad", _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'percent', max: 100, min: 0, graphMode: 'area',
+    unit: 'percent', max: 100, min: 0,
     thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 95 }, { color: 'green', value: 99 }]
   }],
 
@@ -40,7 +34,7 @@ exports.panels = [
   |> mean()
   |> map(fn: (r) => ({_time: now(), _field: "Download", _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'Mbps', decimals: 2, graphMode: 'area',
+    unit: 'Mbps', decimals: 1,
     thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 2 }, { color: 'green', value: 5 }]
   }],
 
@@ -56,7 +50,7 @@ exports.panels = [
   |> mean()
   |> map(fn: (r) => ({_time: now(), _field: "Upload", _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'Mbps', decimals: 2,
+    unit: 'Mbps', decimals: 1,
     thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 1 }, { color: 'green', value: 3 }]
   }],
 
@@ -105,7 +99,7 @@ exports.panels = [
   |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
   |> map(fn: (r) => ({_time: r._time, _field: r.service, _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'ms', thresholdLines: true,
+    unit: 'ms', thresholdLines: true, legendPlacement: 'right', legendCalcs: ['mean', 'max'],
     thresholds: [{ color: 'green', value: 0 }, { color: 'yellow', value: 80 }, { color: 'red', value: 200 }],
     overrides: SVC_OVERRIDES
   }],
@@ -123,7 +117,7 @@ exports.panels = [
   |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
   |> map(fn: (r) => ({_time: r._time, _field: r.service, _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'ms', thresholdLines: true, legendPlacement: 'right',
+    unit: 'ms', thresholdLines: true, legendPlacement: 'right', legendCalcs: ['mean', 'max'],
     thresholds: [{ color: 'green', value: 0 }, { color: 'yellow', value: 20 }, { color: 'red', value: 50 }],
     overrides: SVC_OVERRIDES
   }],
@@ -143,7 +137,7 @@ exports.panels = [
   |> group(columns: ["_field"])`,
     unit: 'Mbps', decimals: 2, fillOpacity: 20,
     thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 2 }, { color: 'green', value: 5 }],
-    overrides: SVC_OVERRIDES, legendCalcs: ['lastNotNull', 'mean']
+    overrides: SVC_OVERRIDES, legendPlacement: 'right', legendCalcs: ['lastNotNull', 'mean']
   }],
 
   // Time Series — Upload
@@ -161,7 +155,7 @@ exports.panels = [
   |> group(columns: ["_field"])`,
     unit: 'Mbps', decimals: 2, fillOpacity: 20,
     thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 1 }, { color: 'green', value: 3 }],
-    overrides: SVC_OVERRIDES, legendCalcs: ['lastNotNull', 'mean']
+    overrides: SVC_OVERRIDES, legendPlacement: 'right', legendCalcs: ['lastNotNull', 'mean']
   }],
 
   // Table — Snapshot Simple
@@ -185,6 +179,7 @@ exports.panels = [
     }))
   |> group()
   |> sort(columns: ["Servicio"])`,
+    columnOrder: ['Servicio', 'Estado', 'URL', 'Error'],
     overrides: [
       { matcher: { id: 'byName', options: 'Estado' }, properties: [
         { id: 'custom.cellOptions', value: { type: 'color-background' } },
@@ -210,12 +205,12 @@ exports.panels = [
   |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
   |> map(fn: (r) => ({_time: r._time, _field: "Run Duration", _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'ms', thresholdLines: true, fillOpacity: 20,
+    unit: 'ms', thresholdLines: true, fillOpacity: 20, legendCalcs: ['lastNotNull', 'mean', 'max'],
     thresholds: [{ color: 'green', value: 0 }, { color: 'yellow', value: 10000 }, { color: 'red', value: 20000 }]
   }],
 
   // Download by Service (Probe specific)
-  ['detail-download-by-service', 'stat', {
+  ['detail-download-by-service', 'bargauge', {
     title: 'Download por Servicio', id: 212,
     desc: 'Ultima velocidad de descarga reportada por servicio para la sonda seleccionada.',
     flux: `from(bucket: v.defaultBucket)
@@ -227,12 +222,12 @@ exports.panels = [
   |> last()
   |> map(fn: (r) => ({_time: r._time, _field: r.service, _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'Mbps', decimals: 2, graphMode: 'area',
+    unit: 'Mbps', decimals: 1, max: null,
     thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 2 }, { color: 'green', value: 5 }]
   }],
 
   // Upload by Service (Probe specific)
-  ['detail-upload-by-service', 'stat', {
+  ['detail-upload-by-service', 'bargauge', {
     title: 'Upload por Servicio', id: 213,
     desc: 'Ultima velocidad de subida reportada por servicio para la sonda seleccionada.',
     flux: `from(bucket: v.defaultBucket)
@@ -244,7 +239,7 @@ exports.panels = [
   |> last()
   |> map(fn: (r) => ({_time: r._time, _field: r.service, _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'Mbps', decimals: 2,
+    unit: 'Mbps', decimals: 1, max: null,
     thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 1 }, { color: 'green', value: 3 }]
   }]
 ];
@@ -256,13 +251,12 @@ exports.layout = [
   ['detail-kpi-upload',          10,  0,  5, 4],
   ['detail-kpi-latency',         15,  0,  5, 4],
   ['detail-kpi-jitter',          20,  0,  4, 4],
-  ['detail-download-by-service',  0,  4, 12, 5],
-  ['detail-upload-by-service',   12,  4, 12, 5],
-  ['detail-latency-ts',           0,  9, 12, 8],
-  ['detail-jitter-ts',           12,  9, 12, 8],
-  ['detail-download-ts',          0, 17, 12, 8],
-  ['detail-upload-ts',           12, 17, 12, 8],
-  ['detail-snapshot-simple',      0, 25, 24, 8],
-  ['detail-run-duration',        0, 33, 24, 8],
+  ['detail-download-by-service',  0,  4, 12, 7],
+  ['detail-upload-by-service',   12,  4, 12, 7],
+  ['detail-latency-ts',           0, 11, 12, 9],
+  ['detail-jitter-ts',           12, 11, 12, 9],
+  ['detail-download-ts',          0, 20, 12, 9],
+  ['detail-upload-ts',           12, 20, 12, 9],
+  ['detail-snapshot-simple',      0, 29, 12, 8],
+  ['detail-run-duration',        12, 29, 12, 8],
 ];
-

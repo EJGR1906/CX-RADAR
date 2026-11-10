@@ -2,6 +2,21 @@
 const DS = 'dfkh6j26t6gw0c';
 const VER = '13.1.0-25153870157';
 
+// Colores fijos por servicio (insensibles a mayusculas: "Youtube" o "YouTube").
+const SERVICE_COLORS = [
+  ['netflix', '#E50914'],
+  ['youtube', '#FF4444'],
+  ['amazon', '#FF9900'],
+  ['microsoft', '#00A4EF'],
+  ['disney\\+', '#113CCF'],
+  ['ookla-barquisimeto', '#B877D9'],
+  ['ookla-caracas', '#1ABC9C']
+];
+const SVC_OVERRIDES = SERVICE_COLORS.map(([pattern, color]) => ({
+  matcher: { id: 'byRegexp', options: `/.*${pattern}.*/i` },
+  properties: [{ id: 'color', value: { fixedColor: color, mode: 'fixed' } }]
+}));
+
 function query(flux, range = false) {
   return {
     kind: 'PanelQuery', spec: {
@@ -36,7 +51,8 @@ function statPanel(id, title, desc, flux, unit, thresholds, opts = {}) {
             justifyMode: 'center', orientation: 'auto',
             percentChangeColorMode: 'standard',
             reduceOptions: { calcs: ['lastNotNull'], fields: '', values: false },
-            showPercentChange: false, textMode: opts.textMode || 'value_and_name', wideLayout: true
+            showPercentChange: false, textMode: opts.textMode || 'value', wideLayout: true,
+            ...(opts.text ? { text: opts.text } : {})
           }
         }
       }
@@ -88,6 +104,8 @@ function tsPanel(id, title, desc, flux, unit, thresholds, opts = {}) {
 }
 
 function barGaugePanel(id, title, desc, flux, unit, thresholds, opts = {}) {
+  // max: null deja la escala automatica (velocidades); por defecto 0-100 (porcentajes).
+  const max = opts.max === undefined ? 100 : opts.max;
   return [id, {
     kind: 'Panel', spec: {
       data: { kind: 'QueryGroup', spec: { queries: [query(flux)], queryOptions: {}, transformations: [] } },
@@ -98,17 +116,20 @@ function barGaugePanel(id, title, desc, flux, unit, thresholds, opts = {}) {
           fieldConfig: {
             defaults: {
               noValue: 'Sin datos',
-              color: { mode: 'thresholds' }, decimals: 1,
-              max: opts.max ?? 100, min: opts.min ?? 0, unit,
+              color: { mode: 'thresholds' }, decimals: opts.decimals ?? 1,
+              ...(max !== null ? { max } : {}), min: opts.min ?? 0, unit,
               thresholds: { mode: 'absolute', steps: thresholds }
-            }, overrides: []
+            }, overrides: opts.overrides || []
           },
           options: {
-            displayMode: opts.displayMode || 'lcd',
-            minVizHeight: 16, minVizWidth: 8,
-            namePlacement: 'auto', orientation: 'horizontal',
+            // "lcd" pinta cada celda con el color de su tramo: una barra al 100 % se
+            // veia casi toda roja. "basic" pinta la barra entera con el color del valor.
+            displayMode: opts.displayMode || 'basic',
+            minVizHeight: 16, minVizWidth: 8, maxVizHeight: 300,
+            namePlacement: 'left', orientation: 'horizontal',
             reduceOptions: { calcs: ['lastNotNull'], fields: '', values: false },
-            showUnfilled: true, sizing: 'auto', valueMode: 'color'
+            showUnfilled: true, sizing: 'auto', valueMode: 'color',
+            text: opts.text || { titleSize: 14, valueSize: 16 }
           }
         }
       }
@@ -116,10 +137,16 @@ function barGaugePanel(id, title, desc, flux, unit, thresholds, opts = {}) {
   }];
 }
 
-function tablePanel(id, title, desc, flux, overrides = []) {
+function tablePanel(id, title, desc, flux, overrides = [], columnOrder = null) {
+  // InfluxDB devuelve las columnas en orden alfabetico ("Duracion ms" quedaba
+  // primero); la transformacion organize fija el orden de lectura.
+  const transformations = columnOrder ? [{
+    kind: 'Transformation', group: 'organize',
+    spec: { id: 'organize', options: { indexByName: Object.fromEntries(columnOrder.map((c, i) => [c, i])) } }
+  }] : [];
   return [id, {
     kind: 'Panel', spec: {
-      data: { kind: 'QueryGroup', spec: { queries: [query(flux)], queryOptions: {}, transformations: [] } },
+      data: { kind: 'QueryGroup', spec: { queries: [query(flux)], queryOptions: {}, transformations } },
       description: desc, id, links: [], title,
       vizConfig: {
         group: 'table', kind: 'VizConfig', version: VER,
@@ -246,5 +273,5 @@ function gridItem(name, x, y, w, h) {
   return { kind: 'GridLayoutItem', spec: { element: { kind: 'ElementReference', name }, x, y, width: w, height: h } };
 }
 
-module.exports = { query, statPanel, tsPanel, barGaugePanel, tablePanel, stateTimelinePanel, geomapPanel, gridItem, DS };
+module.exports = { SVC_OVERRIDES, query, statPanel, tsPanel, barGaugePanel, tablePanel, stateTimelinePanel, geomapPanel, gridItem, DS };
 
