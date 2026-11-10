@@ -112,6 +112,28 @@ certutil -addstore Root gdroot-g2.crt
 Nunca desactivar la verificación de certificados: el token del bot quedaría
 expuesto a quien intercepte la conexión.
 
+### Disney+ en 0 % con `SSLCertVerificationError`
+
+Mismo problema con otra raíz: los videos de Disney+ (`*.media.dssott.com`)
+están firmados por Sectigo y su cadena termina en **Sectigo Public Server
+Authentication Root R46** (2021). Si esa raíz no está en el almacén de Windows,
+la sonda marca Disney+ como caído con `download_error` y el detalle
+`SSLCertVerificationError`, aunque en el navegador los videos abran. Se ve en la
+columna Detalle de "Estado de Endpoints" del tablero por sonda.
+
+Instalar la raíz en la sonda (PowerShell como administrador) y comprobar antes
+que la huella SHA1 sea `AD:98:F9:F3:E4:7D:75:3B:65:D4:82:B3:A4:52:17:BB:6E:F5:E4:38`
+(la misma de la lista de Mozilla):
+
+```powershell
+Invoke-WebRequest -Uri http://crt.sectigo.com/SectigoPublicServerAuthenticationRootR46.crt -OutFile r46.crt
+certutil -dump r46.crt | findstr /i "sha1"
+certutil -addstore Root r46.crt
+python -c "import urllib.request as u; u.urlopen('https://vod-bgc-na-east-1.media.dssott.com/ps01/disney/bgui/2025/11/19/1763572017-national-geographic.mp4').read(1024); print('OK')"
+```
+
+Si la última línea imprime `OK`, la siguiente corrida de la sonda mide Disney+.
+
 ## Monitor cada minuto (`qoe_heartbeat.py`)
 
 Hace conexiones cortas (sin pruebas de velocidad) al router local, a los Ookla
