@@ -1438,7 +1438,23 @@
                 }
               ],
               "queryOptions": {},
-              "transformations": []
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "id": "organize",
+                    "options": {
+                      "indexByName": {
+                        "Servicio": 0,
+                        "Estado": 1,
+                        "URL": 2,
+                        "Error": 3
+                      }
+                    }
+                  }
+                }
+              ]
             }
           },
           "description": "Ultimo estado de los endpoints medidos por la sonda.",

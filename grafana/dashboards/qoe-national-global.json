@@ -595,7 +595,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "hb = from(bucket: v.defaultBucket)\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat_status\" and r._field == \"status_code\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0}))\n\nrun = from(bucket: v.defaultBucket)\n  |> range(start: -40m)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\" and r._field == \"run_duration_ms\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0}))\n\nactiveProbes = union(tables: [hb, run])\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n\nallRuns = from(bucket: v.defaultBucket)\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\" and r._field == \"run_duration_ms\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 0.0, dur: r._value}))\n\nallHb = from(bucket: v.defaultBucket)\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat_status\" and r._field == \"status_code\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 0.0, dur: 0.0}))\n\nactive = activeProbes\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0, dur: 0.0}))\n\n// _value 1 = activa; dur = duracion de la ultima corrida completa (0 si solo hay monitor)\nprobes = union(tables: [allRuns, allHb, active])\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> reduce(\n      identity: {_time: time(v: 0), _value: 0.0, dur: 0.0},\n      fn: (r, accumulator) => ({\n        _time: if r._time > accumulator._time then r._time else accumulator._time,\n        _value: if r._value > accumulator._value then r._value else accumulator._value,\n        dur: if r.dur > accumulator.dur then r.dur else accumulator.dur\n      }))\n\nprobes\n  |> map(fn: (r) => ({\n      \"Sonda\": r.probe_id,\n      \"Sitio\": r.site,\n      \"Estado\": if r._value == 1.0 then \"Activa\" else \"Inactiva\",\n      \"Ultimo Reporte\": string(v: r._time),\n      \"Duracion ms\": r.dur\n    }))\n  |> group()\n  |> sort(columns: [\"Sitio\", \"Sonda\"])",
+                        "query": "hb = from(bucket: v.defaultBucket)\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat_status\" and r._field == \"status_code\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0}))\n\nrun = from(bucket: v.defaultBucket)\n  |> range(start: -40m)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\" and r._field == \"run_duration_ms\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0}))\n\nactiveProbes = union(tables: [hb, run])\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n\nallRuns = from(bucket: v.defaultBucket)\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"qoe_probe_run\" and r._field == \"run_duration_ms\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 0.0, dur: r._value}))\n\nallHb = from(bucket: v.defaultBucket)\n  |> range(start: -24h)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat_status\" and r._field == \"status_code\")\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 0.0, dur: 0.0}))\n\nactive = activeProbes\n  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0, dur: 0.0}))\n\n// _value 1 = activa; dur = duracion de la ultima corrida completa (0 si solo hay monitor)\nprobes = union(tables: [allRuns, allHb, active])\n  |> group(columns: [\"probe_id\", \"site\"])\n  |> reduce(\n      identity: {_time: time(v: 0), _value: 0.0, dur: 0.0},\n      fn: (r, accumulator) => ({\n        _time: if r._time > accumulator._time then r._time else accumulator._time,\n        _value: if r._value > accumulator._value then r._value else accumulator._value,\n        dur: if r.dur > accumulator.dur then r.dur else accumulator.dur\n      }))\n\nprobes\n  |> map(fn: (r) => ({\n      \"Sonda\": r.probe_id,\n      \"Sitio\": r.site,\n      \"Estado\": if r._value == 1.0 then \"Activa\" else \"Inactiva\",\n      \"Ultimo Reporte\": r._time,\n      \"Duracion ms\": r.dur\n    }))\n  |> group()\n  |> sort(columns: [\"Sitio\", \"Sonda\"])",
                         "range": false
                       },
                       "version": "v0"
@@ -604,7 +604,24 @@
                 }
               ],
               "queryOptions": {},
-              "transformations": []
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "organize",
+                  "spec": {
+                    "id": "organize",
+                    "options": {
+                      "indexByName": {
+                        "Sonda": 0,
+                        "Sitio": 1,
+                        "Estado": 2,
+                        "Ultimo Reporte": 3,
+                        "Duracion ms": 4
+                      }
+                    }
+                  }
+                }
+              ]
             }
           },
           "description": "Estado actual de cada sonda. Activa = monitor reportando en los ultimos 5 minutos o corrida completa en los ultimos 40. Ordenable y filtrable para 50+ sondas.",

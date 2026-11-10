@@ -137,10 +137,16 @@ function barGaugePanel(id, title, desc, flux, unit, thresholds, opts = {}) {
   }];
 }
 
-function tablePanel(id, title, desc, flux, overrides = []) {
+function tablePanel(id, title, desc, flux, overrides = [], columnOrder = null) {
+  // InfluxDB devuelve las columnas en orden alfabetico ("Duracion ms" quedaba
+  // primero); la transformacion organize fija el orden de lectura.
+  const transformations = columnOrder ? [{
+    kind: 'Transformation', group: 'organize',
+    spec: { id: 'organize', options: { indexByName: Object.fromEntries(columnOrder.map((c, i) => [c, i])) } }
+  }] : [];
   return [id, {
     kind: 'Panel', spec: {
-      data: { kind: 'QueryGroup', spec: { queries: [query(flux)], queryOptions: {}, transformations: [] } },
+      data: { kind: 'QueryGroup', spec: { queries: [query(flux)], queryOptions: {}, transformations } },
       description: desc, id, links: [], title,
       vizConfig: {
         group: 'table', kind: 'VizConfig', version: VER,

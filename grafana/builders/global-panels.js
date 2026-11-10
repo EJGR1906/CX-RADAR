@@ -171,11 +171,12 @@ probes
       "Sonda": r.probe_id,
       "Sitio": r.site,
       "Estado": if r._value == 1.0 then "Activa" else "Inactiva",
-      "Ultimo Reporte": string(v: r._time),
+      "Ultimo Reporte": r._time,
       "Duracion ms": r.dur
     }))
   |> group()
   |> sort(columns: ["Sitio", "Sonda"])`,
+    columnOrder: ['Sonda', 'Sitio', 'Estado', 'Ultimo Reporte', 'Duracion ms'],
     overrides: [
       { matcher: { id: 'byName', options: 'Estado' }, properties: [
         { id: 'custom.cellOptions', value: { type: 'color-background' } },

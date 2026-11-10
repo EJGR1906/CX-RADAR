@@ -179,6 +179,7 @@ exports.panels = [
     }))
   |> group()
   |> sort(columns: ["Servicio"])`,
+    columnOrder: ['Servicio', 'Estado', 'URL', 'Error'],
     overrides: [
       { matcher: { id: 'byName', options: 'Estado' }, properties: [
         { id: 'custom.cellOptions', value: { type: 'color-background' } },
