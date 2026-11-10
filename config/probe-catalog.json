@@ -37,7 +37,11 @@
       "ytDlpExe": "bin\\yt-dlp.exe",
       "puppeteerCacheDir": "bin\\puppeteer-cache",
       "temporaryDirectory": "bin\\tmp"
-    }
+    },
+    "throughputEngine": "timed",
+    "downloadDurationSeconds": 8,
+    "uploadDurationSeconds": 6,
+    "warmupSeconds": 2
   },
   "targets": [
     {
@@ -71,9 +75,12 @@
       "service": "Netflix",
       "endpointName": "nflx-video-cdn",
       "type": "speedtest",
-      "speedTestMethod": "fast-cli",
+      "speedTestMethod": "fast-api",
       "host": "fast.com",
-      "enabled": true
+      "enabled": true,
+      "uploadMeasurementMethod": "oca",
+      "parallelConnections": 8,
+      "urlCount": 5
     },
     {
       "service": "Disney+",
@@ -101,6 +108,30 @@
       "parallelConnections": 8,
       "uploadPayloadBytes": 33554432,
       "maxDownloadIterations": 3,
+      "enabled": true
+    },
+    {
+      "service": "Inter-Ookla-Barquisimeto",
+      "endpointName": "ookla-38816-bqto",
+      "type": "speedtest",
+      "speedTestMethod": "ookla-http",
+      "host": "speedtest.bqto.inter.com.ve",
+      "ooklaHost": "speedtest.bqto.inter.com.ve",
+      "ooklaPort": 8080,
+      "ooklaServerId": 38816,
+      "parallelConnections": 8,
+      "enabled": true
+    },
+    {
+      "service": "Inter-Ookla-Caracas",
+      "endpointName": "ookla-37714-ccs",
+      "type": "speedtest",
+      "speedTestMethod": "ookla-http",
+      "host": "speedtest.ccs.inter.com.ve",
+      "ooklaHost": "speedtest.ccs.inter.com.ve",
+      "ooklaPort": 8080,
+      "ooklaServerId": 37714,
+      "parallelConnections": 8,
       "enabled": true
     }
   ]

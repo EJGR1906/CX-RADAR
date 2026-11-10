@@ -35,6 +35,7 @@ GITHUB_RAW_BASE = "https://raw.githubusercontent.com/EJGR1906/CX-RADAR/main/scri
 FILES_TO_UPDATE = [
     "install.py",
     "qoe_probe.py",
+    "qoe_throughput.py",
     "register_qoe_task.py",
     "run_qoe_certification.py",
     "set_influx_token.py",

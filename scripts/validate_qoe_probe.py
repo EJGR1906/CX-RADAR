@@ -198,8 +198,13 @@ def _get_config_issues(config: Dict[str, Any]) -> List[str]:
                 issues.append(
                     f"Speed-test target '{svc_ep}' is missing speedTestMethod."
                 )
-            elif stm == "fast-cli":
+            elif stm in ("fast-cli", "fast-api"):
                 pass
+            elif stm == "ookla-http":
+                if not _optional_str(t, "ooklaHost", _optional_str(t, "host")):
+                    issues.append(
+                        f"ookla-http target '{svc_ep}' requires ooklaHost or host."
+                    )
             elif stm == "yt-dlp":
                 video_url = _optional_str(t, "videoUrl", _optional_str(t, "url"))
                 if not video_url:
@@ -224,7 +229,7 @@ def _get_config_issues(config: Dict[str, Any]) -> List[str]:
 
             # upload measurement validation
             um = _get_upload_method(t, probe_run)
-            if um in ("none", "networkquality", "curl-upload"):
+            if um in ("none", "networkquality", "curl-upload", "oca"):
                 pass
             elif um == "upload-url":
                 if not _test_upload_url_ready(t):
