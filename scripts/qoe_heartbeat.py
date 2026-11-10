@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import qoe_config  # noqa: E402
 import qoe_probe  # noqa: E402
 import qoe_telegram  # noqa: E402
 import qoe_throughput  # noqa: E402
@@ -203,7 +204,7 @@ def main() -> None:
 
     repo_root = Path(__file__).resolve().parent.parent
     config_path = Path(args.config_path).resolve() if args.config_path else repo_root / "config" / "probe-catalog.json"
-    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config = qoe_config.load_config(config_path)
     hb = config.get("heartbeat", {})
     probe = config.get("probe", {})
     probe_id = probe.get("probeId", "unknown")

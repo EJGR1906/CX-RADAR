@@ -37,6 +37,7 @@ FILES_TO_UPDATE = [
     # Módulos que importa qoe_probe.py: van antes para que nunca quede una sonda
     # nueva sin sus dependencias si una descarga falla a mitad.
     "qoe_throughput.py",
+    "qoe_config.py",
     "qoe_telegram.py",
     "qoe_probe.py",
     "qoe_heartbeat.py",

@@ -342,7 +342,8 @@ def main() -> None:
 
     repo_root = Path(__file__).resolve().parent.parent
     config_path = Path(args.config_path).resolve() if args.config_path else repo_root / "config" / "probe-catalog.json"
-    config = json.loads(config_path.read_text(encoding="utf-8")) if config_path.is_file() else {}
+    import qoe_config
+    config = qoe_config.load_config(config_path) if config_path.is_file() else {}
     cfg = config.get("onuReport", {})
     log_dir = repo_root / config.get("probeRun", {}).get("logDirectory", "logs")
     report_date = args.date or datetime.date.today().isoformat()

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from qoe_probe import is_windows, resolve_from_base, exe_name, read_env_file_var
+import qoe_config
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +301,7 @@ def _get_influx_token_status(
 def _build_report(config_path: Path) -> Dict[str, Any]:
     # --- Load and validate config ---
     config_text = config_path.read_text(encoding="utf-8")
-    config: Dict[str, Any] = json.loads(config_text)
+    config: Dict[str, Any] = qoe_config.merge_text(config_text, config_path)
     config_dir = config_path.parent
 
     issues = _get_config_issues(config)

@@ -51,3 +51,6 @@ docs/*CONFIDENCIAL*
 
 # Reportes de ONUs descargados: contienen datos personales de abonados
 *.xlsx
+
+# Ajustes propios de cada servidor (identidad de la sonda, router, etc.)
+config/*.local.json

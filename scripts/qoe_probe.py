@@ -36,6 +36,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import qoe_throughput  # noqa: E402  (motor de medición por tiempo, mismo directorio)
+import qoe_config  # noqa: E402  (catálogo + ajustes locales del servidor)
 
 
 # ---------------------------------------------------------------------------
@@ -2370,7 +2371,7 @@ def main() -> None:
 
     # Load configuration
     try:
-        config = json.loads(config_path.read_text(encoding="utf-8"))
+        config = qoe_config.load_config(config_path)
     except Exception as e:
         print(f"Error: Failed to parse configuration file: {e}", file=sys.stderr)
         sys.exit(1)

@@ -29,11 +29,22 @@ monitor de cada minuto. Las duraciones se ajustan en `probeRun`
 
 Todos desde la raíz del repositorio.
 
-1. Actualizar el código y revisar el catálogo. El actualizador no toca
-   `config/probe-catalog.json`, así que hay que copiar a mano desde el
-   repositorio: el objetivo Netflix con `fast-api`, los dos objetivos
-   `Inter-Ookla-*`, las claves nuevas de `probeRun` y las secciones
-   `heartbeat` y `onuReport`.
+1. Dejar de editar `config/probe-catalog.json` en el servidor. Ese archivo
+   llega con cada `git pull`; si el servidor lo modifica, el pull deja marcas
+   de conflicto dentro y la sonda deja de leerlo (pasó en HUB_BTO). Los datos
+   propios del servidor van en `config/probe-catalog.local.json`, que está
+   fuera de git y se aplica encima del catálogo (ver
+   `config/probe-catalog.local.example.json` y `scripts/qoe_config.py`):
+
+   ```bash
+   git checkout -- config/probe-catalog.json
+   git pull origin main
+   cp config/probe-catalog.local.example.json config/probe-catalog.local.json
+   ```
+
+   Después se ajustan los valores de `probe-catalog.local.json` (identidad,
+   router, tipo de conexión). Solo se escriben las claves que cambian; una
+   lista como `targets` reemplaza la del repo completa.
 
 2. Validar y correr en seco:
 
