@@ -5,10 +5,10 @@ const VER = '13.1.0-25153870157';
 // Colores fijos por servicio (insensibles a mayusculas: "Youtube" o "YouTube").
 const SERVICE_COLORS = [
   ['netflix', '#E50914'],
-  ['youtube', '#FF4444'],
+  ['youtube', '#FF66CC'],
   ['amazon', '#FF9900'],
   ['microsoft', '#00A4EF'],
-  ['disney\\+', '#113CCF'],
+  ['disney\\+', '#5B7CFA'],
   ['ookla-barquisimeto', '#B877D9'],
   ['ookla-caracas', '#1ABC9C']
 ];
@@ -75,11 +75,11 @@ function tsPanel(id, title, desc, flux, unit, thresholds, opts = {}) {
               custom: {
                 axisBorderShow: false, axisCenteredZero: false, axisColorMode: 'text',
                 axisLabel: '', axisPlacement: 'auto', barAlignment: 0, barWidthFactor: 0.6,
-                drawStyle: opts.drawStyle || 'line', fillOpacity: opts.fillOpacity ?? 15,
+                drawStyle: opts.drawStyle || 'line', fillOpacity: opts.fillOpacity ?? 0,
                 gradientMode: opts.gradientMode || 'opacity',
                 hideFrom: { legend: false, tooltip: false, viz: false },
                 insertNulls: false, lineInterpolation: opts.interpolation || 'smooth',
-                lineWidth: 2, pointSize: 4,
+                lineWidth: opts.lineWidth ?? 1, pointSize: 4,
                 scaleDistribution: { type: 'linear' },
                 showPoints: 'auto', showValues: false, spanNulls: false,
                 stacking: { group: 'A', mode: opts.stacking || 'none' },
@@ -93,7 +93,7 @@ function tsPanel(id, title, desc, flux, unit, thresholds, opts = {}) {
             annotations: { clustering: -1, multiLane: false },
             legend: {
               calcs: opts.legendCalcs || ['lastNotNull', 'mean', 'max'],
-              displayMode: 'table', placement: opts.legendPlacement || 'bottom', showLegend: true
+              displayMode: 'table', placement: opts.legendPlacement || 'bottom', showLegend: opts.showLegend ?? true
             },
             tooltip: { hideZeros: false, mode: 'multi', sort: 'desc' }
           }
@@ -224,7 +224,8 @@ function geomapPanel(id, title, desc, flux) {
                 name: 'Sondas QoE',
                 config: {
                   style: {
-                    size: { fixed: 12 },
+                    size: { fixed: 18 },
+                    opacity: 0.9,
                     color: {
                       field: 'EstadoVal',
                       fixed: 'green'
@@ -253,6 +254,7 @@ function geomapPanel(id, title, desc, flux) {
               noValue: 'Sin datos',
               custom: {},
               color: { mode: 'thresholds' },
+              mappings: [{ type: 'value', options: { '0': { text: 'Inactiva', color: 'red', index: 0 }, '1': { text: 'Activa', color: 'green', index: 1 } } }],
               thresholds: {
                 mode: 'absolute',
                 steps: [

@@ -135,7 +135,7 @@ exports.panels = [
   |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
   |> map(fn: (r) => ({_time: r._time, _field: r.service, _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'Mbps', decimals: 2, fillOpacity: 20,
+    unit: 'Mbps', decimals: 2,
     thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 2 }, { color: 'green', value: 5 }],
     overrides: SVC_OVERRIDES, legendPlacement: 'right', legendCalcs: ['lastNotNull', 'mean']
   }],
@@ -153,7 +153,7 @@ exports.panels = [
   |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
   |> map(fn: (r) => ({_time: r._time, _field: r.service, _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'Mbps', decimals: 2, fillOpacity: 20,
+    unit: 'Mbps', decimals: 2,
     thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 1 }, { color: 'green', value: 3 }],
     overrides: SVC_OVERRIDES, legendPlacement: 'right', legendCalcs: ['lastNotNull', 'mean']
   }],
@@ -184,18 +184,17 @@ exports.panels = [
       { matcher: { id: 'byName', options: 'Estado' }, properties: [
         { id: 'custom.cellOptions', value: { type: 'color-background' } },
         { id: 'mappings', value: [{ type: 'value', options: { Disponible: { color: 'green', index: 0 }, Caido: { color: 'red', index: 1 } } }] },
-        { id: 'custom.width', value: 110 },
         { id: 'custom.filterable', value: true }
       ]},
-      { matcher: { id: 'byName', options: 'Servicio' }, properties: [{ id: 'custom.width', value: 140 }, { id: 'custom.filterable', value: true }] },
-      { matcher: { id: 'byName', options: 'Error' }, properties: [{ id: 'custom.width', value: 300 }] }
+      { matcher: { id: 'byName', options: 'Servicio' }, properties: [{ id: 'custom.filterable', value: true }] },
+      { matcher: { id: 'byName', options: 'Error' }, properties: [{ id: 'noValue', value: '-' }] }
     ]
   }],
 
   // Time Series — Run Duration
   ['detail-run-duration', 'timeseries', {
     title: 'Duracion de Ejecucion de Sonda', id: 211,
-    desc: 'Tiempo de ejecucion del probe. Picos indican lentitud de red o del sistema.',
+    desc: 'Tiempo de ejecucion de cada corrida completa. Amarillo sobre 10 min, rojo sobre 20 min (la sonda corre cada 30).',
     flux: `from(bucket: v.defaultBucket)
   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
   |> filter(fn: (r) => r._measurement == "qoe_probe_run")
@@ -205,8 +204,10 @@ exports.panels = [
   |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
   |> map(fn: (r) => ({_time: r._time, _field: "Run Duration", _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'ms', thresholdLines: true, fillOpacity: 20, legendCalcs: ['lastNotNull', 'mean', 'max'],
-    thresholds: [{ color: 'green', value: 0 }, { color: 'yellow', value: 10000 }, { color: 'red', value: 20000 }]
+    unit: 'ms', thresholdLines: true, fillOpacity: 20, lineWidth: 2, showLegend: false,
+    // Desde la medicion por tiempo una corrida dura ~4 min: 10 s / 20 s quedaban
+    // por debajo del eje. Amarillo a 10 min, rojo a 20 min (la sonda corre cada 30).
+    thresholds: [{ color: 'green', value: 0 }, { color: 'yellow', value: 600000 }, { color: 'red', value: 1200000 }]
   }],
 
   // Download by Service (Probe specific)
@@ -257,6 +258,6 @@ exports.layout = [
   ['detail-jitter-ts',           12, 11, 12, 9],
   ['detail-download-ts',          0, 20, 12, 9],
   ['detail-upload-ts',           12, 20, 12, 9],
-  ['detail-snapshot-simple',      0, 29, 12, 8],
-  ['detail-run-duration',        12, 29, 12, 8],
+  ['detail-snapshot-simple',      0, 29, 12, 9],
+  ['detail-run-duration',        12, 29, 12, 9],
 ];

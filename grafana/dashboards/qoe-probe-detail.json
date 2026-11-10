@@ -537,7 +537,7 @@
                     "barAlignment": 0,
                     "barWidthFactor": 0.6,
                     "drawStyle": "line",
-                    "fillOpacity": 15,
+                    "fillOpacity": 0,
                     "gradientMode": "opacity",
                     "hideFrom": {
                       "legend": false,
@@ -546,7 +546,7 @@
                     },
                     "insertNulls": false,
                     "lineInterpolation": "smooth",
-                    "lineWidth": 2,
+                    "lineWidth": 1,
                     "pointSize": 4,
                     "scaleDistribution": {
                       "type": "linear"
@@ -607,7 +607,7 @@
                       {
                         "id": "color",
                         "value": {
-                          "fixedColor": "#FF4444",
+                          "fixedColor": "#FF66CC",
                           "mode": "fixed"
                         }
                       }
@@ -652,7 +652,7 @@
                       {
                         "id": "color",
                         "value": {
-                          "fixedColor": "#113CCF",
+                          "fixedColor": "#5B7CFA",
                           "mode": "fixed"
                         }
                       }
@@ -769,7 +769,7 @@
                     "barAlignment": 0,
                     "barWidthFactor": 0.6,
                     "drawStyle": "line",
-                    "fillOpacity": 15,
+                    "fillOpacity": 0,
                     "gradientMode": "opacity",
                     "hideFrom": {
                       "legend": false,
@@ -778,7 +778,7 @@
                     },
                     "insertNulls": false,
                     "lineInterpolation": "smooth",
-                    "lineWidth": 2,
+                    "lineWidth": 1,
                     "pointSize": 4,
                     "scaleDistribution": {
                       "type": "linear"
@@ -839,7 +839,7 @@
                       {
                         "id": "color",
                         "value": {
-                          "fixedColor": "#FF4444",
+                          "fixedColor": "#FF66CC",
                           "mode": "fixed"
                         }
                       }
@@ -884,7 +884,7 @@
                       {
                         "id": "color",
                         "value": {
-                          "fixedColor": "#113CCF",
+                          "fixedColor": "#5B7CFA",
                           "mode": "fixed"
                         }
                       }
@@ -1001,7 +1001,7 @@
                     "barAlignment": 0,
                     "barWidthFactor": 0.6,
                     "drawStyle": "line",
-                    "fillOpacity": 20,
+                    "fillOpacity": 0,
                     "gradientMode": "opacity",
                     "hideFrom": {
                       "legend": false,
@@ -1010,7 +1010,7 @@
                     },
                     "insertNulls": false,
                     "lineInterpolation": "smooth",
-                    "lineWidth": 2,
+                    "lineWidth": 1,
                     "pointSize": 4,
                     "scaleDistribution": {
                       "type": "linear"
@@ -1071,7 +1071,7 @@
                       {
                         "id": "color",
                         "value": {
-                          "fixedColor": "#FF4444",
+                          "fixedColor": "#FF66CC",
                           "mode": "fixed"
                         }
                       }
@@ -1116,7 +1116,7 @@
                       {
                         "id": "color",
                         "value": {
-                          "fixedColor": "#113CCF",
+                          "fixedColor": "#5B7CFA",
                           "mode": "fixed"
                         }
                       }
@@ -1233,7 +1233,7 @@
                     "barAlignment": 0,
                     "barWidthFactor": 0.6,
                     "drawStyle": "line",
-                    "fillOpacity": 20,
+                    "fillOpacity": 0,
                     "gradientMode": "opacity",
                     "hideFrom": {
                       "legend": false,
@@ -1242,7 +1242,7 @@
                     },
                     "insertNulls": false,
                     "lineInterpolation": "smooth",
-                    "lineWidth": 2,
+                    "lineWidth": 1,
                     "pointSize": 4,
                     "scaleDistribution": {
                       "type": "linear"
@@ -1303,7 +1303,7 @@
                       {
                         "id": "color",
                         "value": {
-                          "fixedColor": "#FF4444",
+                          "fixedColor": "#FF66CC",
                           "mode": "fixed"
                         }
                       }
@@ -1348,7 +1348,7 @@
                       {
                         "id": "color",
                         "value": {
-                          "fixedColor": "#113CCF",
+                          "fixedColor": "#5B7CFA",
                           "mode": "fixed"
                         }
                       }
@@ -1524,10 +1524,6 @@
                         ]
                       },
                       {
-                        "id": "custom.width",
-                        "value": 110
-                      },
-                      {
                         "id": "custom.filterable",
                         "value": true
                       }
@@ -1539,10 +1535,6 @@
                       "options": "Servicio"
                     },
                     "properties": [
-                      {
-                        "id": "custom.width",
-                        "value": 140
-                      },
                       {
                         "id": "custom.filterable",
                         "value": true
@@ -1556,8 +1548,8 @@
                     },
                     "properties": [
                       {
-                        "id": "custom.width",
-                        "value": 300
+                        "id": "noValue",
+                        "value": "-"
                       }
                     ]
                   }
@@ -1602,7 +1594,7 @@
               "transformations": []
             }
           },
-          "description": "Tiempo de ejecucion del probe. Picos indican lentitud de red o del sistema.",
+          "description": "Tiempo de ejecucion de cada corrida completa. Amarillo sobre 10 min, rojo sobre 20 min (la sonda corre cada 30).",
           "id": 211,
           "links": [],
           "title": "Duracion de Ejecucion de Sonda",
@@ -1662,11 +1654,11 @@
                       },
                       {
                         "color": "yellow",
-                        "value": 10000
+                        "value": 600000
                       },
                       {
                         "color": "red",
-                        "value": 20000
+                        "value": 1200000
                       }
                     ]
                   }
@@ -1686,7 +1678,7 @@
                   ],
                   "displayMode": "table",
                   "placement": "bottom",
-                  "showLegend": true
+                  "showLegend": false
                 },
                 "tooltip": {
                   "hideZeros": false,
@@ -2046,7 +2038,7 @@
               "x": 0,
               "y": 29,
               "width": 12,
-              "height": 8
+              "height": 9
             }
           },
           {
@@ -2059,7 +2051,7 @@
               "x": 12,
               "y": 29,
               "width": 12,
-              "height": 8
+              "height": 9
             }
           }
         ]
