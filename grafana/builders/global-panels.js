@@ -3,31 +3,79 @@ const GREEN = { color: 'green', value: 0 };
 const YELLOW_80 = { color: 'yellow', value: 80 };
 const RED_200 = { color: 'red', value: 200 };
 
+// Una sonda esta activa si el monitor cada minuto (qoe_heartbeat_status) reporto en
+// los ultimos 5 minutos, o si la sonda completa corrio en los ultimos 40 minutos
+// (se recomienda correrla cada 30). Antes se exigian 10 minutos de qoe_probe_run y
+// una sonda cada 30 minutos casi siempre salia inactiva.
+const ACTIVE_PROBES = `hb = from(bucket: v.defaultBucket)
+  |> range(start: -5m)
+  |> filter(fn: (r) => r._measurement == "qoe_heartbeat_status" and r._field == "status_code")
+  |> group(columns: ["probe_id", "site"])
+  |> last()
+  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0}))
+
+run = from(bucket: v.defaultBucket)
+  |> range(start: -40m)
+  |> filter(fn: (r) => r._measurement == "qoe_probe_run" and r._field == "run_duration_ms")
+  |> group(columns: ["probe_id", "site"])
+  |> last()
+  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0}))
+
+activeProbes = union(tables: [hb, run])
+  |> group(columns: ["probe_id", "site"])
+  |> last()`;
+
+// Todas las sondas vistas en 24 h (monitor o sonda completa), con la duracion de su ultima corrida.
+const KNOWN_PROBES = `allRuns = from(bucket: v.defaultBucket)
+  |> range(start: -24h)
+  |> filter(fn: (r) => r._measurement == "qoe_probe_run" and r._field == "run_duration_ms")
+  |> group(columns: ["probe_id", "site"])
+  |> last()
+  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 0.0, dur: r._value}))
+
+allHb = from(bucket: v.defaultBucket)
+  |> range(start: -24h)
+  |> filter(fn: (r) => r._measurement == "qoe_heartbeat_status" and r._field == "status_code")
+  |> group(columns: ["probe_id", "site"])
+  |> last()
+  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 0.0, dur: 0.0}))
+
+active = activeProbes
+  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0, dur: 0.0}))
+
+// _value 1 = activa; dur = duracion de la ultima corrida completa (0 si solo hay monitor)
+probes = union(tables: [allRuns, allHb, active])
+  |> group(columns: ["probe_id", "site"])
+  |> reduce(
+      identity: {_time: time(v: 0), _value: 0.0, dur: 0.0},
+      fn: (r, accumulator) => ({
+        _time: if r._time > accumulator._time then r._time else accumulator._time,
+        _value: if r._value > accumulator._value then r._value else accumulator._value,
+        dur: if r.dur > accumulator.dur then r.dur else accumulator.dur
+      }))`;
+
 exports.panels = [
   // 1. Sondas Activas
   ['global-kpi-probes', 'stat', {
     title: 'Sondas Activas', id: 101,
-    desc: 'Cantidad de sondas que reportaron en los ultimos 10 minutos.',
-    flux: `from(bucket: v.defaultBucket)
-  |> range(start: -10m)
-  |> filter(fn: (r) => r._measurement == "qoe_probe_run")
-  |> filter(fn: (r) => r._field == "run_duration_ms")
-  |> group(columns: ["probe_id"])
-  |> last()
+    desc: 'Sondas con el monitor cada minuto reportando en los ultimos 5 minutos, o con una corrida completa en los ultimos 40 minutos.',
+    flux: `${ACTIVE_PROBES}
+
+activeProbes
   |> group()
   |> count()
   |> map(fn: (r) => ({_time: now(), _field: "Sondas Activas", _value: float(v: r._value)}))
   |> group(columns: ["_field"])`,
     unit: 'short', decimals: 0,
-    thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 1 }, { color: 'green', value: 2 }]
+    thresholds: [{ color: 'red', value: 0 }, { color: 'green', value: 1 }]
   }],
 
   // 2. Servicios OK
   ['global-kpi-services', 'stat', {
     title: 'Servicios OK', id: 102,
-    desc: 'Servicios con disponibilidad >= 95% en los ultimos 30 minutos.',
+    desc: 'Servicios (de 7) con disponibilidad >= 95% en la ultima hora, consolidando todas las sondas.',
     flux: `from(bucket: v.defaultBucket)
-  |> range(start: -30m)
+  |> range(start: -1h)
   |> filter(fn: (r) => r._measurement == "qoe_real_metrics")
   |> filter(fn: (r) => r._field == "available")
   |> map(fn: (r) => ({r with _value: if r._value then 1.0 else 0.0}))
@@ -38,16 +86,16 @@ exports.panels = [
   |> sum()
   |> map(fn: (r) => ({_time: now(), _field: "Servicios OK", _value: r._value}))
   |> group(columns: ["_field"])`,
-    unit: 'short', decimals: 0, max: 5, min: 0,
-    thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 4 }, { color: 'green', value: 5 }]
+    unit: 'short', decimals: 0, max: 7, min: 0,
+    thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 6 }, { color: 'green', value: 7 }]
   }],
 
   // 3. Disponibilidad Nacional
   ['global-kpi-avail', 'stat', {
     title: 'Disponibilidad Nacional', id: 103,
-    desc: 'Promedio nacional de disponibilidad de todos los servicios y sondas en los ultimos 30 minutos. Verde >= 99%, Amarillo >= 95%, Rojo < 95%.',
+    desc: 'Promedio nacional de disponibilidad de todos los servicios y sondas en la ultima hora. Verde >= 99%, Amarillo >= 95%, Rojo < 95%.',
     flux: `from(bucket: v.defaultBucket)
-  |> range(start: -30m)
+  |> range(start: -1h)
   |> filter(fn: (r) => r._measurement == "qoe_real_metrics")
   |> filter(fn: (r) => r._field == "available")
   |> map(fn: (r) => ({r with _value: if r._value then 100.0 else 0.0}))
@@ -62,9 +110,9 @@ exports.panels = [
   // 4. Latencia Media
   ['global-kpi-latency', 'stat', {
     title: 'Latencia Media Nacional', id: 104,
-    desc: 'Latencia promedio nacional de todas las sondas y servicios en los ultimos 30 minutos.',
+    desc: 'Latencia promedio nacional de todas las sondas y servicios en la ultima hora.',
     flux: `from(bucket: v.defaultBucket)
-  |> range(start: -30m)
+  |> range(start: -1h)
   |> filter(fn: (r) => r._measurement == "qoe_real_metrics")
   |> filter(fn: (r) => r._field == "latency")
   |> group()
@@ -78,9 +126,9 @@ exports.panels = [
   // 5. Fallas Recientes
   ['global-kpi-failures', 'stat', {
     title: 'Fallas Recientes', id: 105,
-    desc: 'Suma de fallas reportadas por todas las sondas en los ultimos 30 minutos. Verde = 0, Amarillo >= 1, Rojo >= 3.',
+    desc: 'Suma de fallas reportadas por todas las sondas en la ultima hora. Verde = 0, Amarillo >= 1, Rojo >= 3.',
     flux: `from(bucket: v.defaultBucket)
-  |> range(start: -30m)
+  |> range(start: -1h)
   |> filter(fn: (r) => r._measurement == "qoe_probe_run")
   |> filter(fn: (r) => r._field == "failure_count")
   |> group(columns: ["probe_id"])
@@ -95,10 +143,10 @@ exports.panels = [
 
   // 6. Bar Gauge — Disponibilidad por Servicio
   ['global-avail-bar', 'bargauge', {
-    title: 'Disponibilidad por Servicio (ultimos 30m)', id: 106,
+    title: 'Disponibilidad por Servicio (ultima hora)', id: 106,
     desc: 'Porcentaje de mediciones exitosas por servicio, consolidado de todas las sondas.',
     flux: `from(bucket: v.defaultBucket)
-  |> range(start: -30m)
+  |> range(start: -1h)
   |> filter(fn: (r) => r._measurement == "qoe_real_metrics")
   |> filter(fn: (r) => r._field == "available")
   |> map(fn: (r) => ({r with _value: if r._value then 100.0 else 0.0}))
@@ -113,27 +161,12 @@ exports.panels = [
   // 9. Tabla Estado de Sondas (escala a 50+)
   ['global-probe-table', 'table', {
     title: 'Estado de Sondas QoE', id: 109,
-    desc: 'Estado actual de cada sonda. Activa = reporto en los ultimos 10 minutos. Ordenable y filtrable para 50+ sondas.',
-    flux: `allProbes = from(bucket: v.defaultBucket)
-  |> range(start: -24h)
-  |> filter(fn: (r) => r._measurement == "qoe_probe_run")
-  |> filter(fn: (r) => r._field == "run_duration_ms")
-  |> group(columns: ["probe_id", "site"])
-  |> last()
-  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 0.0, dur: r._value}))
+    desc: 'Estado actual de cada sonda. Activa = monitor reportando en los ultimos 5 minutos o corrida completa en los ultimos 40. Ordenable y filtrable para 50+ sondas.',
+    flux: `${ACTIVE_PROBES}
 
-activeProbes = from(bucket: v.defaultBucket)
-  |> range(start: -10m)
-  |> filter(fn: (r) => r._measurement == "qoe_probe_run")
-  |> filter(fn: (r) => r._field == "run_duration_ms")
-  |> group(columns: ["probe_id", "site"])
-  |> last()
-  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0, dur: r._value}))
+${KNOWN_PROBES}
 
-union(tables: [allProbes, activeProbes])
-  |> group(columns: ["probe_id", "site"])
-  |> sort(columns: ["_value"], desc: true)
-  |> first()
+probes
   |> map(fn: (r) => ({
       "Sonda": r.probe_id,
       "Sitio": r.site,
@@ -160,26 +193,11 @@ union(tables: [allProbes, activeProbes])
   ['global-map', 'geomap', {
     title: 'Mapa de Sondas QoE (Venezuela)', id: 110,
     desc: 'Ubicacion geografica y estado de actividad de las sondas QoE activas (verde) e inactivas (rojo).',
-    flux: `allProbes = from(bucket: v.defaultBucket)
-  |> range(start: -24h)
-  |> filter(fn: (r) => r._measurement == "qoe_probe_run")
-  |> filter(fn: (r) => r._field == "run_duration_ms")
-  |> group(columns: ["probe_id", "site"])
-  |> last()
-  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 0.0, dur: r._value}))
+    flux: `${ACTIVE_PROBES}
 
-activeProbes = from(bucket: v.defaultBucket)
-  |> range(start: -10m)
-  |> filter(fn: (r) => r._measurement == "qoe_probe_run")
-  |> filter(fn: (r) => r._field == "run_duration_ms")
-  |> group(columns: ["probe_id", "site"])
-  |> last()
-  |> map(fn: (r) => ({_time: r._time, probe_id: r.probe_id, site: r.site, _value: 1.0, dur: r._value}))
+${KNOWN_PROBES}
 
-union(tables: [allProbes, activeProbes])
-  |> group(columns: ["probe_id", "site"])
-  |> sort(columns: ["_value"], desc: true)
-  |> first()
+probes
   |> map(fn: (r) => ({
       _time: r._time,
       "Sonda": r.probe_id,
@@ -208,8 +226,7 @@ exports.layout = [
   ['global-kpi-avail',   10,  0,  5, 4],
   ['global-kpi-latency', 15,  0,  5, 4],
   ['global-kpi-failures',20,  0,  4, 4],
-  ['global-avail-bar',    0,  4, 24, 6],
-  ['global-map',          0, 10, 24, 10],
-  ['global-probe-table',  0, 20, 24, 8],
+  ['global-avail-bar',    0,  4, 24, 7],
+  ['global-map',          0, 11, 14, 11],
+  ['global-probe-table', 14, 11, 10, 11],
 ];
-

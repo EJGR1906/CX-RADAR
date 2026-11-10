@@ -107,7 +107,7 @@
               },
               "options": {
                 "colorMode": "background",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "center",
                 "orientation": "auto",
                 "percentChangeColorMode": "standard",
@@ -119,7 +119,7 @@
                   "values": false
                 },
                 "showPercentChange": false,
-                "textMode": "value_and_name",
+                "textMode": "value",
                 "wideLayout": true
               }
             }
@@ -172,7 +172,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "decimals": 2,
+                  "decimals": 1,
                   "unit": "Mbps",
                   "thresholds": {
                     "mode": "absolute",
@@ -196,7 +196,7 @@
               },
               "options": {
                 "colorMode": "background",
-                "graphMode": "area",
+                "graphMode": "none",
                 "justifyMode": "center",
                 "orientation": "auto",
                 "percentChangeColorMode": "standard",
@@ -208,7 +208,7 @@
                   "values": false
                 },
                 "showPercentChange": false,
-                "textMode": "value_and_name",
+                "textMode": "value",
                 "wideLayout": true
               }
             }
@@ -261,7 +261,7 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "decimals": 2,
+                  "decimals": 1,
                   "unit": "Mbps",
                   "thresholds": {
                     "mode": "absolute",
@@ -297,7 +297,7 @@
                   "values": false
                 },
                 "showPercentChange": false,
-                "textMode": "value_and_name",
+                "textMode": "value",
                 "wideLayout": true
               }
             }
@@ -386,7 +386,7 @@
                   "values": false
                 },
                 "showPercentChange": false,
-                "textMode": "value_and_name",
+                "textMode": "value",
                 "wideLayout": true
               }
             }
@@ -475,7 +475,7 @@
                   "values": false
                 },
                 "showPercentChange": false,
-                "textMode": "value_and_name",
+                "textMode": "value",
                 "wideLayout": true
               }
             }
@@ -586,7 +586,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Netflix.*/"
+                      "options": "/.*netflix.*/i"
                     },
                     "properties": [
                       {
@@ -601,7 +601,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Youtube.*/"
+                      "options": "/.*youtube.*/i"
                     },
                     "properties": [
                       {
@@ -616,7 +616,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Amazon.*/"
+                      "options": "/.*amazon.*/i"
                     },
                     "properties": [
                       {
@@ -631,7 +631,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Microsoft.*/"
+                      "options": "/.*microsoft.*/i"
                     },
                     "properties": [
                       {
@@ -646,13 +646,43 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Disney\\+.*/"
+                      "options": "/.*disney\\+.*/i"
                     },
                     "properties": [
                       {
                         "id": "color",
                         "value": {
                           "fixedColor": "#113CCF",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/.*ookla-barquisimeto.*/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "#B877D9",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/.*ookla-caracas.*/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "#1ABC9C",
                           "mode": "fixed"
                         }
                       }
@@ -667,12 +697,11 @@
                 },
                 "legend": {
                   "calcs": [
-                    "lastNotNull",
                     "mean",
                     "max"
                   ],
                   "displayMode": "table",
-                  "placement": "bottom",
+                  "placement": "right",
                   "showLegend": true
                 },
                 "tooltip": {
@@ -789,7 +818,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Netflix.*/"
+                      "options": "/.*netflix.*/i"
                     },
                     "properties": [
                       {
@@ -804,7 +833,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Youtube.*/"
+                      "options": "/.*youtube.*/i"
                     },
                     "properties": [
                       {
@@ -819,7 +848,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Amazon.*/"
+                      "options": "/.*amazon.*/i"
                     },
                     "properties": [
                       {
@@ -834,7 +863,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Microsoft.*/"
+                      "options": "/.*microsoft.*/i"
                     },
                     "properties": [
                       {
@@ -849,13 +878,43 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Disney\\+.*/"
+                      "options": "/.*disney\\+.*/i"
                     },
                     "properties": [
                       {
                         "id": "color",
                         "value": {
                           "fixedColor": "#113CCF",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/.*ookla-barquisimeto.*/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "#B877D9",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/.*ookla-caracas.*/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "#1ABC9C",
                           "mode": "fixed"
                         }
                       }
@@ -870,7 +929,6 @@
                 },
                 "legend": {
                   "calcs": [
-                    "lastNotNull",
                     "mean",
                     "max"
                   ],
@@ -992,7 +1050,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Netflix.*/"
+                      "options": "/.*netflix.*/i"
                     },
                     "properties": [
                       {
@@ -1007,7 +1065,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Youtube.*/"
+                      "options": "/.*youtube.*/i"
                     },
                     "properties": [
                       {
@@ -1022,7 +1080,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Amazon.*/"
+                      "options": "/.*amazon.*/i"
                     },
                     "properties": [
                       {
@@ -1037,7 +1095,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Microsoft.*/"
+                      "options": "/.*microsoft.*/i"
                     },
                     "properties": [
                       {
@@ -1052,13 +1110,43 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Disney\\+.*/"
+                      "options": "/.*disney\\+.*/i"
                     },
                     "properties": [
                       {
                         "id": "color",
                         "value": {
                           "fixedColor": "#113CCF",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/.*ookla-barquisimeto.*/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "#B877D9",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/.*ookla-caracas.*/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "#1ABC9C",
                           "mode": "fixed"
                         }
                       }
@@ -1077,7 +1165,7 @@
                     "mean"
                   ],
                   "displayMode": "table",
-                  "placement": "bottom",
+                  "placement": "right",
                   "showLegend": true
                 },
                 "tooltip": {
@@ -1194,7 +1282,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Netflix.*/"
+                      "options": "/.*netflix.*/i"
                     },
                     "properties": [
                       {
@@ -1209,7 +1297,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Youtube.*/"
+                      "options": "/.*youtube.*/i"
                     },
                     "properties": [
                       {
@@ -1224,7 +1312,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Amazon.*/"
+                      "options": "/.*amazon.*/i"
                     },
                     "properties": [
                       {
@@ -1239,7 +1327,7 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Microsoft.*/"
+                      "options": "/.*microsoft.*/i"
                     },
                     "properties": [
                       {
@@ -1254,13 +1342,43 @@
                   {
                     "matcher": {
                       "id": "byRegexp",
-                      "options": "/.*Disney\\+.*/"
+                      "options": "/.*disney\\+.*/i"
                     },
                     "properties": [
                       {
                         "id": "color",
                         "value": {
                           "fixedColor": "#113CCF",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/.*ookla-barquisimeto.*/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "#B877D9",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byRegexp",
+                      "options": "/.*ookla-caracas.*/i"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "#1ABC9C",
                           "mode": "fixed"
                         }
                       }
@@ -1279,7 +1397,7 @@
                     "mean"
                   ],
                   "displayMode": "table",
-                  "placement": "bottom",
+                  "placement": "right",
                   "showLegend": true
                 },
                 "tooltip": {
@@ -1600,7 +1718,7 @@
           "links": [],
           "title": "Download por Servicio",
           "vizConfig": {
-            "group": "stat",
+            "group": "bargauge",
             "kind": "VizConfig",
             "version": "13.1.0-25153870157",
             "spec": {
@@ -1610,7 +1728,8 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "decimals": 2,
+                  "decimals": 1,
+                  "min": 0,
                   "unit": "Mbps",
                   "thresholds": {
                     "mode": "absolute",
@@ -1633,11 +1752,12 @@
                 "overrides": []
               },
               "options": {
-                "colorMode": "background",
-                "graphMode": "area",
-                "justifyMode": "center",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
+                "displayMode": "basic",
+                "minVizHeight": 16,
+                "minVizWidth": 8,
+                "maxVizHeight": 300,
+                "namePlacement": "left",
+                "orientation": "horizontal",
                 "reduceOptions": {
                   "calcs": [
                     "lastNotNull"
@@ -1645,9 +1765,13 @@
                   "fields": "",
                   "values": false
                 },
-                "showPercentChange": false,
-                "textMode": "value_and_name",
-                "wideLayout": true
+                "showUnfilled": true,
+                "sizing": "auto",
+                "valueMode": "color",
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 16
+                }
               }
             }
           }
@@ -1689,7 +1813,7 @@
           "links": [],
           "title": "Upload por Servicio",
           "vizConfig": {
-            "group": "stat",
+            "group": "bargauge",
             "kind": "VizConfig",
             "version": "13.1.0-25153870157",
             "spec": {
@@ -1699,7 +1823,8 @@
                   "color": {
                     "mode": "thresholds"
                   },
-                  "decimals": 2,
+                  "decimals": 1,
+                  "min": 0,
                   "unit": "Mbps",
                   "thresholds": {
                     "mode": "absolute",
@@ -1722,11 +1847,12 @@
                 "overrides": []
               },
               "options": {
-                "colorMode": "background",
-                "graphMode": "none",
-                "justifyMode": "center",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
+                "displayMode": "basic",
+                "minVizHeight": 16,
+                "minVizWidth": 8,
+                "maxVizHeight": 300,
+                "namePlacement": "left",
+                "orientation": "horizontal",
                 "reduceOptions": {
                   "calcs": [
                     "lastNotNull"
@@ -1734,9 +1860,13 @@
                   "fields": "",
                   "values": false
                 },
-                "showPercentChange": false,
-                "textMode": "value_and_name",
-                "wideLayout": true
+                "showUnfilled": true,
+                "sizing": "auto",
+                "valueMode": "color",
+                "text": {
+                  "titleSize": 14,
+                  "valueSize": 16
+                }
               }
             }
           }
@@ -1822,7 +1952,7 @@
               "x": 0,
               "y": 4,
               "width": 12,
-              "height": 5
+              "height": 7
             }
           },
           {
@@ -1835,7 +1965,7 @@
               "x": 12,
               "y": 4,
               "width": 12,
-              "height": 5
+              "height": 7
             }
           },
           {
@@ -1846,9 +1976,9 @@
                 "name": "detail-latency-ts"
               },
               "x": 0,
-              "y": 9,
+              "y": 11,
               "width": 12,
-              "height": 8
+              "height": 9
             }
           },
           {
@@ -1859,9 +1989,9 @@
                 "name": "detail-jitter-ts"
               },
               "x": 12,
-              "y": 9,
+              "y": 11,
               "width": 12,
-              "height": 8
+              "height": 9
             }
           },
           {
@@ -1872,9 +2002,9 @@
                 "name": "detail-download-ts"
               },
               "x": 0,
-              "y": 17,
+              "y": 20,
               "width": 12,
-              "height": 8
+              "height": 9
             }
           },
           {
@@ -1885,9 +2015,9 @@
                 "name": "detail-upload-ts"
               },
               "x": 12,
-              "y": 17,
+              "y": 20,
               "width": 12,
-              "height": 8
+              "height": 9
             }
           },
           {
@@ -1898,8 +2028,8 @@
                 "name": "detail-snapshot-simple"
               },
               "x": 0,
-              "y": 25,
-              "width": 24,
+              "y": 29,
+              "width": 12,
               "height": 8
             }
           },
@@ -1910,9 +2040,9 @@
                 "kind": "ElementReference",
                 "name": "detail-run-duration"
               },
-              "x": 0,
-              "y": 33,
-              "width": 24,
+              "x": 12,
+              "y": 29,
+              "width": 12,
               "height": 8
             }
           }
