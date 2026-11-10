@@ -289,6 +289,13 @@ def main() -> None:
         help="Windows only: registers task using Interactive logon instead of S4U"
     )
     parser.add_argument(
+        "--script",
+        type=str,
+        choices=["probe", "heartbeat"],
+        default="probe",
+        help="probe: sonda completa (qoe_probe.py); heartbeat: monitor liviano cada minuto (qoe_heartbeat.py)"
+    )
+    parser.add_argument(
         "--description",
         type=str,
         default="Runs the CX-Radar QoE probe and sends metrics to InfluxDB Cloud.",
@@ -302,7 +309,8 @@ def main() -> None:
 
     script_dir = Path(__file__).resolve().parent
     repo_root = script_dir.parent
-    probe_script_path = (script_dir / "qoe_probe.py").resolve()
+    script_file = "qoe_heartbeat.py" if args.script == "heartbeat" else "qoe_probe.py"
+    probe_script_path = (script_dir / script_file).resolve()
 
     if args.config_path:
         config_path = Path(args.config_path).resolve()

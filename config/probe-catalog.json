@@ -134,5 +134,53 @@
       "parallelConnections": 8,
       "enabled": true
     }
-  ]
+  ],
+  "heartbeat": {
+    "failThreshold": 2,
+    "recoverThreshold": 2,
+    "samplesPerTarget": 5,
+    "timeoutSeconds": 2,
+    "maxLatencyMs": {
+      "inter": 40,
+      "external": 150
+    },
+    "maxLossPercentage": 20,
+    "targets": [
+      {
+        "name": "inter-ookla-bqto",
+        "host": "speedtest.bqto.inter.com.ve",
+        "port": 8080,
+        "kind": "inter"
+      },
+      {
+        "name": "inter-ookla-ccs",
+        "host": "speedtest.ccs.inter.com.ve",
+        "port": 8080,
+        "kind": "inter"
+      },
+      {
+        "name": "cloudflare",
+        "host": "1.1.1.1",
+        "port": 443,
+        "kind": "external"
+      },
+      {
+        "name": "google",
+        "host": "www.google.com",
+        "port": 443,
+        "kind": "external"
+      },
+      {
+        "name": "netflix",
+        "host": "fast.com",
+        "port": 443,
+        "kind": "external"
+      }
+    ],
+    "dnsNames": [
+      "www.google.com",
+      "www.youtube.com",
+      "www.netflix.com"
+    ]
+  }
 }
