@@ -1429,7 +1429,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_real_metrics\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> filter(fn: (r) => r._field =~ /available|endpoint_name|error_class/)\n  |> group(columns: [\"probe_id\", \"service\", \"_field\"])\n  |> last()\n  |> toString()\n  |> pivot(rowKey: [\"probe_id\", \"service\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({\n      \"Estado\": if exists r.available and r.available == \"true\" then \"Disponible\" else \"Caido\",\n      \"Servicio\": r.service,\n      \"URL\": if exists r.endpoint_name then r.endpoint_name else \"\",\n      \"Error\": if exists r.error_class then r.error_class else \"\"\n    }))\n  |> group()\n  |> sort(columns: [\"Servicio\"])",
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: -30m, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_real_metrics\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> filter(fn: (r) => r._field =~ /^(available|endpoint_name|error_class|error_detail)$/)\n  |> group(columns: [\"probe_id\", \"service\", \"_field\"])\n  |> last()\n  |> toString()\n  |> pivot(rowKey: [\"probe_id\", \"service\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({\n      \"Estado\": if exists r.available and r.available == \"true\" then \"Disponible\" else \"Caido\",\n      \"Servicio\": r.service,\n      \"URL\": if exists r.endpoint_name then r.endpoint_name else \"\",\n      \"Error\": if exists r.error_class then r.error_class else \"\",\n      \"Detalle\": if exists r.error_detail then r.error_detail else \"\"\n    }))\n  |> group()\n  |> sort(columns: [\"Servicio\"])",
                         "range": false
                       },
                       "version": "v0"
@@ -1449,7 +1449,8 @@
                         "Servicio": 0,
                         "Estado": 1,
                         "URL": 2,
-                        "Error": 3
+                        "Error": 3,
+                        "Detalle": 4
                       }
                     }
                   }
@@ -1457,7 +1458,7 @@
               ]
             }
           },
-          "description": "Ultimo estado de los endpoints medidos por la sonda.",
+          "description": "Ultimo estado de los endpoints medidos por la sonda. Detalle muestra el motivo exacto del fallo (clic en la celda para verlo completo).",
           "id": 210,
           "links": [],
           "title": "Estado de Endpoints",
@@ -1550,6 +1551,26 @@
                       {
                         "id": "noValue",
                         "value": "-"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "Detalle"
+                    },
+                    "properties": [
+                      {
+                        "id": "noValue",
+                        "value": "-"
+                      },
+                      {
+                        "id": "custom.inspect",
+                        "value": true
+                      },
+                      {
+                        "id": "custom.align",
+                        "value": "left"
                       }
                     ]
                   }
