@@ -182,5 +182,15 @@
       "www.youtube.com",
       "www.netflix.com"
     ]
+  },
+  "onuReport": {
+    "minOnusPerPon": 5,
+    "newOfflineAbsolute": 6,
+    "newOfflineMin": 4,
+    "newOfflineRatio": 0.3,
+    "rxDropDb": 2.0,
+    "mostlyOfflineRatio": 0.5,
+    "maxTelegramItems": 15,
+    "snapshotRetentionDays": 30
   }
 }

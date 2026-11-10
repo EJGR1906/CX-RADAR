@@ -40,6 +40,7 @@ FILES_TO_UPDATE = [
     "qoe_telegram.py",
     "qoe_probe.py",
     "qoe_heartbeat.py",
+    "onu_report.py",
     "register_qoe_task.py",
     "run_qoe_certification.py",
     "set_influx_token.py",

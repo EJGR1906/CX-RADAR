@@ -18,6 +18,7 @@ Architecture details live in [docs/architecture/qoe-architecture.md](docs/archit
 - Probe config: [config/probe-catalog.json](config/probe-catalog.json)
 - Probe scripts: [scripts/](scripts)
 - Dashboard JSON and Flux examples: [grafana/](grafana)
+- Real throughput, 1-minute heartbeat, Telegram alerts and ONU report: [docs/operations/medicion-real-y-alertas.md](docs/operations/medicion-real-y-alertas.md)
 - Operations and QA runbooks: [docs/operations/task-scheduler-runbook.md](docs/operations/task-scheduler-runbook.md), [docs/qa/validation-runbook.md](docs/qa/validation-runbook.md), [docs/qa/certification-checklist.md](docs/qa/certification-checklist.md)
 - Security guidance: [docs/security/hardening.md](docs/security/hardening.md)
 - Grafana setup: [docs/observability/grafana-cloud-setup.md](docs/observability/grafana-cloud-setup.md)

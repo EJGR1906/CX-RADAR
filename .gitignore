@@ -48,3 +48,6 @@ docs/REPORTE_CX_CONFIDENCIAL.md
 docs/*CONFIDENCIAL*
 *REPORTE_CX*
 
+
+# Reportes de ONUs descargados: contienen datos personales de abonados
+*.xlsx
