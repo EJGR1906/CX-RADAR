@@ -151,29 +151,85 @@ def measure_download(
     ctx = _ssl_context(verify_tls)
 
     def worker(idx: int, deadline: float, counter: _ByteCounter) -> None:
+        # Cada conexión se reutiliza entre peticiones (keep-alive), como hace un
+        # navegador. Con archivos pequeños, abrir una conexión TCP+TLS por pedido
+        # hacía que casi todo el tiempo se fuera en handshakes (Disney+: 55 Mbps).
+        conns: Dict[tuple, http.client.HTTPConnection] = {}
+
+        def get_conn(parsed: urllib.parse.SplitResult, timeout: float) -> http.client.HTTPConnection:
+            key = (parsed.scheme, parsed.hostname, parsed.port)
+            conn = conns.get(key)
+            if conn is None:
+                if parsed.scheme == "https":
+                    conn = http.client.HTTPSConnection(parsed.hostname, parsed.port, timeout=timeout, context=ctx)
+                else:
+                    conn = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=timeout)
+                conns[key] = conn
+            return conn
+
+        def drop(parsed: urllib.parse.SplitResult) -> None:
+            conn = conns.pop((parsed.scheme, parsed.hostname, parsed.port), None)
+            if conn is not None:
+                conn.close()
+
         n = 0
-        while time.perf_counter() < deadline:
-            url = urls[(idx + n) % len(urls)]
-            n += 1
-            req = urllib.request.Request(url)
-            if user_agent:
-                req.add_header("User-Agent", user_agent)
-            if request_bytes > 0:
-                req.add_header("Range", f"bytes=0-{request_bytes - 1}")
-            for k, v in (extra_headers or {}).items():
-                req.add_header(k, v)
-            try:
-                remaining = max(1.0, deadline - time.perf_counter())
-                with urllib.request.urlopen(req, context=ctx, timeout=min(timeout_s, remaining + 2)) as resp:  # nosec B310 - esquema validado
-                    while time.perf_counter() < deadline:
-                        chunk = resp.read(READ_BLOCK_BYTES)
-                        if not chunk:
+        try:
+            while time.perf_counter() < deadline:
+                url = urls[(idx + n) % len(urls)]
+                n += 1
+                for _ in range(4):  # hasta 3 redirecciones
+                    parsed = urllib.parse.urlsplit(url)
+                    path = (parsed.path or "/") + (f"?{parsed.query}" if parsed.query else "")
+                    headers = {"Accept-Encoding": "identity"}
+                    if user_agent:
+                        headers["User-Agent"] = user_agent
+                    if request_bytes > 0:
+                        headers["Range"] = f"bytes=0-{request_bytes - 1}"
+                    headers.update(extra_headers or {})
+                    remaining = max(1.0, deadline - time.perf_counter())
+                    try:
+                        conn = get_conn(parsed, min(timeout_s, remaining + 2))
+                        conn.request("GET", path, headers=headers)
+                        resp = conn.getresponse()
+                    except Exception as e:
+                        drop(parsed)
+                        counter.error(f"{type(e).__name__}: {e}")
+                        time.sleep(0.2)
+                        break
+                    if resp.status in (301, 302, 303, 307, 308) and resp.getheader("Location"):
+                        resp.read()
+                        url = urllib.parse.urljoin(url, resp.getheader("Location"))
+                        try:
+                            _validate_url(url)
+                        except ValueError as e:
+                            counter.error(str(e))
                             break
-                        counter.add(len(chunk))
-                counter.request_done()
-            except Exception as e:  # la conexión reintenta mientras quede tiempo
-                counter.error(f"{type(e).__name__}: {e}")
-                time.sleep(0.2)
+                        continue
+                    if resp.status >= 400:
+                        resp.read()
+                        counter.error(f"HTTP {resp.status} {url}")
+                        time.sleep(0.2)
+                        break
+                    complete = False
+                    try:
+                        while time.perf_counter() < deadline:
+                            chunk = resp.read(READ_BLOCK_BYTES)
+                            if not chunk:
+                                complete = True
+                                break
+                            counter.add(len(chunk))
+                    except Exception as e:
+                        counter.error(f"{type(e).__name__}: {e}")
+                    if complete:
+                        counter.request_done()
+                        if resp.will_close:
+                            drop(parsed)
+                    else:
+                        drop(parsed)  # respuesta a medias: la conexión no se puede reutilizar
+                    break
+        finally:
+            for conn in conns.values():
+                conn.close()
 
     return _run_timed(worker, connections, duration_s, warmup_s)
 

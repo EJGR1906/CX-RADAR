@@ -394,7 +394,8 @@ def main() -> None:
     if not args.skip_telegram:
         import qoe_telegram
         if qoe_telegram.is_configured():
-            print("Telegram: enviado" if qoe_telegram.send_message(summary) else "Telegram: no se pudo enviar")
+            print("Telegram: enviado" if qoe_telegram.send_message(summary)
+                  else f"Telegram: no se pudo enviar. {qoe_telegram.LAST_ERROR}")
 
 
 if __name__ == "__main__":

@@ -17,6 +17,20 @@ servidor del hub (UCS C220, conectado como cliente: ONU, router y servidor).
 Las páginas que ya se medían (Microsoft, YouTube, Netflix, Disney+, Amazon) se
 mantienen; ahora se miden igual que un speedtest real.
 
+Ajustes después de la primera corrida en HUB_BTO (10-nov):
+
+- Las conexiones se reutilizan entre pedidos (keep-alive), como en un
+  navegador. Con archivos pequeños, abrir una conexión por pedido hacía que
+  casi todo el tiempo se fuera en conectar: Disney+ daba 55 Mbps en el hub.
+- Disney+ mide contra los videos de su CDN de video (`media.dssott.com`,
+  `downloadUrls`). No hay archivos públicos grandes de Disney+; con
+  conexiones reutilizadas el tamaño deja de importar.
+- Netflix mide solo contra las OCAs cuyo nombre contiene `ocaHostFilter`
+  (`telemic`, la caché de Inter). fast.com también asigna OCAs de Bogotá y
+  Miami, pero Netflix reproduce desde la caché del ISP. Si ninguna coincide,
+  se mide contra todas y el log lo advierte. `source_host` y el log muestran
+  qué OCAs se usaron.
+
 Consumo de datos: cada prueba de velocidad dura unos 14 s (8 de bajada y 6 de
 subida). Con 7 objetivos y un plan de 600 Mbps son del orden de 4 GB por
 corrida. Cada 10 minutos serían unos 600 GB por día, así que se recomienda
@@ -78,6 +92,25 @@ Todos desde la raíz del repositorio.
    python scripts/qoe_heartbeat.py --skip-telegram
    python scripts/register_qoe_task.py --script heartbeat --task-name CX-Radar-Heartbeat --interval-minutes 1
    ```
+
+### Si Telegram da error de certificado
+
+`qoe_telegram.py --test` explica la causa. En Windows Server 2012 R2 el
+almacén de Windows puede no tener la raíz de GoDaddy que firma
+`api.telegram.org` (Windows solo descarga raíces cuando las pide un
+navegador, y Python no lo hace). Comprobar el emisor y, si es GoDaddy,
+instalar la raíz verificando su huella SHA1
+`47:BE:AB:C9:22:EA:E8:0E:78:78:34:62:A7:9F:45:C2:54:FD:E6:8B`:
+
+```bash
+openssl s_client -connect api.telegram.org:443 -servername api.telegram.org </dev/null 2>/dev/null | openssl x509 -noout -issuer
+curl -sSo gdroot-g2.crt https://certs.godaddy.com/repository/gdroot-g2.crt
+openssl x509 -in gdroot-g2.crt -noout -subject -fingerprint -sha1
+certutil -addstore Root gdroot-g2.crt
+```
+
+Nunca desactivar la verificación de certificados: el token del bot quedaría
+expuesto a quien intercepte la conexión.
 
 ## Monitor cada minuto (`qoe_heartbeat.py`)
 

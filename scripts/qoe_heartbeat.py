@@ -270,6 +270,7 @@ def main() -> None:
             if action:
                 msg = build_message(action, probe_id, site, status, summary, checks, state, now_ms)
                 if not qoe_telegram.send_message(msg, creds):
+                    qoe_probe.log_message(f"Heartbeat: Telegram no disponible, el aviso queda pendiente: {qoe_telegram.LAST_ERROR}", "WARNING")
                     state.setdefault("pending", []).append(msg)
 
     state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")

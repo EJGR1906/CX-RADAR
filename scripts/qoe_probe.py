@@ -1811,7 +1811,8 @@ def log_bufferbloat_diagnostic(
 
 def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], tools: Dict[str, Path]) -> Dict[str, Any]:
     """Perform burst traffic speed test using standard HTTP Range requests."""
-    download_url = get_optional_str(target, "downloadUrl", get_optional_str(target, "url"))
+    download_urls = [u for u in (target.get("downloadUrls") or []) if isinstance(u, str) and u]
+    download_url = download_urls[0] if download_urls else get_optional_str(target, "downloadUrl", get_optional_str(target, "url"))
     if not download_url:
         raise ValueError("Burst target requires downloadUrl or url.")
 
@@ -1853,7 +1854,7 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
         try:
             if timed:
                 download_mbps, download_bytes, download_duration_ms, err_det, dl_latencies = timed_download(
-                    [download_url], target, probe_run, num_connections,
+                    download_urls or [download_url], target, probe_run, num_connections,
                     request_bytes=max(0, get_optional_int(target, "requestBytes", 0)), ping_host=ref_host
                 )
             else:
@@ -2012,6 +2013,19 @@ def run_fast_api_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], 
         return _speed_result("fast-api", 0.0, 0.0, lat, get_target_host(target), "resolve_error",
                              "fast.com API returned no OCA targets.", 0.0, base, 0.0, 0.0)
 
+    all_hosts = ",".join(t["host"] for t in targets)
+    # fast.com reparte la prueba entre OCAs locales y extranjeras (Bogotá, Miami...).
+    # Netflix reproduce casi siempre desde la caché dentro del ISP, así que con
+    # ocaHostFilter (por ejemplo "telemic") se mide solo contra esas OCAs.
+    oca_filter = get_optional_str(target, "ocaHostFilter").lower()
+    oca_scope = "all"
+    if oca_filter:
+        matched = [t for t in targets if oca_filter in t["host"].lower()]
+        if matched:
+            targets, oca_scope = matched, f"filter:{oca_filter}"
+        else:
+            oca_scope = f"all(no-match:{oca_filter})"
+            log_message(f"fast-api: ninguna OCA contiene '{oca_filter}'; se mide contra todas: {all_hosts}", "WARNING")
     hosts = ",".join(t["host"] for t in targets)
     oca_host = targets[0]["host"]
     lat_raw = qoe_throughput.measure_tcp_latency(oca_host, 443, count=10)
@@ -2030,8 +2044,9 @@ def run_fast_api_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], 
 
     err_class = "download_error" if dl_err else ""
     detail = dl_err or (f"upload: {ul_err}" if ul_err else "")
-    raw = f"oca_hosts={hosts};client_asn={info['client_asn']};client_city={info['client_city']}"
-    log_message(f"fast-api OCAs asignadas: {hosts} (ASN detectado {info['client_asn']}, ciudad {info['client_city']})")
+    raw = (f"oca_hosts={hosts};oca_scope={oca_scope};all_oca_hosts={all_hosts};"
+           f"client_asn={info['client_asn']};client_city={info['client_city']}")
+    log_message(f"fast-api OCAs asignadas: {all_hosts} (ASN detectado {info['client_asn']}, ciudad {info['client_city']}); medidas: {hosts}")
     return _speed_result("timed-fast-api", dl, ul, lat, oca_host, err_class, detail, dl_ms + ul_ms, base,
                          _bufferbloat(dl_lat, base["ref_base_latency"]), _bufferbloat(ul_lat, base["ref_base_latency"]), raw)
 

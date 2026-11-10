@@ -80,7 +80,8 @@
       "enabled": true,
       "uploadMeasurementMethod": "oca",
       "parallelConnections": 8,
-      "urlCount": 5
+      "urlCount": 5,
+      "ocaHostFilter": "telemic"
     },
     {
       "service": "Disney+",
@@ -88,13 +89,21 @@
       "type": "speedtest",
       "speedTestMethod": "burst",
       "uploadMeasurementMethod": "curl-upload",
-      "host": "cnbl-cdn.bamgrid.com",
-      "downloadUrl": "https://cnbl-cdn.bamgrid.com/assets/eb4d592bb1646448b0dcf7fb5d400c52c21c72afeefd8e79411f05a88b47fb0e/original",
+      "host": "vod-bgc-na-east-1.media.dssott.com",
+      "downloadUrl": "https://vod-bgc-na-east-1.media.dssott.com/ps01/disney/bgui/2025/11/19/1763572017-national-geographic.mp4",
       "targetTransferBytes": 33554432,
       "parallelConnections": 8,
       "uploadPayloadBytes": 33554432,
       "maxDownloadIterations": 14,
-      "enabled": true
+      "enabled": true,
+      "downloadUrls": [
+        "https://vod-bgc-na-east-1.media.dssott.com/ps01/disney/bgui/2025/11/19/1763572017-national-geographic.mp4",
+        "https://vod-bgc-na-east-1.media.dssott.com/ps01/disney/bgui/2025/11/19/1763572081-pixar.mp4",
+        "https://vod-bgc-na-east-1.media.dssott.com/ps01/disney/bgui/2025/11/19/1763572428-star-wars.mp4",
+        "https://vod-bgc-na-east-1.media.dssott.com/ps01/disney/bgui/2025/11/19/1763568616-disney.mp4",
+        "https://vod-bgc-na-east-1.media.dssott.com/ps01/disney/bgui/2025/11/19/1763568825-marvel.mp4",
+        "https://vod-bgc-na-east-1.media.dssott.com/ps01/disney/bgui/2025/11/19/1763572191-xyz.mp4"
+      ]
     },
     {
       "service": "Amazon",

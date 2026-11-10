@@ -134,6 +134,8 @@ def _test_nq_for_target(
 
 
 def _test_speed_fallback_ready(target: Dict[str, Any]) -> bool:
+    if any(isinstance(u, str) and u for u in (target.get("downloadUrls") or [])):
+        return True
     download_url = _optional_str(target, "downloadUrl",
                                  _optional_str(target, "url"))
     return download_url != ""
