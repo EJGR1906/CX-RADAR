@@ -92,6 +92,54 @@ class TestThroughputEngine(unittest.TestCase):
         self.assertEqual(r["LossPercentage"], 0.0)
 
 
+class _KeepAliveHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    connections = set()
+
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        _KeepAliveHandler.connections.add(self.client_address)
+        if self.path == "/redirect":
+            self.send_response(302)
+            self.send_header("Location", "/small")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        body = b"y" * 100_000
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+class TestKeepAlive(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.server = ThreadingHTTPServer(("127.0.0.1", 0), _KeepAliveHandler)
+        cls.base = f"http://127.0.0.1:{cls.server.server_address[1]}"
+        threading.Thread(target=cls.server.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+
+    def setUp(self):
+        _KeepAliveHandler.connections = set()
+
+    def test_small_file_reuses_connection(self):
+        r = qt.measure_download([self.base + "/small"], connections=2, duration_s=0.8, warmup_s=0.1)
+        self.assertGreater(r["Requests"], 10)
+        self.assertLessEqual(len(_KeepAliveHandler.connections), 2)  # una por conexión, no una por pedido
+
+    def test_follows_redirect(self):
+        r = qt.measure_download([self.base + "/redirect"], connections=1, duration_s=0.5, warmup_s=0.1)
+        self.assertGreater(r["Bytes"], 0)
+        self.assertEqual(r["Errors"], [])
+
+
 class TestHelpers(unittest.TestCase):
     def test_steady_mbps_discards_warmup(self):
         # 0-2 s: 1 MB (arranque lento); 2-4 s: 10 MB (estable)
