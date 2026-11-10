@@ -232,7 +232,7 @@ function geomapPanel(id, title, desc, flux) {
                     },
                     symbol: { fixed: 'circle' }
                   },
-                  showLegend: true,
+                  showLegend: false,
                   tooltip: true
                 },
                 location: {

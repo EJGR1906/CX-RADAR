@@ -161,12 +161,12 @@ exports.panels = [
   // Table — Snapshot Simple
   ['detail-snapshot-simple', 'table', {
     title: 'Estado de Endpoints', id: 210,
-    desc: 'Ultimo estado de los endpoints medidos por la sonda.',
+    desc: 'Ultimo estado de los endpoints medidos por la sonda. Detalle muestra el motivo exacto del fallo (clic en la celda para verlo completo).',
     flux: `from(bucket: v.defaultBucket)
   |> range(start: -30m, stop: v.timeRangeStop)
   |> filter(fn: (r) => r._measurement == "qoe_real_metrics")
   |> filter(fn: (r) => ${P})
-  |> filter(fn: (r) => r._field =~ /available|endpoint_name|error_class/)
+  |> filter(fn: (r) => r._field =~ /^(available|endpoint_name|error_class|error_detail)$/)
   |> group(columns: ["probe_id", "service", "_field"])
   |> last()
   |> toString()
@@ -175,11 +175,12 @@ exports.panels = [
       "Estado": if exists r.available and r.available == "true" then "Disponible" else "Caido",
       "Servicio": r.service,
       "URL": if exists r.endpoint_name then r.endpoint_name else "",
-      "Error": if exists r.error_class then r.error_class else ""
+      "Error": if exists r.error_class then r.error_class else "",
+      "Detalle": if exists r.error_detail then r.error_detail else ""
     }))
   |> group()
   |> sort(columns: ["Servicio"])`,
-    columnOrder: ['Servicio', 'Estado', 'URL', 'Error'],
+    columnOrder: ['Servicio', 'Estado', 'URL', 'Error', 'Detalle'],
     overrides: [
       { matcher: { id: 'byName', options: 'Estado' }, properties: [
         { id: 'custom.cellOptions', value: { type: 'color-background' } },
@@ -187,7 +188,9 @@ exports.panels = [
         { id: 'custom.filterable', value: true }
       ]},
       { matcher: { id: 'byName', options: 'Servicio' }, properties: [{ id: 'custom.filterable', value: true }] },
-      { matcher: { id: 'byName', options: 'Error' }, properties: [{ id: 'noValue', value: '-' }] }
+      { matcher: { id: 'byName', options: 'Error' }, properties: [{ id: 'noValue', value: '-' }] },
+      // Motivo exacto que guarda la sonda (error_detail); puede ser largo: clic para verlo completo.
+      { matcher: { id: 'byName', options: 'Detalle' }, properties: [{ id: 'noValue', value: '-' }, { id: 'custom.inspect', value: true }, { id: 'custom.align', value: 'left' }] }
     ]
   }],
 

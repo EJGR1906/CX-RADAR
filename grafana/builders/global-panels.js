@@ -185,6 +185,7 @@ probes
       ]},
       { matcher: { id: 'byName', options: 'Sonda' }, properties: [{ id: 'custom.filterable', value: true }] },
       { matcher: { id: 'byName', options: 'Sitio' }, properties: [{ id: 'custom.filterable', value: true }] },
+      { matcher: { id: 'byName', options: 'Ultimo Reporte' }, properties: [{ id: 'unit', value: 'dateTimeFromNow' }] },
       { matcher: { id: 'byName', options: 'Duracion ms' }, properties: [{ id: 'unit', value: 'ms' }, { id: 'decimals', value: 0 }, { id: 'displayName', value: 'Duracion corrida' }] }
     ]
   }],

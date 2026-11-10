@@ -725,6 +725,18 @@
                   {
                     "matcher": {
                       "id": "byName",
+                      "options": "Ultimo Reporte"
+                    },
+                    "properties": [
+                      {
+                        "id": "unit",
+                        "value": "dateTimeFromNow"
+                      }
+                    ]
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
                       "options": "Duracion ms"
                     },
                     "properties": [
@@ -824,7 +836,7 @@
                           "fixed": "circle"
                         }
                       },
-                      "showLegend": true,
+                      "showLegend": false,
                       "tooltip": true
                     },
                     "location": {
