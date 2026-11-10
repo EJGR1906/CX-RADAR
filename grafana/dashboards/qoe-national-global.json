@@ -693,10 +693,6 @@
                         ]
                       },
                       {
-                        "id": "custom.width",
-                        "value": 100
-                      },
-                      {
                         "id": "custom.filterable",
                         "value": true
                       }
@@ -709,10 +705,6 @@
                     },
                     "properties": [
                       {
-                        "id": "custom.width",
-                        "value": 200
-                      },
-                      {
                         "id": "custom.filterable",
                         "value": true
                       }
@@ -724,10 +716,6 @@
                       "options": "Sitio"
                     },
                     "properties": [
-                      {
-                        "id": "custom.width",
-                        "value": 140
-                      },
                       {
                         "id": "custom.filterable",
                         "value": true
@@ -747,6 +735,10 @@
                       {
                         "id": "decimals",
                         "value": 0
+                      },
+                      {
+                        "id": "displayName",
+                        "value": "Duracion corrida"
                       }
                     ]
                   }
@@ -821,8 +813,9 @@
                     "config": {
                       "style": {
                         "size": {
-                          "fixed": 12
+                          "fixed": 18
                         },
+                        "opacity": 0.9,
                         "color": {
                           "field": "EstadoVal",
                           "fixed": "green"
@@ -855,6 +848,23 @@
                   "color": {
                     "mode": "thresholds"
                   },
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "text": "Inactiva",
+                          "color": "red",
+                          "index": 0
+                        },
+                        "1": {
+                          "text": "Activa",
+                          "color": "green",
+                          "index": 1
+                        }
+                      }
+                    }
+                  ],
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [

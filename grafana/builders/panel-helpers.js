@@ -224,7 +224,8 @@ function geomapPanel(id, title, desc, flux) {
                 name: 'Sondas QoE',
                 config: {
                   style: {
-                    size: { fixed: 12 },
+                    size: { fixed: 18 },
+                    opacity: 0.9,
                     color: {
                       field: 'EstadoVal',
                       fixed: 'green'
@@ -253,6 +254,7 @@ function geomapPanel(id, title, desc, flux) {
               noValue: 'Sin datos',
               custom: {},
               color: { mode: 'thresholds' },
+              mappings: [{ type: 'value', options: { '0': { text: 'Inactiva', color: 'red', index: 0 }, '1': { text: 'Activa', color: 'green', index: 1 } } }],
               thresholds: {
                 mode: 'absolute',
                 steps: [
