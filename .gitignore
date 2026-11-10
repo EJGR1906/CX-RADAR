@@ -48,3 +48,9 @@ docs/REPORTE_CX_CONFIDENCIAL.md
 docs/*CONFIDENCIAL*
 *REPORTE_CX*
 
+
+# Reportes de ONUs descargados: contienen datos personales de abonados
+*.xlsx
+
+# Ajustes propios de cada servidor (identidad de la sonda, router, etc.)
+config/*.local.json

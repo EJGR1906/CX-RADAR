@@ -34,11 +34,15 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import qoe_throughput  # noqa: E402  (motor de medición por tiempo, mismo directorio)
+import qoe_config  # noqa: E402  (catálogo + ajustes locales del servidor)
+
 
 # ---------------------------------------------------------------------------
 # Global Constants & Logging Setup
 # ---------------------------------------------------------------------------
-PROBE_VERSION = "0.2.0"
+PROBE_VERSION = "0.3.0"
 
 class InsecureRequestWarning(Warning):
     """Warning for unverified TLS requests."""
@@ -164,6 +168,68 @@ def get_mbps_from_bytes_duration(bytes_count: float, duration_ms: float) -> floa
 # ---------------------------------------------------------------------------
 # InfluxDB Line Protocol Formatting
 # ---------------------------------------------------------------------------
+def use_timed_engine(target: Dict[str, Any], probe_run: Dict[str, Any]) -> bool:
+    """El motor por tiempo es el predeterminado; 'fixed-bytes' conserva el método anterior."""
+    engine = get_optional_str(target, "throughputEngine", get_optional_str(probe_run, "throughputEngine", "timed"))
+    return engine.lower() != "fixed-bytes"
+
+
+def get_timed_settings(target: Dict[str, Any], probe_run: Dict[str, Any]) -> Dict[str, float]:
+    def num(key: str, default: float) -> float:
+        for src in (target, probe_run):
+            v = src.get(key)
+            if isinstance(v, (int, float)) and v > 0:
+                return float(v)
+        return default
+    return {
+        "download_s": num("downloadDurationSeconds", 8.0),
+        "upload_s": num("uploadDurationSeconds", 6.0),
+        "warmup_s": num("warmupSeconds", 2.0),
+        "request_timeout_s": num("requestTimeoutSeconds", 10.0),
+    }
+
+
+def timed_download(urls: List[str], target: Dict[str, Any], probe_run: Dict[str, Any],
+                   num_connections: int, request_bytes: int = 0,
+                   ping_host: Optional[str] = None) -> Tuple[float, float, float, str, List[float]]:
+    """Descarga por tiempo. Devuelve (mbps, bytes, duration_ms, error_detail, latencias_bajo_carga)."""
+    cfg = get_timed_settings(target, probe_run)
+    collector = ConcurrentPingCollector(ping_host, interval_seconds=0.5) if ping_host else None
+    if collector:
+        collector.start()
+    try:
+        r = qoe_throughput.measure_download(
+            urls, connections=num_connections, duration_s=cfg["download_s"], warmup_s=cfg["warmup_s"],
+            request_bytes=request_bytes, timeout_s=cfg["request_timeout_s"],
+            user_agent=get_optional_str(probe_run, "userAgent"), verify_tls=bool(probe_run.get("verifyTls", True)),
+        )
+    finally:
+        latencies = collector.stop() if collector else []
+    err = "" if r["Bytes"] > 0 else ("; ".join(r["Errors"]) or "No bytes were downloaded.")
+    return r["Mbps"], float(r["Bytes"]), r["DurationMs"], err, latencies
+
+
+def timed_upload(urls: List[str], target: Dict[str, Any], probe_run: Dict[str, Any],
+                 num_connections: int, payload_bytes: int, method: str = "POST",
+                 ping_host: Optional[str] = None) -> Tuple[float, float, float, str, List[float]]:
+    """Subida por tiempo. Devuelve (mbps, bytes, duration_ms, error_detail, latencias_bajo_carga)."""
+    cfg = get_timed_settings(target, probe_run)
+    collector = ConcurrentPingCollector(ping_host, interval_seconds=0.5) if ping_host else None
+    if collector:
+        collector.start()
+    try:
+        r = qoe_throughput.measure_upload(
+            urls, connections=num_connections, duration_s=cfg["upload_s"], warmup_s=cfg["warmup_s"],
+            payload_bytes=payload_bytes, timeout_s=cfg["request_timeout_s"],
+            user_agent=get_optional_str(probe_run, "userAgent"), verify_tls=bool(probe_run.get("verifyTls", True)),
+            method=method,
+        )
+    finally:
+        latencies = collector.stop() if collector else []
+    err = "" if r["Bytes"] > 0 and r["Requests"] > 0 else ("; ".join(r["Errors"]) or "No upload request completed.")
+    return r["Mbps"], float(r["Bytes"]), r["DurationMs"], err, latencies
+
+
 def escape_tag(value: str) -> str:
     """Escape backslash, space, comma, and equals sign for InfluxDB tags/keys."""
     val = str(value)
@@ -422,6 +488,21 @@ def get_ping_burst_stats(host: str, count: int = 10, timeout_ms: int = 1000) -> 
             samples.append(float(m.group(1)))
 
     if not samples:
+        # Muchos CDN (y algunos routers) filtran ICMP: sin respuesta de ping la latencia
+        # quedaba en 0 y la pérdida en 100 %, lo que falseaba los tableros. Se intenta
+        # medir con el tiempo de conexión TCP antes de declarar el destino inalcanzable.
+        for port in (443, 80):
+            tcp = qoe_throughput.measure_tcp_latency(host, port, count=min(count, 5), timeout_s=max(1.0, timeout_ms / 1000.0))
+            if tcp["Samples"] > 0:
+                return {
+                    "Host": host,
+                    "LatencyMs": tcp["LatencyMs"],
+                    "JitterMs": tcp["JitterMs"],
+                    "SuccessfulReplies": tcp["Samples"],
+                    "Samples": [],
+                    "PacketLossPercentage": tcp["LossPercentage"],
+                    "Method": f"tcp:{port}",
+                }
         result["PacketLossPercentage"] = 100.0
         return result
 
@@ -1126,7 +1207,8 @@ def get_upload_supplement_cache_key(target: Dict[str, Any], method: str) -> str:
         return f"networkquality::{service}::{endpoint_name}"
     elif method == "curl-upload":
         endpoint = get_optional_str(target, "uploadEndpoint", "https://speed.cloudflare.com/__up")
-        return f"curl-upload::{service}::{endpoint_name}::{endpoint.lower()}"
+        # La subida a un endpoint genérico (Cloudflare) no depende del servicio: se mide una vez por corrida.
+        return f"curl-upload::{endpoint.lower()}"
     elif method == "upload-url":
         upload_url = get_optional_str(target, "uploadUrl")
         if not upload_url:
@@ -1140,7 +1222,7 @@ def run_upload_supplement(
 ) -> Optional[Dict[str, Any]]:
     """Execute upload supplement if targets lack upload throughput values."""
     method = get_upload_supplement_method(target, probe_run)
-    if not method or method == "none":
+    if not method or method in ("none", "oca"):
         return None
 
     cache_key = get_upload_supplement_cache_key(target, method)
@@ -1187,17 +1269,26 @@ def run_upload_supplement(
                 upload_method = get_optional_str(target, "uploadMethod", "POST")
 
             ref_host = get_optional_str(probe_run, "bufferbloatReferenceHost", "1.1.1.1")
-            dur, uploaded_bytes, err_det, ul_latencies = upload_parallel_chunks(
-                endpoint, transfer_dir, payload_bytes, num_connections,
-                upload_method, timeout, user_agent=ua, verify_tls=verify_tls,
-                ping_host=ref_host
-            )
+            timed = use_timed_engine(target, probe_run)
+            if timed:
+                ul_mbps, uploaded_bytes, dur, err_det, ul_latencies = timed_upload(
+                    [endpoint], target, probe_run, num_connections, payload_bytes,
+                    method=upload_method, ping_host=ref_host
+                )
+            else:
+                dur, uploaded_bytes, err_det, ul_latencies = upload_parallel_chunks(
+                    endpoint, transfer_dir, payload_bytes, num_connections,
+                    upload_method, timeout, user_agent=ua, verify_tls=verify_tls,
+                    ping_host=ref_host
+                )
+                ul_mbps = get_mbps_from_bytes_duration(uploaded_bytes, dur)
             if err_det:
                 raise RuntimeError(err_det)
 
-            result["UploadMbps"] = get_mbps_from_bytes_duration(uploaded_bytes, dur)
+            result["UploadMbps"] = ul_mbps
             result["RunDurationMs"] = dur
-            result["Tool"] = f"{method}-{num_connections}x" if num_connections > 1 else method
+            host_label = urllib.parse.urlsplit(endpoint).hostname or endpoint
+            result["Tool"] = ("timed-" if timed else "") + (f"{method}-{num_connections}x" if num_connections > 1 else method) + f"@{host_label}"
             result["Latencies"] = ul_latencies
 
     except Exception as e:
@@ -1402,6 +1493,8 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
         )
 
         direct_url = ""
+        timed = False
+        yt_mbps = 0.0
         for line in stdout.splitlines():
             line = line.strip()
             if line.startswith("http"):
@@ -1427,6 +1520,7 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
 
             # 2. Fragment Download
             fragment_bytes = max(1, get_optional_int(target, "fragmentBytes", 4194304))
+            timed = use_timed_engine(target, probe_run)
             verify_tls = bool(probe_run.get("verifyTls", True))
 
             ref_host = get_optional_str(probe_run, "bufferbloatReferenceHost", "1.1.1.1")
@@ -1442,11 +1536,17 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
 
             dl_latencies = []
             try:
-                download_duration_ms, download_bytes, err_det, dl_latencies = download_parallel_chunks(
-                    direct_url, transfer_dir, fragment_bytes, num_connections,
-                    timeout, user_agent=get_optional_str(probe_run, "userAgent"), verify_tls=verify_tls,
-                    ping_host=ref_host
-                )
+                if timed:
+                    yt_mbps, download_bytes, download_duration_ms, err_det, dl_latencies = timed_download(
+                        [direct_url], target, probe_run, num_connections,
+                        request_bytes=fragment_bytes, ping_host=ref_host
+                    )
+                else:
+                    download_duration_ms, download_bytes, err_det, dl_latencies = download_parallel_chunks(
+                        direct_url, transfer_dir, fragment_bytes, num_connections,
+                        timeout, user_agent=get_optional_str(probe_run, "userAgent"), verify_tls=verify_tls,
+                        ping_host=ref_host
+                    )
                 if err_det:
                     err_class = "download_error"
                     err_detail = err_det
@@ -1455,7 +1555,7 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
                 err_detail = str(e)
 
         ping_stats = get_ping_burst_stats(source_host)
-        download_mbps = get_mbps_from_bytes_duration(download_bytes, download_duration_ms)
+        download_mbps = yt_mbps if timed else get_mbps_from_bytes_duration(download_bytes, download_duration_ms)
 
         dl_loaded_latency = sum(dl_latencies) / len(dl_latencies) if dl_latencies else 0.0
         bb_dl = max(0.0, round(dl_loaded_latency - ref_base_latency, 2)) if dl_loaded_latency > 0 and ref_base_latency > 0 else 0.0
@@ -1465,7 +1565,7 @@ def run_yt_dlp_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], to
             err_detail = "Direct media URL resolved but fragment download wrote no bytes."
 
         return {
-            "Tool": f"yt-dlp-{num_connections}x" if num_connections > 1 else "yt-dlp",
+            "Tool": ("timed-" if timed else "") + (f"yt-dlp-{num_connections}x" if num_connections > 1 else "yt-dlp"),
             "ExitCode": 0 if not err_class else -1,
             "TimedOut": False,
             "DownloadMbps": download_mbps,
@@ -1748,11 +1848,19 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
         start_time = time.perf_counter()
 
         dl_latencies = []
+        timed = use_timed_engine(target, probe_run)
+        download_mbps = 0.0
         try:
-            download_duration_ms, download_bytes, err_det, dl_latencies = download_parallel_chunks(
-                download_url, transfer_dir, target_bytes, num_connections,
-                timeout, user_agent=ua, verify_tls=verify_tls, ping_host=ref_host
-            )
+            if timed:
+                download_mbps, download_bytes, download_duration_ms, err_det, dl_latencies = timed_download(
+                    [download_url], target, probe_run, num_connections,
+                    request_bytes=max(0, get_optional_int(target, "requestBytes", 0)), ping_host=ref_host
+                )
+            else:
+                download_duration_ms, download_bytes, err_det, dl_latencies = download_parallel_chunks(
+                    download_url, transfer_dir, target_bytes, num_connections,
+                    timeout, user_agent=ua, verify_tls=verify_tls, ping_host=ref_host
+                )
             if err_det:
                 error_class = "download_error"
                 error_detail = err_det
@@ -1760,7 +1868,8 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
             error_class = "download_error"
             error_detail = str(e)
 
-        download_mbps = get_mbps_from_bytes_duration(download_bytes, download_duration_ms)
+        if not timed:
+            download_mbps = get_mbps_from_bytes_duration(download_bytes, download_duration_ms)
         upload_mbps = 0.0
         ul_latencies = []
 
@@ -1800,7 +1909,7 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
         latency = ping_stats["LatencyMs"]
 
         return {
-            "Tool": f"burst-{num_connections}x" if num_connections > 1 else "burst",
+            "Tool": ("timed-" if timed else "") + (f"burst-{num_connections}x" if num_connections > 1 else "burst"),
             "ExitCode": 0 if not error_class else -1,
             "TimedOut": False,
             "DownloadMbps": download_mbps,
@@ -1827,6 +1936,141 @@ def run_burst_traffic_measurement(target: Dict[str, Any], probe_run: Dict[str, A
 
 
 # ---------------------------------------------------------------------------
+# Speed Test: fast.com nativo y servidores Ookla (motor por tiempo)
+# ---------------------------------------------------------------------------
+def get_baseline_network_stats(probe_run: Dict[str, Any]) -> Dict[str, Any]:
+    """Latencia de referencia sin carga, pérdida y latencia al gateway (antes de la prueba)."""
+    ref_host = get_optional_str(probe_run, "bufferbloatReferenceHost", "1.1.1.1")
+    ref = get_ping_burst_stats(ref_host, count=10, timeout_ms=800)
+    gw_ip = get_default_gateway()
+    gw_latency = get_ping_burst_stats(gw_ip, count=5, timeout_ms=500)["LatencyMs"] if gw_ip else 0.0
+    return {
+        "ref_host": ref_host,
+        "ref_base_latency": ref["LatencyMs"],
+        "packet_loss": ref["PacketLossPercentage"],
+        "gw_latency": gw_latency,
+    }
+
+
+def _bufferbloat(latencies: List[float], base: float) -> float:
+    if not latencies or base <= 0:
+        return 0.0
+    return max(0.0, round(sum(latencies) / len(latencies) - base, 2))
+
+
+def _speed_result(tool: str, dl: float, ul: float, lat: Dict[str, Any], source_host: str,
+                  err_class: str, err_detail: str, duration_ms: float, base: Dict[str, Any],
+                  bb_dl: float, bb_ul: float, raw: str = "") -> Dict[str, Any]:
+    return {
+        "Tool": tool,
+        "ExitCode": 0 if not err_class else -1,
+        "TimedOut": False,
+        "DownloadMbps": dl,
+        "UploadMbps": ul,
+        "LatencyMs": lat["LatencyMs"],
+        "JitterMs": lat["JitterMs"],
+        "RpmResponsiveness": get_approximate_rpm(lat["LatencyMs"]),
+        "SourceHost": source_host,
+        "ErrorClass": err_class,
+        "ErrorDetail": err_detail,
+        "RawStdOut": raw,
+        "RawStdErr": "",
+        "RunDurationMs": round(duration_ms, 2),
+        "Available": err_class == "" and dl > 0,
+        "PacketLossPercentage": base["packet_loss"],
+        "GatewayLatencyMs": base["gw_latency"],
+        "BufferbloatDownloadMs": bb_dl,
+        "BufferbloatUploadMs": bb_ul,
+        "RefBaseLatencyMs": base["ref_base_latency"],
+    }
+
+
+def run_fast_api_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], tools: Dict[str, Path]) -> Dict[str, Any]:
+    """fast.com sin navegador: pide las OCAs asignadas a esta conexión y mide contra ellas.
+
+    Es el mismo procedimiento que hace la página de fast.com (API pública + descargas
+    /speedtest/range/0-N + subidas POST a la misma OCA), sin Chrome ni Puppeteer, que
+    era la fuente de las mediciones vacías por detección de bots.
+    """
+    connections = max(1, get_optional_int(target, "parallelConnections", 8))
+    url_count = max(1, get_optional_int(target, "urlCount", 5))
+    timeout = float(get_optional_int(probe_run, "connectTimeoutSeconds", 10))
+    ua = get_optional_str(probe_run, "userAgent")
+    verify_tls = bool(probe_run.get("verifyTls", True))
+    base = get_baseline_network_stats(probe_run)
+
+    try:
+        info = qoe_throughput.get_fast_targets(url_count, timeout, ua, verify_tls)
+    except Exception as e:
+        lat = {"LatencyMs": 0.0, "JitterMs": 0.0}
+        return _speed_result("fast-api", 0.0, 0.0, lat, get_target_host(target), "resolve_error",
+                             f"fast.com API failed: {e}", 0.0, base, 0.0, 0.0)
+
+    targets = info["targets"]
+    if not targets:
+        lat = {"LatencyMs": 0.0, "JitterMs": 0.0}
+        return _speed_result("fast-api", 0.0, 0.0, lat, get_target_host(target), "resolve_error",
+                             "fast.com API returned no OCA targets.", 0.0, base, 0.0, 0.0)
+
+    hosts = ",".join(t["host"] for t in targets)
+    oca_host = targets[0]["host"]
+    lat_raw = qoe_throughput.measure_tcp_latency(oca_host, 443, count=10)
+    lat = {"LatencyMs": lat_raw["LatencyMs"], "JitterMs": lat_raw["JitterMs"]}
+
+    dl_bytes_per_req = max(1, get_optional_int(target, "requestBytes", 26214400))
+    dl_urls = [qoe_throughput.fast_range_url(t["url"], dl_bytes_per_req) for t in targets]
+    dl, _, dl_ms, dl_err, dl_lat = timed_download(dl_urls, target, probe_run, connections, ping_host=base["ref_host"])
+
+    ul, ul_ms, ul_err, ul_lat = 0.0, 0.0, "", []
+    if get_optional_str(target, "uploadMeasurementMethod", "oca").lower() == "oca" and not dl_err:
+        ul_payload = max(65536, get_optional_int(target, "uploadPayloadBytes", 8 * 1024 * 1024))
+        ul_urls = [qoe_throughput.fast_range_url(t["url"], ul_payload) for t in targets]
+        ul, _, ul_ms, ul_err, ul_lat = timed_upload(ul_urls, target, probe_run, max(1, connections // 2),
+                                                    ul_payload, ping_host=base["ref_host"])
+
+    err_class = "download_error" if dl_err else ""
+    detail = dl_err or (f"upload: {ul_err}" if ul_err else "")
+    raw = f"oca_hosts={hosts};client_asn={info['client_asn']};client_city={info['client_city']}"
+    log_message(f"fast-api OCAs asignadas: {hosts} (ASN detectado {info['client_asn']}, ciudad {info['client_city']})")
+    return _speed_result("timed-fast-api", dl, ul, lat, oca_host, err_class, detail, dl_ms + ul_ms, base,
+                         _bufferbloat(dl_lat, base["ref_base_latency"]), _bufferbloat(ul_lat, base["ref_base_latency"]), raw)
+
+
+def run_ookla_http_measurement(target: Dict[str, Any], probe_run: Dict[str, Any], tools: Dict[str, Path]) -> Dict[str, Any]:
+    """Prueba contra un servidor Ookla (OoklaServer) por sus endpoints HTTP /hello, /download y /upload.
+
+    Los servidores Ookla de Inter están dentro de la red: medir contra ellos separa una
+    falla del acceso o del backbone de Inter de una falla del tránsito internacional.
+    """
+    host = get_optional_str(target, "ooklaHost", get_optional_str(target, "host"))
+    port = get_optional_int(target, "ooklaPort", 8080)
+    scheme = get_optional_str(target, "ooklaScheme", "http")
+    connections = max(1, get_optional_int(target, "parallelConnections", 8))
+    dl_size = max(1_000_000, get_optional_int(target, "requestBytes", 25_000_000))
+    urls = qoe_throughput.ookla_urls(host, port, scheme, dl_size)
+    base = get_baseline_network_stats(probe_run)
+
+    lat_raw = qoe_throughput.measure_tcp_latency(host, port, count=10)
+    lat = {"LatencyMs": lat_raw["LatencyMs"], "JitterMs": lat_raw["JitterMs"]}
+    if lat_raw["Samples"] == 0:
+        return _speed_result("ookla-http", 0.0, 0.0, lat, host, "connect_error",
+                             f"Could not open TCP connection to {host}:{port}.", 0.0, base, 0.0, 0.0)
+
+    dl, _, dl_ms, dl_err, dl_lat = timed_download([urls["download"]], target, probe_run, connections,
+                                                  ping_host=base["ref_host"])
+    ul, ul_ms, ul_err, ul_lat = 0.0, 0.0, "", []
+    if not dl_err:
+        ul_payload = max(65536, get_optional_int(target, "uploadPayloadBytes", 8 * 1024 * 1024))
+        ul, _, ul_ms, ul_err, ul_lat = timed_upload([urls["upload"]], target, probe_run, max(1, connections // 2),
+                                                    ul_payload, ping_host=base["ref_host"])
+    err_class = "download_error" if dl_err else ""
+    detail = dl_err or (f"upload: {ul_err}" if ul_err else "")
+    return _speed_result("timed-ookla-http", dl, ul, lat, host, err_class, detail, dl_ms + ul_ms, base,
+                         _bufferbloat(dl_lat, base["ref_base_latency"]), _bufferbloat(ul_lat, base["ref_base_latency"]),
+                         f"ookla={scheme}://{host}:{port}")
+
+
+# ---------------------------------------------------------------------------
 # Combined Speed Test Execution Handler
 # ---------------------------------------------------------------------------
 def run_speedtest_target_wrapper(
@@ -1844,6 +2088,10 @@ def run_speedtest_target_wrapper(
         res = run_networkquality_measurement(target, probe_run, tools)
     elif method == "burst":
         res = run_burst_traffic_measurement(target, probe_run, tools)
+    elif method == "fast-api":
+        res = run_fast_api_measurement(target, probe_run, tools)
+    elif method == "ookla-http":
+        res = run_ookla_http_measurement(target, probe_run, tools)
     else:
         raise ValueError(f"Unsupported speedTestMethod '{method}' on target '{target.get('service')}/{target.get('endpointName')}'")
 
@@ -1853,7 +2101,7 @@ def run_speedtest_target_wrapper(
     upload_err_detail = ""
 
     if res["UploadMbps"] > 0:
-        if res["Tool"] == "burst" and get_optional_str(target, "uploadUrl"):
+        if "burst" in res["Tool"] and get_optional_str(target, "uploadUrl"):
             upload_tool = "upload-url"
         else:
             upload_tool = res["Tool"]
@@ -2123,7 +2371,7 @@ def main() -> None:
 
     # Load configuration
     try:
-        config = json.loads(config_path.read_text(encoding="utf-8"))
+        config = qoe_config.load_config(config_path)
     except Exception as e:
         print(f"Error: Failed to parse configuration file: {e}", file=sys.stderr)
         sys.exit(1)

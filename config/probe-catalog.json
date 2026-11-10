@@ -37,7 +37,11 @@
       "ytDlpExe": "bin\\yt-dlp.exe",
       "puppeteerCacheDir": "bin\\puppeteer-cache",
       "temporaryDirectory": "bin\\tmp"
-    }
+    },
+    "throughputEngine": "timed",
+    "downloadDurationSeconds": 8,
+    "uploadDurationSeconds": 6,
+    "warmupSeconds": 2
   },
   "targets": [
     {
@@ -71,9 +75,12 @@
       "service": "Netflix",
       "endpointName": "nflx-video-cdn",
       "type": "speedtest",
-      "speedTestMethod": "fast-cli",
+      "speedTestMethod": "fast-api",
       "host": "fast.com",
-      "enabled": true
+      "enabled": true,
+      "uploadMeasurementMethod": "oca",
+      "parallelConnections": 8,
+      "urlCount": 5
     },
     {
       "service": "Disney+",
@@ -102,6 +109,88 @@
       "uploadPayloadBytes": 33554432,
       "maxDownloadIterations": 3,
       "enabled": true
+    },
+    {
+      "service": "Inter-Ookla-Barquisimeto",
+      "endpointName": "ookla-38816-bqto",
+      "type": "speedtest",
+      "speedTestMethod": "ookla-http",
+      "host": "speedtest.bqto.inter.com.ve",
+      "ooklaHost": "speedtest.bqto.inter.com.ve",
+      "ooklaPort": 8080,
+      "ooklaServerId": 38816,
+      "parallelConnections": 8,
+      "enabled": true
+    },
+    {
+      "service": "Inter-Ookla-Caracas",
+      "endpointName": "ookla-37714-ccs",
+      "type": "speedtest",
+      "speedTestMethod": "ookla-http",
+      "host": "speedtest.ccs.inter.com.ve",
+      "ooklaHost": "speedtest.ccs.inter.com.ve",
+      "ooklaPort": 8080,
+      "ooklaServerId": 37714,
+      "parallelConnections": 8,
+      "enabled": true
     }
-  ]
+  ],
+  "heartbeat": {
+    "failThreshold": 2,
+    "recoverThreshold": 2,
+    "samplesPerTarget": 5,
+    "timeoutSeconds": 2,
+    "maxLatencyMs": {
+      "inter": 40,
+      "external": 150
+    },
+    "maxLossPercentage": 20,
+    "targets": [
+      {
+        "name": "inter-ookla-bqto",
+        "host": "speedtest.bqto.inter.com.ve",
+        "port": 8080,
+        "kind": "inter"
+      },
+      {
+        "name": "inter-ookla-ccs",
+        "host": "speedtest.ccs.inter.com.ve",
+        "port": 8080,
+        "kind": "inter"
+      },
+      {
+        "name": "cloudflare",
+        "host": "1.1.1.1",
+        "port": 443,
+        "kind": "external"
+      },
+      {
+        "name": "google",
+        "host": "www.google.com",
+        "port": 443,
+        "kind": "external"
+      },
+      {
+        "name": "netflix",
+        "host": "fast.com",
+        "port": 443,
+        "kind": "external"
+      }
+    ],
+    "dnsNames": [
+      "www.google.com",
+      "www.youtube.com",
+      "www.netflix.com"
+    ]
+  },
+  "onuReport": {
+    "minOnusPerPon": 5,
+    "newOfflineAbsolute": 6,
+    "newOfflineMin": 4,
+    "newOfflineRatio": 0.3,
+    "rxDropDb": 2.0,
+    "mostlyOfflineRatio": 0.5,
+    "maxTelegramItems": 15,
+    "snapshotRetentionDays": 30
+  }
 }

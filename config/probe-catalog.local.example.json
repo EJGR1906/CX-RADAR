@@ -1,0 +1,9 @@
+{
+  "probe": {
+    "probeId": "HUB_BTO",
+    "site": "Server-HUB",
+    "router_brand": "VSOL",
+    "router_model": "HG5033-AX30-3G",
+    "connection_type": "ETHERNET"
+  }
+}
