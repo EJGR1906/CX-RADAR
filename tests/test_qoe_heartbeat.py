@@ -268,7 +268,9 @@ class TestDnsAndHttp(unittest.TestCase):
 
     def test_http_get_connection_refused_is_an_error_not_an_exception(self):
         r = hb.http_get("http://127.0.0.1:1/", 1)
-        self.assertEqual((r["status"], r["error"]), (0, "connect"))
+        self.assertEqual(r["status"], 0)
+        # Linux y macOS rechazan la conexión al instante; Windows reintenta y termina en timeout.
+        self.assertIn(r["error"], ("connect", "timeout"))
 
     def test_verify_internet(self):
         ok = self.http_server(204)
