@@ -17,6 +17,8 @@ Auditoría con el log real del 12/11 (1425 corridas) y Outlook caído sin que la
 - **Robustez:** estado dañado ya no tumba las alertas, error interno se registra y se avisa, bloqueo contra corridas simultáneas, tiempo máximo por corrida, búfer de InfluxDB que aparta líneas rechazadas, rotación de logs del monitor.
 - **Programador:** se quita `-RunOnlyIfNetworkAvailable` y se agrega `-ExecutionTimeLimit` (`scripts/register_qoe_task.py`). Hay que volver a registrar las tareas en cada sonda.
 - **Pruebas:** banco de inyección de fallas (`tests/test_fault_injection.py`) y matriz de detección (`docs/qa/detection-matrix.md`).
+- **CI:** `.github/workflows/tests.yml` corre todas las pruebas en Windows, Linux y macOS (Python 3.8 y 3.13). Las pruebas que estaban en `scripts/` pasan a `tests/` (chocaban de nombre y `unittest discover` fallaba).
+- **Certificación:** `run_qoe_certification.py` incluye una corrida del monitor en una carpeta aparte (`--log-dir`).
 
 ---
 

@@ -903,6 +903,8 @@ def main() -> None:
     parser.add_argument("--skip-influx-write", action="store_true")
     parser.add_argument("--skip-telegram", action="store_true")
     parser.add_argument("--rounds", type=int, default=0, help="Rondas de muestreo (por defecto, las de la ventana configurada)")
+    parser.add_argument("--log-dir", type=str, default="",
+                        help="Carpeta de log, estado y bloqueo. Para pruebas: no toca el estado del monitor programado.")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
@@ -912,6 +914,8 @@ def main() -> None:
         log_dir = repo_root / qoe_config.load_config(cfg_path).get("probeRun", {}).get("logDirectory", "logs")
     except Exception:
         pass  # el error de configuración se reporta dentro de run()
+    if args.log_dir:
+        log_dir = Path(args.log_dir).resolve()
     log_dir.mkdir(parents=True, exist_ok=True)
     qoe_probe.log_path_global = log_dir / f"qoe-heartbeat-{datetime.date.today().isoformat()}.log"
 

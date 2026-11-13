@@ -11,7 +11,7 @@ from update_qoe_probe import run_cmd
 class TestRunCmd(unittest.TestCase):
     def test_run_cmd_success(self):
         # We test echo
-        ret, stdout, stderr = run_cmd(['echo', 'hello'])
+        ret, stdout, stderr = run_cmd([sys.executable, '-c', 'print("hello")'])  # `echo` no es un programa en Windows
         self.assertEqual(ret, 0)
         self.assertEqual(stdout, 'hello')
         self.assertEqual(stderr, '')

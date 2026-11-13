@@ -46,9 +46,7 @@ FILES_TO_UPDATE = [
     "run_qoe_certification.py",
     "set_influx_token.py",
     "setup_portable.py",
-    "test_qoe_probe.py",
-    "test_setup_portable.py",
-    "test_update_qoe_probe.py",
+    "setup_grafana_alert.py",
     "update_qoe_probe.py",
     "validate_qoe_probe.py"
 ]

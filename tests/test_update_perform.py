@@ -5,7 +5,7 @@ import tempfile
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
 import update_qoe_probe
 
 class TestUpdateQoeProbe(unittest.TestCase):

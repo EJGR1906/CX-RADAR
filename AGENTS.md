@@ -19,6 +19,7 @@ Architecture details live in [docs/architecture/qoe-architecture.md](docs/archit
 - Probe scripts: [scripts/](scripts)
 - Dashboard JSON and Flux examples: [grafana/](grafana)
 - Real throughput, 1-minute heartbeat, Telegram alerts and ONU report: [docs/operations/medicion-real-y-alertas.md](docs/operations/medicion-real-y-alertas.md)
+- Qué fallas detecta el monitor y qué prueba lo demuestra: [docs/qa/detection-matrix.md](docs/qa/detection-matrix.md)
 - Operations and QA runbooks: [docs/operations/task-scheduler-runbook.md](docs/operations/task-scheduler-runbook.md), [docs/qa/validation-runbook.md](docs/qa/validation-runbook.md), [docs/qa/certification-checklist.md](docs/qa/certification-checklist.md)
 - Security guidance: [docs/security/hardening.md](docs/security/hardening.md)
 - Grafana setup: [docs/observability/grafana-cloud-setup.md](docs/observability/grafana-cloud-setup.md)
@@ -49,6 +50,9 @@ python scripts/qoe_probe.py
 QA checks:
 
 ```bash
+# Pruebas unitarias y banco de inyección de fallas (lo mismo que corre el CI)
+python -m unittest discover -s tests
+
 # Ejecutar suite de humo de certificación
 python scripts/run_qoe_certification.py --output-path logs/qoe-certification-smoke.json
 

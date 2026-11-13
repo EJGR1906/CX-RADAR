@@ -7,8 +7,11 @@ cuánto tiempo avisa y qué prueba automática lo demuestra. Las pruebas están 
 prueba, el producto no lo afirma.
 
 ```bash
-python tests/test_fault_injection.py
+python -m unittest discover -s tests
 ```
+
+El CI (`.github/workflows/tests.yml`) las corre en Windows, Linux y macOS con
+Python 3.8 y 3.13 en cada cambio.
 
 ## Fallas de la conexión
 
