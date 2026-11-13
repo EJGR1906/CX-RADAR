@@ -136,28 +136,116 @@ Si la última línea imprime `OK`, la siguiente corrida de la sonda mide Disney+
 
 ## Monitor cada minuto (`qoe_heartbeat.py`)
 
-Hace conexiones cortas (sin pruebas de velocidad) al router local, a los Ookla
-de Inter, a Cloudflare, Google y fast.com, y resuelve DNS. Clasifica:
+No mide velocidad. Cada corrida muestrea la conexión durante 45 s: una conexión
+TCP cada 5 s a cada destino (10 rondas). Además consulta el DNS, pide una página
+de verificación y revisa servicios externos. Lo que detecta y la prueba que lo
+demuestra están en [docs/qa/detection-matrix.md](../qa/detection-matrix.md).
 
-| Estado | Significado |
-|---|---|
-| `ok` | Todo responde dentro de los umbrales. |
-| `degradado` | Responde, pero con latencia o pérdida altas, o algún destino no responde. |
-| `caida_transito` | La red de Inter responde pero internet no: salida o tránsito. |
-| `caida_acceso` | No responde nada: PON, OLT, agregación o BNG. |
-| `caida_router_local` | No responde el router de la sonda: falla del punto de medición. |
+Destinos (`heartbeat.targets`):
+- del proveedor (`kind: inter`): los Ookla de Inter;
+- externos por nombre: Google y fast.com;
+- anclas por IP: 1.1.1.1, 8.8.8.8 y 9.9.9.9. No dependen del DNS, así que una
+  falla de DNS no se confunde con una caída.
 
-Avisa por Telegram con 2 corridas malas seguidas (2 minutos), avisa si empeora
-y avisa la recuperación con la duración. Si la caída impide enviar el aviso de
-falla, no lo manda atrasado: al volver la conexión envía un solo mensaje
-RECUPERADO con el diagnóstico (acceso, tránsito o router local), la hora de
-inicio y la duración. Las
-métricas que no se pudieron escribir se reenvían, así que Grafana muestra la
-ventana completa.
+Los destinos por nombre se resuelven una vez por corrida y se guarda la última
+IP: con el DNS caído se siguen probando.
+
+| Estado | Código | Significado |
+|---|---|---|
+| `ok` | 0 | Todo responde dentro de los umbrales. |
+| `degradado` | 1 | Responde con latencia o pérdida altas, o algún destino no responde. |
+| `microcortes` | 6 | Dentro de la ventana hubo 2 o más rondas sin respuesta de ningún destino (corte de segundos) y volvió. |
+| `internet_interceptado` | 7 | Conecta, pero la página de verificación no responde lo esperado: portal cautivo, proxy o bloqueo. |
+| `falla_dns` | 5 | Hay conexión por IP, pero no resuelve ni el DNS del sistema ni la consulta directa. |
+| `caida_transito` | 2 | La red del proveedor responde pero internet no: salida o tránsito. |
+| `caida_acceso` | 3 | No responde nada y el router local sí: PON, OLT, agregación o BNG. |
+| `caida_router_local` | 4 | No responde el router de la sonda. |
+| `sin_red_local` | 8 | El equipo no tiene red (cable o Wi-Fi desconectado). Falla local, no del proveedor. |
+
+Un destino "responde" si contestó en alguna de las últimas 3 rondas, así el
+estado describe el final de la ventana: un corte que empieza a mitad de la
+corrida ya sale como caída.
+
+Avisos por Telegram:
+- una caída (cualquier estado que no sea `degradado` o `microcortes`) avisa a las
+  2 corridas seguidas (`failThreshold`);
+- `degradado` y `microcortes` avisan a las 5 (`degradedFailThreshold`);
+- si un incidente ya avisado empeora, se avisa de inmediato (EMPEORA);
+- el incidente se cierra tras 5 corridas buenas (`recoverThreshold`). El
+  RECUPERADO trae la duración, desde cuándo está estable y cuántos cortes hubo.
+  Una conexión intermitente genera un solo par FALLA/RECUPERADO.
+
+Si la caída impide enviar el aviso de falla, no se manda atrasado: al volver se
+envía un solo RECUPERADO con el diagnóstico. Las métricas que no se pudieron
+escribir se reenvían, así que Grafana muestra la ventana completa. Si InfluxDB
+rechaza las líneas guardadas (HTTP 400 o 422) se apartan en
+`logs/heartbeat-buffer.rejected-*.lp` para que no bloqueen los envíos siguientes.
+
+Cada línea del log trae el diagnóstico completo:
+
+```text
+Heartbeat ok (inter-ookla-bqto=4.1ms, ...) | router=ok dns=ok/ok web=ok perdida=0.0% cortes=0s | servicios: Outlook=ok [45.3s]
+```
+
+`dns=sistema/públicos`, `web` es la página de verificación, `cortes` son los
+segundos sin respuesta de ningún destino. `X` es falla y `?` no medido.
 
 Umbrales en la sección `heartbeat` del catálogo: `maxLatencyMs` (40 ms para
-Inter, 150 ms para externos), `maxLossPercentage`, `failThreshold` y
-`recoverThreshold`.
+Inter, 150 ms para externos), `maxLossPercentage` (más de 20 % de las 10
+muestras de un destino), `windowSeconds` y `sampleIntervalSeconds`.
+
+Protecciones de la propia sonda:
+- un archivo de estado dañado se descarta y se reinicia;
+- un error interno queda en el log y se avisa por Telegram (una vez cada 6 h);
+- no corren dos monitores a la vez (`logs/heartbeat.lock`);
+- una corrida se detiene a los 110 s;
+- los logs del monitor se borran a los 30 días (`logRetentionDays`).
+
+### Latencia real en Windows
+
+Hasta la versión anterior las latencias del monitor en Windows salían en
+múltiplos de 15,6 ms (15,6 / 31,2 / 46,9...): Windows despierta los sockets en
+ticks de ese tamaño. En el log del 12/11 el 86 % de las muestras estaba en un
+múltiplo. Ahora el monitor sube la resolución del reloj a 1 ms mientras mide y
+no cronometra la consulta DNS. Después de actualizar, las latencias hacia Inter
+deben bajar a su valor real; conviene revisar `maxLatencyMs` con los valores nuevos.
+
+### Servicios externos (Outlook, Microsoft 365, Teams)
+
+`heartbeat.serviceChecks` es una lista de páginas que se piden por HTTPS una vez
+por minuto (sin seguir redirecciones). Un servicio está `caido` si fallan todas
+sus pruebas y `parcial` si falla alguna. Avisa a las 3 corridas seguidas
+(`serviceFailThreshold`) con un mensaje distinto al de red:
+
+```text
+SERVICIO EXTERNO CAÍDO: Outlook (3 de 3 pruebas fallan)
+La red de la sonda e internet responden normal: la falla es del servicio, no de la conexión.
+- outlook-m365: conexión cortada
+```
+
+Los servicios no se evalúan mientras la red de la sonda está caída, con falla de
+DNS o interceptada. Los resultados van a InfluxDB en `qoe_service_check`
+(tags `service` y `check`).
+
+Límite: sin credenciales se ve la puerta de entrada del servicio (DNS, TLS,
+errores 5xx, timeouts). No se ven fallas por cuenta o buzón, donde el portal
+carga pero el correo no sale.
+
+`expectedHttpCodes` de las tres pruebas de Outlook se definió con Outlook
+fallando (12/11). Con el servicio sano hay que correr el monitor una vez y
+confirmar que salen `ok`; si no, ajustar los códigos.
+
+### Volver a registrar las tareas (obligatorio al actualizar)
+
+La tarea de Windows se creaba con "ejecutar solo si hay red disponible": el
+monitor no corría justo cuando el equipo se quedaba sin red. Ya no se usa, y
+además cada corrida tiene tiempo máximo (2 min el monitor, 20 min la sonda).
+En cada sonda:
+
+```bash
+python scripts/register_qoe_task.py --script heartbeat --task-name CX-Radar-Heartbeat --interval-minutes 1
+python scripts/register_qoe_task.py --interval-minutes 30
+```
 
 ### Aviso inmediato durante la caída (Grafana Cloud)
 

@@ -323,14 +323,18 @@ def read_env_file_var(env_path: Path, var_name: str) -> str:
     return ""
 
 
-def get_influx_token(influx_cfg: Dict[str, Any], config_dir: Path) -> str:
-    """Resolve the InfluxDB authentication token from env or .env file."""
+def get_influx_token(influx_cfg: Dict[str, Any], config_dir: Path, quiet: bool = False) -> str:
+    """Resolve the InfluxDB authentication token from env or .env file.
+
+    `quiet` omite la línea de log (el monitor de cada minuto la repetía 1440 veces al día).
+    """
     token_name = get_optional_str(influx_cfg, "tokenEnvVar", "INFLUXDB_TOKEN")
 
     # 1. Process Environment
     token = os.environ.get(token_name, "")
     if token:
-        log_message(f"Using InfluxDB token from environment variable '{token_name}'.", "INFO")
+        if not quiet:
+            log_message(f"Using InfluxDB token from environment variable '{token_name}'.", "INFO")
         return token
 
     # 2. Local .env files
@@ -339,7 +343,8 @@ def get_influx_token(influx_cfg: Dict[str, Any], config_dir: Path) -> str:
         if candidate.is_file():
             token = read_env_file_var(candidate, token_name)
             if token:
-                log_message(f"Using InfluxDB token from .env file '{candidate}'.", "INFO")
+                if not quiet:
+                    log_message(f"Using InfluxDB token from .env file '{candidate}'.", "INFO")
                 return token
 
     raise ValueError(f"InfluxDB token was not found in environment variable '{token_name}' or any .env file.")

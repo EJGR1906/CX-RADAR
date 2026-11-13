@@ -46,7 +46,7 @@ El helper de tarea programada ahora predetermina `-ExecutionPolicy RemoteSigned`
 
 La tarea se registra con un nivel de ejecución limitado. Evita el contexto de administrador a menos que una dependencia futura lo requiera y el requisito esté documentado explícitamente.
 
-La tarea programada también usa `RunOnlyIfNetworkAvailable` para que la sonda no siga generando fallas locales mientras la estación de trabajo está desconectada.
+La tarea programada ya no usa `RunOnlyIfNetworkAvailable`: el monitor tiene que correr justo cuando el equipo se queda sin red, para registrar la falla y diagnosticarla como local. Cada corrida tiene tiempo máximo (`ExecutionTimeLimit`: 2 min el monitor, 20 min la sonda).
 
 ## Seguridad de tasa y reputación
 

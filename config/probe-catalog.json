@@ -146,14 +146,17 @@
   ],
   "heartbeat": {
     "failThreshold": 2,
-    "recoverThreshold": 2,
-    "samplesPerTarget": 5,
+    "degradedFailThreshold": 5,
+    "recoverThreshold": 5,
+    "windowSeconds": 45,
+    "sampleIntervalSeconds": 5,
     "timeoutSeconds": 2,
     "maxLatencyMs": {
       "inter": 40,
       "external": 150
     },
     "maxLossPercentage": 20,
+    "logRetentionDays": 30,
     "targets": [
       {
         "name": "inter-ookla-bqto",
@@ -174,6 +177,18 @@
         "kind": "external"
       },
       {
+        "name": "google-dns",
+        "host": "8.8.8.8",
+        "port": 443,
+        "kind": "external"
+      },
+      {
+        "name": "quad9",
+        "host": "9.9.9.9",
+        "port": 443,
+        "kind": "external"
+      },
+      {
         "name": "google",
         "host": "www.google.com",
         "port": 443,
@@ -190,6 +205,61 @@
       "www.google.com",
       "www.youtube.com",
       "www.netflix.com"
+    ],
+    "dnsServers": [
+      {
+        "name": "cloudflare",
+        "ip": "1.1.1.1"
+      },
+      {
+        "name": "google",
+        "ip": "8.8.8.8"
+      }
+    ],
+    "connectivityChecks": [
+      {
+        "url": "http://connectivitycheck.gstatic.com/generate_204",
+        "expectedStatus": 204
+      },
+      {
+        "url": "https://www.google.com/generate_204",
+        "expectedStatus": 204
+      }
+    ],
+    "serviceFailThreshold": 3,
+    "serviceRecoverThreshold": 2,
+    "serviceTimeoutSeconds": 8,
+    "serviceChecks": [
+      {
+        "service": "Outlook",
+        "name": "outlook-m365",
+        "url": "https://outlook.office365.com/owa/healthcheck.htm",
+        "expectedHttpCodes": [200]
+      },
+      {
+        "service": "Outlook",
+        "name": "outlook-web",
+        "url": "https://outlook.office.com/mail/",
+        "expectedHttpCodes": [200, 302]
+      },
+      {
+        "service": "Outlook",
+        "name": "outlook-com",
+        "url": "https://outlook.live.com/owa/",
+        "expectedHttpCodes": [200, 302]
+      },
+      {
+        "service": "Microsoft 365 Login",
+        "name": "m365-login",
+        "url": "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration",
+        "expectedHttpCodes": [200]
+      },
+      {
+        "service": "Teams",
+        "name": "teams-web",
+        "url": "https://teams.microsoft.com/",
+        "expectedHttpCodes": [200, 302]
+      }
     ]
   },
   "onuReport": {
