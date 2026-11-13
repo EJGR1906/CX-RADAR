@@ -2,7 +2,11 @@
 
 **Solución Automatizada de Monitoreo de Calidad de Experiencia (QoE) en Servicios Web**
 
-CX-Radar es una plataforma corporativa diseñada para evaluar de forma continua y objetiva la calidad de los servicios web críticos para la organización (como Microsoft, YouTube, Netflix, Disney+ y Amazon) desde la perspectiva de la red local.
+CX-Radar detecta fallas de la conexión a internet y mide la calidad de los servicios web críticos (como Microsoft, YouTube, Netflix, Disney+ y Amazon) desde la red local.
+
+- **Monitor cada minuto**: muestrea la conexión 45 s por minuto, diagnostica dónde está la falla (equipo, router, acceso del proveedor, salida a internet, DNS o un servicio externo como Outlook) y avisa por Telegram.
+- **Sonda de velocidad cada 30 minutos**: mide bajada, subida, latencia y jitter reales, y avisa si la velocidad cae bajo el plan contratado.
+- **Qué se detecta y cómo se prueba**: [docs/qa/detection-matrix.md](docs/qa/detection-matrix.md). Cada fila enlaza la prueba automática que la respalda (`python -m unittest discover -s tests`).
 
 ---
 

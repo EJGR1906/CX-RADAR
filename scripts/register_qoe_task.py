@@ -52,6 +52,11 @@ def run_cmd(args: List[str], env: Optional[Dict[str, str]] = None) -> Tuple[int,
         return -1, "", str(e)
 
 
+def execution_limit_minutes(script_path: Path) -> int:
+    """Tiempo máximo de una corrida: 2 min el monitor de cada minuto, 20 min la sonda completa."""
+    return 2 if script_path.name == "qoe_heartbeat.py" else 20
+
+
 def register_windows(
     task_name: str, script_path: Path, config_path: Path, interval_minutes: int,
     run_as_current_user: bool, description: str
@@ -66,7 +71,9 @@ def register_windows(
     $ErrorActionPreference = 'Stop'
     $action = New-ScheduledTaskAction -Execute $env:TASK_EXEC -Argument "`"$env:TASK_SCRIPT`" --config-path `"$env:TASK_CONFIG`""
     $trigger = New-ScheduledTaskTrigger -Once -At ((Get-Date).Date) -RepetitionInterval (New-TimeSpan -Minutes ([int]$env:TASK_INTERVAL)) -RepetitionDuration ([TimeSpan]::MaxValue)
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -RunOnlyIfNetworkAvailable -StartWhenAvailable
+    # Sin -RunOnlyIfNetworkAvailable: la tarea tiene que correr justo cuando no hay red, para registrar la falla.
+    # -ExecutionTimeLimit: una corrida colgada no puede bloquear las siguientes (IgnoreNew).
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes ([int]$env:TASK_LIMIT))
     $currentUserName = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
     $principal = New-ScheduledTaskPrincipal -UserId $currentUserName -LogonType $env:TASK_LOGON -RunLevel Limited
     $task = New-ScheduledTask -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description $env:TASK_DESC
@@ -83,6 +90,7 @@ def register_windows(
     proc_env["TASK_LOGON"] = logon_type
     proc_env["TASK_DESC"] = description
     proc_env["TASK_NAME"] = task_name
+    proc_env["TASK_LIMIT"] = str(execution_limit_minutes(script_path))
 
     # We invoke powershell
     code, stdout, stderr = run_cmd([
@@ -162,7 +170,8 @@ After=network.target
 Type=oneshot
 WorkingDirectory={script_path.parent.parent}
 ExecStart={sys.executable} {script_path} --config-path {config_path}
-EnvironmentFile={script_path.parent.parent}/.env
+EnvironmentFile=-{script_path.parent.parent}/.env
+TimeoutStartSec={execution_limit_minutes(script_path) * 60}
 """
 
     timer_content = f"""[Unit]

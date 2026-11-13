@@ -35,6 +35,835 @@
     "description": "Vista Detallada por sonda de QoE para CX-Radar. Permite analizar el rendimiento especifico de una sonda.",
     "editable": true,
     "elements": {
+      "detail-conn-uptime": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "refId": "A",
+                    "query": {
+                      "datasource": {
+                        "name": "dfkh6j26t6gw0c"
+                      },
+                      "group": "influxdb",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat_status\" and r._field == \"status_code\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> map(fn: (r) => ({_time: r._time, _value: if contains(value: int(v: r._value), set: [2, 3, 4, 5, 7, 8]) then 1.0 else 0.0}))\n  |> mean()\n  |> map(fn: (r) => ({_time: now(), _field: \"Internet disponible\", _value: (1.0 - r._value) * 100.0}))\n  |> group(columns: [\"_field\"])",
+                        "range": false
+                      },
+                      "version": "v0"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Porcentaje de minutos del rango en que la sonda tuvo internet (segun el monitor de cada minuto). Degradado y microcortes cuentan como disponible. Los minutos en que la sonda no reporto no se cuentan.",
+          "id": 214,
+          "links": [],
+          "title": "Internet Disponible",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "version": "13.1.0-25153870157",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Sin datos",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "decimals": 2,
+                  "unit": "percent",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "red",
+                        "value": 0
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 99
+                      },
+                      {
+                        "color": "green",
+                        "value": 99.9
+                      }
+                    ]
+                  },
+                  "max": 100,
+                  "min": 0
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": true
+              }
+            }
+          }
+        }
+      },
+      "detail-conn-down-minutes": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "refId": "A",
+                    "query": {
+                      "datasource": {
+                        "name": "dfkh6j26t6gw0c"
+                      },
+                      "group": "influxdb",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat_status\" and r._field == \"status_code\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> map(fn: (r) => ({_time: r._time, _value: if contains(value: int(v: r._value), set: [2, 3, 4, 5, 7, 8]) then 1.0 else 0.0}))\n  |> sum()\n  |> map(fn: (r) => ({_time: now(), _field: \"Minutos sin internet\", _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                        "range": false
+                      },
+                      "version": "v0"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Minutos del rango en que el monitor diagnostico caida de acceso, de transito, de router, de red local, de DNS o internet interceptado.",
+          "id": 215,
+          "links": [],
+          "title": "Minutos sin Internet",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "version": "13.1.0-25153870157",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Sin datos",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "decimals": 0,
+                  "unit": "none",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 1
+                      },
+                      {
+                        "color": "red",
+                        "value": 10
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": true
+              }
+            }
+          }
+        }
+      },
+      "detail-conn-cuts": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "refId": "A",
+                    "query": {
+                      "datasource": {
+                        "name": "dfkh6j26t6gw0c"
+                      },
+                      "group": "influxdb",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat_status\" and r._field == \"status_code\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> map(fn: (r) => ({_time: r._time, _value: if contains(value: int(v: r._value), set: [2, 3, 4, 5, 7, 8]) then 1.0 else 0.0}))\n  |> difference(nonNegative: false)\n  |> map(fn: (r) => ({_time: r._time, _value: if r._value > 0.0 then 1.0 else 0.0}))\n  |> sum()\n  |> map(fn: (r) => ({_time: now(), _field: \"Cortes\", _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                        "range": false
+                      },
+                      "version": "v0"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Numero de veces que la conexion paso de funcionar a no tener internet en el rango.",
+          "id": 216,
+          "links": [],
+          "title": "Cortes",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "version": "13.1.0-25153870157",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Sin datos",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "decimals": 0,
+                  "unit": "none",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 1
+                      },
+                      {
+                        "color": "red",
+                        "value": 5
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": true
+              }
+            }
+          }
+        }
+      },
+      "detail-conn-blackout": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "refId": "A",
+                    "query": {
+                      "datasource": {
+                        "name": "dfkh6j26t6gw0c"
+                      },
+                      "group": "influxdb",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat_status\" and r._field == \"blackout_s\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> group()\n  |> sum()\n  |> map(fn: (r) => ({_time: now(), _field: \"Segundos sin respuesta\", _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                        "range": false
+                      },
+                      "version": "v0"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Suma de los segundos en que no respondio ningun destino dentro de las ventanas de 45 s del monitor (resolucion de 5 s).",
+          "id": 217,
+          "links": [],
+          "title": "Segundos en Microcortes",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "version": "13.1.0-25153870157",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Sin datos",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "decimals": 0,
+                  "unit": "s",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "yellow",
+                        "value": 10
+                      },
+                      {
+                        "color": "red",
+                        "value": 120
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": true
+              }
+            }
+          }
+        }
+      },
+      "detail-conn-timeline": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "refId": "A",
+                    "query": {
+                      "datasource": {
+                        "name": "dfkh6j26t6gw0c"
+                      },
+                      "group": "influxdb",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat_status\" and r._field == \"status_code\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> group(columns: [\"probe_id\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\n  |> map(fn: (r) => ({_time: r._time, _field: \"Conexion\", _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                        "range": true
+                      },
+                      "version": "v0"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Diagnostico del monitor de cada minuto. Si el rango agrupa varios minutos se muestra el codigo mas alto del grupo. Los huecos son minutos sin reporte (equipo apagado o datos aun no reenviados).",
+          "id": 218,
+          "links": [],
+          "title": "Estado de la Conexion (cada minuto)",
+          "vizConfig": {
+            "group": "state-timeline",
+            "kind": "VizConfig",
+            "version": "13.1.0-25153870157",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Sin datos",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "custom": {
+                    "fillOpacity": 80,
+                    "lineWidth": 1
+                  },
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "color": "green",
+                          "index": 0,
+                          "text": "OK"
+                        },
+                        "1": {
+                          "color": "yellow",
+                          "index": 1,
+                          "text": "Degradado"
+                        },
+                        "2": {
+                          "color": "red",
+                          "index": 5,
+                          "text": "Sin salida a internet"
+                        },
+                        "3": {
+                          "color": "dark-red",
+                          "index": 6,
+                          "text": "Caida del acceso"
+                        },
+                        "4": {
+                          "color": "blue",
+                          "index": 7,
+                          "text": "Router local caido"
+                        },
+                        "5": {
+                          "color": "dark-orange",
+                          "index": 4,
+                          "text": "Falla de DNS"
+                        },
+                        "6": {
+                          "color": "orange",
+                          "index": 2,
+                          "text": "Microcortes"
+                        },
+                        "7": {
+                          "color": "purple",
+                          "index": 3,
+                          "text": "Internet interceptado"
+                        },
+                        "8": {
+                          "color": "dark-blue",
+                          "index": 8,
+                          "text": "Sonda sin red local"
+                        }
+                      }
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "alignValue": "center",
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": false
+                },
+                "mergeValues": true,
+                "rowHeight": 0.8,
+                "showValue": "auto",
+                "tooltip": {
+                  "hideZeros": true,
+                  "mode": "multi",
+                  "sort": "none"
+                }
+              }
+            }
+          }
+        }
+      },
+      "detail-services-timeline": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "refId": "A",
+                    "query": {
+                      "datasource": {
+                        "name": "dfkh6j26t6gw0c"
+                      },
+                      "group": "influxdb",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_service_check\" and r._field == \"available\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> map(fn: (r) => ({r with _value: if r._value then 1 else 0}))\n  |> group(columns: [\"service\", \"check\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: min, createEmpty: false)\n  |> map(fn: (r) => ({_time: r._time, _field: r.service + \" / \" + r.check, _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                        "range": true
+                      },
+                      "version": "v0"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Resultado de cada prueba HTTPS de servicios externos del monitor de cada minuto. Solo se evaluan cuando la red de la sonda funciona: un hueco significa que la sonda no tenia internet.",
+          "id": 219,
+          "links": [],
+          "title": "Servicios Externos (Outlook, Microsoft 365, Teams)",
+          "vizConfig": {
+            "group": "state-timeline",
+            "kind": "VizConfig",
+            "version": "13.1.0-25153870157",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Sin datos",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "custom": {
+                    "fillOpacity": 80,
+                    "lineWidth": 1
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "0": {
+                          "color": "red",
+                          "index": 1,
+                          "text": "Caído"
+                        },
+                        "1": {
+                          "color": "green",
+                          "index": 0,
+                          "text": "Disponible"
+                        }
+                      },
+                      "type": "value"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "alignValue": "center",
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": false
+                },
+                "mergeValues": true,
+                "rowHeight": 0.8,
+                "showValue": "auto",
+                "tooltip": {
+                  "hideZeros": true,
+                  "mode": "multi",
+                  "sort": "none"
+                }
+              }
+            }
+          }
+        }
+      },
+      "detail-hb-latency": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "refId": "A",
+                    "query": {
+                      "datasource": {
+                        "name": "dfkh6j26t6gw0c"
+                      },
+                      "group": "influxdb",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat\" and r._field == \"latency_ms\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> group(columns: [\"check\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\n  |> map(fn: (r) => ({_time: r._time, _field: r.check, _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                        "range": true
+                      },
+                      "version": "v0"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Latencia de conexion TCP (mediana de la ventana) hacia cada destino del monitor de cada minuto. Se muestra el maximo de cada intervalo.",
+          "id": 220,
+          "links": [],
+          "title": "Latencia por Destino (monitor)",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "version": "13.1.0-25153870157",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Sin datos",
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 0,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 4,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "decimals": 1,
+                  "unit": "ms",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "annotations": {
+                  "clustering": -1,
+                  "multiLane": false
+                },
+                "legend": {
+                  "calcs": [
+                    "lastNotNull",
+                    "mean",
+                    "max"
+                  ],
+                  "displayMode": "table",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            }
+          }
+        }
+      },
+      "detail-hb-loss": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "refId": "A",
+                    "query": {
+                      "datasource": {
+                        "name": "dfkh6j26t6gw0c"
+                      },
+                      "group": "influxdb",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat\" and r._field == \"loss_pct\")\n  |> filter(fn: (r) => r.probe_id == \"${probe_id}\")\n  |> group(columns: [\"check\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\n  |> map(fn: (r) => ({_time: r._time, _field: r.check, _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                        "range": true
+                      },
+                      "version": "v0"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Porcentaje de conexiones sin respuesta hacia cada destino en la ventana del monitor (10 muestras por minuto). Se muestra el maximo de cada intervalo.",
+          "id": 221,
+          "links": [],
+          "title": "Perdida por Destino (monitor)",
+          "vizConfig": {
+            "group": "timeseries",
+            "kind": "VizConfig",
+            "version": "13.1.0-25153870157",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Sin datos",
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "bars",
+                    "fillOpacity": 60,
+                    "gradientMode": "opacity",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 4,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  },
+                  "decimals": 0,
+                  "unit": "percent",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "annotations": {
+                  "clustering": -1,
+                  "multiLane": false
+                },
+                "legend": {
+                  "calcs": [
+                    "lastNotNull",
+                    "mean",
+                    "max"
+                  ],
+                  "displayMode": "table",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "multi",
+                  "sort": "desc"
+                }
+              }
+            }
+          }
+        }
+      },
       "detail-kpi-avail": {
         "kind": "Panel",
         "spec": {
@@ -1911,10 +2740,114 @@
             "spec": {
               "element": {
                 "kind": "ElementReference",
-                "name": "detail-kpi-avail"
+                "name": "detail-conn-uptime"
               },
               "x": 0,
               "y": 0,
+              "width": 6,
+              "height": 4
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "detail-conn-down-minutes"
+              },
+              "x": 6,
+              "y": 0,
+              "width": 6,
+              "height": 4
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "detail-conn-cuts"
+              },
+              "x": 12,
+              "y": 0,
+              "width": 6,
+              "height": 4
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "detail-conn-blackout"
+              },
+              "x": 18,
+              "y": 0,
+              "width": 6,
+              "height": 4
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "detail-conn-timeline"
+              },
+              "x": 0,
+              "y": 4,
+              "width": 24,
+              "height": 4
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "detail-services-timeline"
+              },
+              "x": 0,
+              "y": 8,
+              "width": 24,
+              "height": 8
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "detail-hb-latency"
+              },
+              "x": 0,
+              "y": 16,
+              "width": 12,
+              "height": 10
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "detail-hb-loss"
+              },
+              "x": 12,
+              "y": 16,
+              "width": 12,
+              "height": 10
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "detail-kpi-avail"
+              },
+              "x": 0,
+              "y": 26,
               "width": 5,
               "height": 4
             }
@@ -1927,7 +2860,7 @@
                 "name": "detail-kpi-download"
               },
               "x": 5,
-              "y": 0,
+              "y": 26,
               "width": 5,
               "height": 4
             }
@@ -1940,7 +2873,7 @@
                 "name": "detail-kpi-upload"
               },
               "x": 10,
-              "y": 0,
+              "y": 26,
               "width": 5,
               "height": 4
             }
@@ -1953,7 +2886,7 @@
                 "name": "detail-kpi-latency"
               },
               "x": 15,
-              "y": 0,
+              "y": 26,
               "width": 5,
               "height": 4
             }
@@ -1966,7 +2899,7 @@
                 "name": "detail-kpi-jitter"
               },
               "x": 20,
-              "y": 0,
+              "y": 26,
               "width": 4,
               "height": 4
             }
@@ -1979,7 +2912,7 @@
                 "name": "detail-download-by-service"
               },
               "x": 0,
-              "y": 4,
+              "y": 30,
               "width": 12,
               "height": 7
             }
@@ -1992,7 +2925,7 @@
                 "name": "detail-upload-by-service"
               },
               "x": 12,
-              "y": 4,
+              "y": 30,
               "width": 12,
               "height": 7
             }
@@ -2005,7 +2938,7 @@
                 "name": "detail-latency-ts"
               },
               "x": 0,
-              "y": 11,
+              "y": 37,
               "width": 12,
               "height": 9
             }
@@ -2018,7 +2951,7 @@
                 "name": "detail-jitter-ts"
               },
               "x": 12,
-              "y": 11,
+              "y": 37,
               "width": 12,
               "height": 9
             }
@@ -2031,7 +2964,7 @@
                 "name": "detail-download-ts"
               },
               "x": 0,
-              "y": 20,
+              "y": 46,
               "width": 12,
               "height": 9
             }
@@ -2044,7 +2977,7 @@
                 "name": "detail-upload-ts"
               },
               "x": 12,
-              "y": 20,
+              "y": 46,
               "width": 12,
               "height": 9
             }
@@ -2057,7 +2990,7 @@
                 "name": "detail-snapshot-simple"
               },
               "x": 0,
-              "y": 29,
+              "y": 55,
               "width": 12,
               "height": 9
             }
@@ -2070,7 +3003,7 @@
                 "name": "detail-run-duration"
               },
               "x": 12,
-              "y": 29,
+              "y": 55,
               "width": 12,
               "height": 9
             }

@@ -80,11 +80,14 @@ Si necesitas registrar o reconfigurar las tareas programadas individualmente sin
 
 ### 1. Registrar la Tarea Programada de la Sonda (Python 3)
 
-Para programar la ejecución recurrente de la sonda (por defecto cada 10 minutos):
+Para programar la sonda completa cada 30 minutos y el monitor de conexión cada minuto:
 
 ```bash
-python scripts/register_qoe_task.py
+python scripts/register_qoe_task.py --interval-minutes 30
+python scripts/register_qoe_task.py --script heartbeat --task-name CX-Radar-Heartbeat --interval-minutes 1
 ```
+
+Las tareas de Windows se crean sin la condición "solo si hay red disponible" (el monitor debe correr cuando no hay red) y con tiempo máximo de ejecución.
 
 En equipos de escritorio de Windows o servidores personales donde prefieras ejecutarlo bajo la sesión interactiva del usuario actual, usa:
 
@@ -96,17 +99,19 @@ python scripts/register_qoe_task.py --run-as-current-user
 
 ### 2. Registrar la Tarea de Actualización Automática (Python 3)
 
-Para programar la tarea diaria de actualización automática a las 8:00 AM (la cual verifica hashes SHA-256 contra GitHub para actualizar sólo cuando existan cambios):
+Para programar la tarea diaria de actualización automática a las 8:00 AM (compara cada script con el SHA-256 del manifiesto `scripts/release-manifest.json` e instala todos los cambios o ninguno):
 
 ```bash
 python scripts/update_qoe_probe.py --register
 ```
 
-Si ejecutas sobre Windows Server 2012 R2 o sistemas con certificados obsoletos y necesitas omitir la verificación SSL, o si quieres usar inicio de sesión interactivo, utiliza:
+Para usar inicio de sesión interactivo:
 
 ```bash
-python scripts/update_qoe_probe.py --register --run-as-current-user --no-verify-ssl
+python scripts/update_qoe_probe.py --register --run-as-current-user
 ```
+
+El actualizador siempre verifica el certificado TLS (`--no-verify-ssl` ya no tiene efecto): descarga código que luego se ejecuta. En Windows Server 2012 R2 con certificados raíz obsoletos hay que instalar la raíz que falta, igual que para Telegram (ver [medicion-real-y-alertas.md](medicion-real-y-alertas.md)). Para fijar una versión revisada en lugar de `main`: `python scripts/update_qoe_probe.py --ref <tag>`.
 
 ---
 

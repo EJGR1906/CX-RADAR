@@ -301,32 +301,119 @@ def measure_upload(
     return _run_timed(worker, connections, duration_s, warmup_s)
 
 
-def measure_tcp_latency(host: str, port: int = 443, count: int = 10, timeout_s: float = 2.0,
-                        interval_s: float = 0.1) -> Dict[str, Any]:
-    """Latencia por tiempo de conexión TCP (no depende de ICMP, que suele estar filtrado)."""
-    rtts: List[float] = []
-    failures = 0
-    for i in range(max(1, count)):
-        t0 = time.perf_counter()
+class high_res_timer:
+    """Sube la resolución del reloj de Windows a 1 ms mientras se mide.
+
+    Por defecto Windows despierta los sockets en ticks de 15,6 ms, así que una
+    conexión de 3 ms se registra como 15,6 ms y una de 20 ms como 31,2 ms. Con
+    `timeBeginPeriod(1)` la latencia medida vuelve a ser la real. En otros
+    sistemas no hace nada.
+    """
+
+    def __enter__(self) -> "high_res_timer":
+        self._winmm = None
+        if os.name == "nt":
+            try:
+                import ctypes
+                self._winmm = ctypes.windll.winmm  # type: ignore[attr-defined]
+                self._winmm.timeBeginPeriod(1)
+            except Exception:
+                self._winmm = None
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        if self._winmm is not None:
+            try:
+                self._winmm.timeEndPeriod(1)
+            except Exception:
+                pass
+
+
+def resolve_host(host: str, port: int = 443, timeout_s: float = 3.0) -> Optional[tuple]:
+    """Resuelve `host` una vez. Devuelve (familia, dirección) o None.
+
+    `getaddrinfo` no acepta tiempo límite, así que corre en un hilo aparte: con
+    el DNS caído puede tardar decenas de segundos y no debe frenar la medición.
+    """
+    try:
+        info = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM, flags=socket.AI_NUMERICHOST)
+        return info[0][0], info[0][4]
+    except OSError:
+        pass
+    box: List[Any] = []
+
+    def work() -> None:
         try:
-            with socket.create_connection((host, port), timeout=timeout_s):
-                rtts.append((time.perf_counter() - t0) * 1000)
+            info = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+            v4 = [i for i in info if i[0] == socket.AF_INET]
+            pick = (v4 or info)[0]
+            box.append((pick[0], pick[4]))
         except OSError:
-            failures += 1
-        if i < count - 1:
-            time.sleep(interval_s)
+            pass
+
+    th = threading.Thread(target=work, daemon=True)
+    th.start()
+    th.join(timeout_s)
+    return box[0] if box else None
+
+
+def tcp_connect_ms(addr: tuple, timeout_s: float = 2.0) -> Optional[float]:
+    """Tiempo de conexión TCP a una dirección ya resuelta, en ms. None si no conecta."""
+    family, sockaddr = addr
+    sock = socket.socket(family, socket.SOCK_STREAM)
+    sock.settimeout(timeout_s)
+    t0 = time.perf_counter()
+    try:
+        sock.connect(sockaddr)
+        return (time.perf_counter() - t0) * 1000
+    except OSError:
+        return None
+    finally:
+        try:
+            sock.close()
+        except OSError:
+            pass
+
+
+def summarize_latency(samples: Sequence[Optional[float]]) -> Dict[str, Any]:
+    """Resume una serie de muestras (ms o None si no hubo respuesta)."""
+    rtts = [s for s in samples if s is not None]
+    total = max(1, len(samples))
     if rtts:
         diffs = [abs(rtts[i] - rtts[i - 1]) for i in range(1, len(rtts))]
+        ordered = sorted(rtts)
         latency = round(statistics.median(rtts), 2)
+        p95 = round(ordered[min(len(ordered) - 1, int(round(0.95 * (len(ordered) - 1))))], 2)
         jitter = round(statistics.mean(diffs), 2) if diffs else 0.0
     else:
-        latency, jitter = 0.0, 0.0
+        latency, p95, jitter = 0.0, 0.0, 0.0
     return {
         "LatencyMs": latency,
+        "P95Ms": p95,
         "JitterMs": jitter,
-        "LossPercentage": round(failures * 100.0 / max(1, count), 1),
+        "LossPercentage": round((len(samples) - len(rtts)) * 100.0 / total, 1),
         "Samples": len(rtts),
     }
+
+
+def measure_tcp_latency(host: str, port: int = 443, count: int = 10, timeout_s: float = 2.0,
+                        interval_s: float = 0.1) -> Dict[str, Any]:
+    """Latencia por tiempo de conexión TCP (no depende de ICMP, que suele estar filtrado).
+
+    El nombre se resuelve una sola vez y fuera del cronómetro: antes cada
+    muestra incluía la consulta DNS y la latencia salía inflada.
+    """
+    count = max(1, count)
+    addr = resolve_host(host, port, timeout_s=max(timeout_s, 3.0))
+    if addr is None:
+        return summarize_latency([None] * count)
+    samples: List[Optional[float]] = []
+    with high_res_timer():
+        for i in range(count):
+            samples.append(tcp_connect_ms(addr, timeout_s))
+            if i < count - 1:
+                time.sleep(interval_s)
+    return summarize_latency(samples)
 
 
 # ---------------------------------------------------------------------------

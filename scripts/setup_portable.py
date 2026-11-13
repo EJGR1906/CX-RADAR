@@ -129,6 +129,50 @@ def _download(url: str, dest: Path, *, label: str = "") -> None:
 
 
 # ---------------------------------------------------------------------------
+# Verificación de descargas
+# ---------------------------------------------------------------------------
+def _sha256_file(path: Path) -> str:
+    import hashlib
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 256), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _expected_checksum(sums_text: str, filename: str) -> str:
+    """Busca `filename` en un archivo de sumas con líneas `<sha256>  <nombre>`."""
+    for line in sums_text.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[-1].lstrip("*") == filename and len(parts[0]) == 64:
+            return parts[0].lower()
+    return ""
+
+
+def _verify_download(path: Path, sums_url: str, filename: str) -> None:
+    """Compara el archivo con la suma SHA-256 publicada por el proyecto. Si no coincide, lo borra y aborta.
+
+    Los binarios descargados se ejecutan en la sonda: un archivo cortado o alterado
+    en el camino no debe instalarse.
+    """
+    sums_path = path.with_name(path.name + ".sha256sums")
+    try:
+        _download(sums_url, sums_path, label=f"sumas SHA-256 de {filename}")
+        expected = _expected_checksum(sums_path.read_text(encoding="utf-8", errors="ignore"), filename)
+    finally:
+        if sums_path.is_file():
+            sums_path.unlink()
+    actual = _sha256_file(path)
+    if not expected or expected != actual:
+        path.unlink()
+        raise SystemExit(
+            f"Error: {filename} no coincide con la suma SHA-256 publicada "
+            f"(esperada {expected[:16] or 'no encontrada'}, recibida {actual[:16]}). No se instaló."
+        )
+    print(f"    SHA-256 verificado: {actual[:16]}...")
+
+
+# ---------------------------------------------------------------------------
 # Archive extraction
 # ---------------------------------------------------------------------------
 
@@ -473,6 +517,7 @@ def main() -> None:
     if args.force or not _test_portable_node(node_root):
         if not archive_path.is_file():
             _download(node_url, archive_path, label="Node.js")
+        _verify_download(archive_path, node_url.rsplit("/", 1)[0] + "/SHASUMS256.txt", archive_name)
         print(f"  Extracting to {node_root} ...")
         _extract_node_archive(archive_path, node_root)
     else:
@@ -489,7 +534,13 @@ def main() -> None:
     ytdlp_url = args.yt_dlp_url or _ytdlp_url_default()
 
     if args.force or not yt_dlp_path.is_file():
-        _download(ytdlp_url, yt_dlp_path, label="yt-dlp")
+        download_path = downloads_dir / ytdlp_url.rsplit("/", 1)[-1]
+        _download(ytdlp_url, download_path, label="yt-dlp")
+        if args.yt_dlp_url:
+            print("    URL personalizada de yt-dlp: no hay suma publicada con la que verificar.")
+        else:
+            _verify_download(download_path, ytdlp_url.rsplit("/", 1)[0] + "/SHA2-256SUMS", download_path.name)
+        shutil.move(str(download_path), str(yt_dlp_path))
         if not _is_windows():
             # Make executable on Unix
             yt_dlp_path.chmod(yt_dlp_path.stat().st_mode | 0o755)

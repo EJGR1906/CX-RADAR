@@ -2,6 +2,26 @@
 const DS = 'dfkh6j26t6gw0c';
 const VER = '13.1.0-25153870157';
 
+// Estados del monitor de cada minuto (status_code de qoe_heartbeat_status).
+// Los codigos coinciden con STATUS_CODES de scripts/qoe_heartbeat.py.
+const CONNECTION_STATES = [
+  [0, 'OK', 'green'],
+  [1, 'Degradado', 'yellow'],
+  [6, 'Microcortes', 'orange'],
+  [7, 'Internet interceptado', 'purple'],
+  [5, 'Falla de DNS', 'dark-orange'],
+  [2, 'Sin salida a internet', 'red'],
+  [3, 'Caida del acceso', 'dark-red'],
+  [4, 'Router local caido', 'blue'],
+  [8, 'Sonda sin red local', 'dark-blue']
+];
+const CONNECTION_MAPPINGS = [{
+  type: 'value',
+  options: Object.fromEntries(CONNECTION_STATES.map(([code, text, color], index) => [String(code), { color, index, text }]))
+}];
+// Codigos en los que la sonda no tiene internet utilizable.
+const NO_INTERNET_CODES = [2, 3, 4, 5, 7, 8];
+
 // Colores fijos por servicio (insensibles a mayusculas: "Youtube" o "YouTube").
 const SERVICE_COLORS = [
   ['netflix', '#E50914'],
@@ -166,7 +186,7 @@ function tablePanel(id, title, desc, flux, overrides = [], columnOrder = null) {
   }];
 }
 
-function stateTimelinePanel(id, title, desc, flux) {
+function stateTimelinePanel(id, title, desc, flux, opts = {}) {
   return [id, {
     kind: 'Panel', spec: {
       data: { kind: 'QueryGroup', spec: { queries: [query(flux, true)], queryOptions: {}, transformations: [] } },
@@ -178,7 +198,7 @@ function stateTimelinePanel(id, title, desc, flux) {
             defaults: {
               noValue: 'Sin datos',
               color: { mode: 'thresholds' }, custom: { fillOpacity: 80, lineWidth: 1 },
-              mappings: [
+              mappings: opts.mappings || [
                 { options: { '1': { color: 'green', index: 0, text: 'Disponible' }, '0': { color: 'red', index: 1, text: 'Caído' } }, type: 'value' }
               ],
               thresholds: { mode: 'absolute', steps: [{ color: 'green', value: 0 }] }
@@ -275,5 +295,5 @@ function gridItem(name, x, y, w, h) {
   return { kind: 'GridLayoutItem', spec: { element: { kind: 'ElementReference', name }, x, y, width: w, height: h } };
 }
 
-module.exports = { SVC_OVERRIDES, query, statPanel, tsPanel, barGaugePanel, tablePanel, stateTimelinePanel, geomapPanel, gridItem, DS };
+module.exports = { SVC_OVERRIDES, query, statPanel, tsPanel, barGaugePanel, tablePanel, stateTimelinePanel, geomapPanel, gridItem, DS, CONNECTION_MAPPINGS, NO_INTERNET_CODES };
 

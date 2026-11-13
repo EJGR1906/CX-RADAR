@@ -316,6 +316,45 @@ def main() -> None:
             print(f"  Reasons: {failures}")
             overall_passed = False
 
+        # 2b. Monitor de cada minuto: corrida corta en una carpeta aparte (no toca el estado en producción)
+        print("\n  Heartbeat (monitor de cada minuto)...")
+        hb_dir = scenario_root / "heartbeat"
+        hb_dir.mkdir(parents=True, exist_ok=True)
+        hb_start = time.time()
+        hb_exit, _, hb_stderr = run_process([
+            sys.executable, str(script_dir / "qoe_heartbeat.py"),
+            "--skip-influx-write", "--skip-telegram", "--rounds", "2",
+            "--config-path", str(base_config_path), "--log-dir", str(hb_dir)
+        ], timeout=90)
+        hb_lines = []
+        for hb_log in hb_dir.glob("qoe-heartbeat-*.log"):
+            hb_lines += hb_log.read_text(encoding="utf-8", errors="replace").splitlines()
+        hb_results = [ln for ln in hb_lines if "] Heartbeat " in ln and "Heartbeat:" not in ln]
+        hb_failures = []
+        if hb_exit != 0:
+            hb_failures.append(f"Exit code non-zero ({hb_exit}): {hb_stderr.strip()[-300:]}")
+        if len(hb_results) != 1:
+            hb_failures.append(f"Se esperaba 1 línea de resultado en el log y hay {len(hb_results)}")
+        if any("[ERROR]" in ln for ln in hb_lines):
+            hb_failures.append("El log del heartbeat contiene errores")
+        if not (hb_dir / "heartbeat-state.json").is_file():
+            hb_failures.append("No se escribió heartbeat-state.json")
+        if (hb_dir / "heartbeat.lock").exists():
+            hb_failures.append("Quedó el bloqueo heartbeat.lock sin liberar")
+        hb_passed = not hb_failures
+        scenarios_run.append({
+            "name": "heartbeat_smoke",
+            "passed": hb_passed,
+            "exit_code": hb_exit,
+            "duration_seconds": round(time.time() - hb_start, 2),
+            "result_line": hb_results[0] if hb_results else "",
+            "failures": hb_failures
+        })
+        print(f"  Heartbeat: {'PASSED' if hb_passed else 'FAILED'}")
+        if not hb_passed:
+            print(f"  Reasons: {hb_failures}")
+            overall_passed = False
+
         # 3. Resilience Scenarios
         if args.run_resilience_checks:
             print("\n[Step 3/4] Running Resilience Fault Tolerance Scenarios...")

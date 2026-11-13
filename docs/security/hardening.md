@@ -3,6 +3,30 @@
 > [!NOTE]
 > **Nota de Migración:** Los scripts de PowerShell detallados aquí se consideran legados. El proyecto ha migrado a Python 3. Consulta la [Guía de Migración](../MIGRATION.md) para conocer las nuevas instrucciones multiplataforma y de almacenamiento de secretos mediante archivos `.env`.
 
+## Estado actual (Python 3)
+
+Las secciones de más abajo describen la versión PowerShell y se conservan como referencia. Lo vigente:
+
+### Credenciales
+
+- Viven en `.env` en la raíz (fuera de git): `INFLUXDB_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. El instalador y `set_influx_token.py` dejan el archivo legible solo por el usuario actual (`chmod 600` o `icacls`). Si se edita a mano, repetir la restricción.
+- El instalador pasa el token de InfluxDB por variable de entorno al paso que lo guarda: no queda en la línea de comandos ni en pantalla.
+- **Un token por sonda, solo de escritura** al bucket. Hoy todas las sondas pueden compartir un mismo token: una sonda comprometida podría escribir datos falsos de las demás. Crear en InfluxDB Cloud un token *Write* por sonda permite revocar una sin tocar el resto.
+- **El bot de Telegram** es el mismo en todas las sondas: quien tenga el token puede enviar mensajes al chat y leer lo que se le escriba al bot. No usar ese bot para nada más y regenerar el token en @BotFather si una sonda se pierde.
+- `GRAFANA_TOKEN` (rol Editor o Admin) solo hace falta para `setup_grafana_alert.py`: usarlo desde un equipo de administración, no dejarlo en las sondas.
+
+### Actualizaciones y descargas
+
+- `update_qoe_probe.py` descarga `scripts/release-manifest.json` y los scripts que cambiaron. Cada archivo debe coincidir con su SHA-256, compilar y poder importarse junto a los demás; se instalan todos o ninguno, con respaldo en `scripts/.update-backup/` y restauración si falla un reemplazo.
+- TLS se verifica siempre en el actualizador. `--no-verify-ssl` y `verifyTls: false` no lo desactivan.
+- Límite: el manifiesto viene del mismo repositorio. Protege la integridad de la descarga, no contra alguien con permiso de escritura en la rama. Proteger `main` (revisión obligatoria) o actualizar desde un tag con `--ref`.
+- Quien publica cambios en `scripts/` regenera el manifiesto con `python scripts/update_qoe_probe.py --write-manifest`; el CI falla si quedó desactualizado.
+- `setup_portable.py` compara Node.js con `SHASUMS256.txt` de nodejs.org y `yt-dlp` con `SHA2-256SUMS` de su publicación. Si no coincide borra la descarga y aborta. `fast-cli` se instala con versión fija por npm.
+
+### Reporte de ONUs
+
+`onu_report.py` rechaza archivos `.xlsx` con contenido interno de más de 300 MB o con DOCTYPE en su XML.
+
 ## Manejo de secretos
 
 La sonda ahora admite dos fuentes de token, en este orden:
@@ -46,7 +70,7 @@ El helper de tarea programada ahora predetermina `-ExecutionPolicy RemoteSigned`
 
 La tarea se registra con un nivel de ejecución limitado. Evita el contexto de administrador a menos que una dependencia futura lo requiera y el requisito esté documentado explícitamente.
 
-La tarea programada también usa `RunOnlyIfNetworkAvailable` para que la sonda no siga generando fallas locales mientras la estación de trabajo está desconectada.
+La tarea programada ya no usa `RunOnlyIfNetworkAvailable`: el monitor tiene que correr justo cuando el equipo se queda sin red, para registrar la falla y diagnosticarla como local. Cada corrida tiene tiempo máximo (`ExecutionTimeLimit`: 2 min el monitor, 20 min la sonda).
 
 ## Seguridad de tasa y reputación
 

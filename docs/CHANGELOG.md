@@ -2,6 +2,33 @@
 
 All notable changes to CX-Radar are documented here.
 
+## [Unreleased] — 2026-11-13
+
+### Detección de fallas (`scripts/qoe_heartbeat.py`, `scripts/qoe_throughput.py`)
+
+Auditoría con el log real del 12/11 (1425 corridas) y Outlook caído sin que la sonda avisara.
+
+- **Latencia real:** el 86 % de las latencias medidas en Windows eran múltiplos de 15,6 ms (tick del reloj). Ahora se mide con resolución de 1 ms, contra la IP ya resuelta y sin cronometrar el DNS.
+- **Muestreo continuo:** de ~1 s por minuto a 45 s por minuto (una ronda cada 5 s). Se ven microcortes y pérdida desde 10 %.
+- **Diagnósticos nuevos:** `falla_dns` (antes salía `degradado`), `sin_red_local` (antes culpaba al acceso del proveedor), `internet_interceptado` (antes salía `ok`) y `microcortes`. Los códigos 0–4 no cambian.
+- **Anclas por IP** (1.1.1.1, 8.8.8.8, 9.9.9.9) y consulta DNS directa por UDP.
+- **Servicios externos:** Outlook, login de Microsoft 365 y Teams por HTTPS, con aviso propio y measurement `qoe_service_check`.
+- **Menos ruido:** caída avisa a los 2 min, `degradado` a los 5, el incidente cierra tras 5 min buenos. El log del 12/11 pasa de 13 avisos de FALLA a 4 (los 4 cortes reales).
+- **Robustez:** estado dañado ya no tumba las alertas, error interno se registra y se avisa, bloqueo contra corridas simultáneas, tiempo máximo por corrida, búfer de InfluxDB que aparta líneas rechazadas, rotación de logs del monitor.
+- **Programador:** se quita `-RunOnlyIfNetworkAvailable` y se agrega `-ExecutionTimeLimit` (`scripts/register_qoe_task.py`). Hay que volver a registrar las tareas en cada sonda.
+- **Pruebas:** banco de inyección de fallas (`tests/test_fault_injection.py`) y matriz de detección (`docs/qa/detection-matrix.md`).
+- **Tableros:** el detalle por sonda y la vista global muestran el estado de la conexión minuto a minuto, disponibilidad, cortes, microcortes, latencia y pérdida por destino y servicios externos. Antes el monitor de cada minuto no tenía ningún panel propio.
+- **Velocidad bajo el plan:** `scripts/qoe_speed_alert.py` avisa cuando la mejor medición queda bajo el 50 % de `probe.planDownMbps`/`planUpMbps` en 2 corridas seguidas.
+- **Sin huecos:** la sonda completa guarda en `logs/probe-buffer.lp` lo que no pudo escribir en InfluxDB y lo reenvía.
+- **Resumen diario** por Telegram con disponibilidad, cortes y fallas de servicios del día anterior.
+- **Actualizador:** todo o nada contra `scripts/release-manifest.json` (SHA-256 por archivo), con prueba de importación, respaldo y restauración. TLS siempre verificado; `--no-verify-ssl` ya no tiene efecto. La documentación deja de llamarlo "firma digital".
+- **Herramientas portables:** Node.js y `yt-dlp` se comparan con las sumas SHA-256 publicadas antes de instalarse.
+- **Instalador:** registra el monitor de cada minuto, configura Telegram y el plan contratado, guarda los datos del servidor en `probe-catalog.local.json`, deja la sonda completa cada 30 min y termina con una corrida y un mensaje de prueba. El token ya no pasa por la línea de comandos.
+- **CI:** `.github/workflows/tests.yml` corre todas las pruebas en Windows, Linux y macOS (Python 3.8 y 3.13). Las pruebas que estaban en `scripts/` pasan a `tests/` (chocaban de nombre y `unittest discover` fallaba).
+- **Certificación:** `run_qoe_certification.py` incluye una corrida del monitor en una carpeta aparte (`--log-dir`).
+
+---
+
 ## [Unreleased] — 2026-11-10
 
 ### Alertas de caída

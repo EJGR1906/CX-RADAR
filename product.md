@@ -1,6 +1,8 @@
 # Contexto de Producto CX-Radar
 
-CX-Radar es una solución automatizada de monitoreo de Calidad de Experiencia (QoE) diseñada para ejecutarse de forma continua en sondas de red local. Mide, registra y emite alertas sobre el rendimiento de servicios web clave (Microsoft, YouTube, Netflix, Disney+, Amazon) desde la perspectiva de la infraestructura local.
+CX-Radar detecta fallas de la conexión a internet desde sondas instaladas en la red local. Un monitor revisa la conexión cada minuto, diagnostica dónde está la falla (equipo, router, acceso del proveedor, salida a internet, DNS o un servicio externo) y avisa por Telegram. Una sonda completa mide cada 30 minutos la velocidad real hacia servicios clave (Microsoft, YouTube, Netflix, Disney+, Amazon y los servidores del proveedor).
+
+Lo que el producto afirma detectar está en [docs/qa/detection-matrix.md](docs/qa/detection-matrix.md), cada fila con la prueba automática que lo demuestra. Lo que no aparece ahí no se promete.
 
 ---
 
@@ -40,4 +42,5 @@ CX-Radar es una solución automatizada de monitoreo de Calidad de Experiencia (Q
 - **Almacenamiento Seguro de Configuración**: Restricción de permisos en archivos locales de credenciales (`.env`).
 - **Arquitectura de Red Resiliente**: Manejo transparente de fallas de DNS, tiempos de espera en base de datos y endpoints no disponibles sin interrumpir el ciclo de prueba.
 - **Rutina de Automantenimiento**: Eliminación automática de archivos temporales y rotación de logs para prevenir la saturación del espacio en disco.
-- **Actualizador Atómico**: Verificación de firmas digitales SHA-256 contra el repositorio central e instalación atómica de actualizaciones.
+- **Monitor de Conexión cada Minuto**: Diagnóstico de cortes, microcortes, falla de DNS, falla local y servicios externos caídos (Outlook, Microsoft 365, Teams), con avisos por incidente y resumen diario.
+- **Actualizador Todo o Nada**: Cada script descargado se compara con el SHA-256 de un manifiesto, se comprueba que el conjunto funciona y se instala completo o no se instala; guarda respaldo y restaura si algo falla. Es una verificación de integridad, no una firma digital: el manifiesto viene del mismo repositorio.

@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts")))
+
 import unittest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
@@ -165,6 +170,40 @@ class TestSetupPortable(unittest.TestCase):
         written_content3 = mock_api_js.write_text.call_args[0][0]
         self.assertIn("'--disable-blink-features=AutomationControlled'", written_content3)
         self.assertIn("'--ignore-certificate-errors'", written_content3)
+
+class TestDownloadVerification(unittest.TestCase):
+    SUMS = "aaaa  otro.zip\n" + "b" * 64 + "  node-v1-linux-x64.tar.xz\n" + "c" * 64 + " *yt-dlp.exe\n"
+
+    def test_expected_checksum_lookup(self):
+        self.assertEqual(setup_portable._expected_checksum(self.SUMS, "node-v1-linux-x64.tar.xz"), "b" * 64)
+        self.assertEqual(setup_portable._expected_checksum(self.SUMS, "yt-dlp.exe"), "c" * 64)
+        self.assertEqual(setup_portable._expected_checksum(self.SUMS, "no-esta.zip"), "")
+        self.assertEqual(setup_portable._expected_checksum(self.SUMS, "otro.zip"), "")  # suma mal formada
+
+    def _verify(self, content, published_digest):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            target = Path(d) / "tool.bin"
+            target.write_bytes(content)
+
+            def fake_download(url, dest, label=""):
+                dest.write_text(f"{published_digest}  tool.bin\n", encoding="utf-8")
+
+            with patch.object(setup_portable, "_download", fake_download), patch("builtins.print"):
+                try:
+                    setup_portable._verify_download(target, "https://x/SUMS", "tool.bin")
+                    aborted = False
+                except SystemExit:
+                    aborted = True
+            return aborted, target.exists(), len(list(Path(d).iterdir()))
+
+    def test_matching_download_is_kept_and_sums_file_removed(self):
+        import hashlib
+        self.assertEqual(self._verify(b"binario", hashlib.sha256(b"binario").hexdigest()), (False, True, 1))
+
+    def test_tampered_download_is_deleted_and_install_aborts(self):
+        self.assertEqual(self._verify(b"alterado", "0" * 64), (True, False, 0))
+
 
 if __name__ == '__main__':
     unittest.main()
