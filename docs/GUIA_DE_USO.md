@@ -35,7 +35,10 @@ La forma más rápida y segura de desplegar la sonda es mediante el instalador a
    - **Token de InfluxDB (`influxToken`)**: Clave de autenticación para la base de datos en la nube.
    - **URL de InfluxDB**: Dirección del servicio InfluxDB Cloud.
    - **Organización y Bucket**: Nombres asignados en su cuenta de InfluxDB.
-   - **Intervalo de Ejecución**: Frecuencia deseada para las pruebas (predeterminado: 10 minutos).
+   - **Telegram (opcional)**: Token del bot y chat que recibe las alertas. Sin esto la sonda mide pero no avisa.
+   - **Plan contratado (opcional)**: Mbps de bajada y subida, para avisar cuando la velocidad baje del 50 %.
+
+El instalador registra dos tareas: el monitor de conexión cada minuto (`CX-Radar-Heartbeat`) y la sonda completa de velocidad cada 30 minutos (`--interval-minutes`; cada corrida consume datos). Los datos de este servidor se guardan en `config/probe-catalog.local.json`; `config/probe-catalog.json` no se modifica.
 
 Al finalizar, el instalador dejará la sonda operando de forma automática.
 
@@ -53,7 +56,10 @@ python scripts/install.py \
   --influx-url "https://us-east-1-1.aws.cloud2.influxdata.com" \
   --influx-org "su-organizacion" \
   --influx-bucket "qoe_metrics" \
-  --interval-minutes 10
+  --telegram-bot-token "TOKEN_DEL_BOT" \
+  --telegram-chat-id "ID_DEL_CHAT" \
+  --plan-down-mbps 600 --plan-up-mbps 600 \
+  --non-interactive
 ```
 
 ---
@@ -90,9 +96,10 @@ python scripts/qoe_probe.py --skip-influx-write
 ```
 
 ### Paso 6: Programación Automática de la Tarea
-Registre la sonda en el planificador de tareas nativo del sistema operativo para que se ejecute en segundo plano cada 10 minutos:
+Registre la sonda en el planificador de tareas nativo del sistema operativo para que se ejecute en segundo plano cada 30 minutos, y el monitor de conexión cada minuto:
 ```bash
-python scripts/register_qoe_task.py
+python scripts/register_qoe_task.py --interval-minutes 30
+python scripts/register_qoe_task.py --script heartbeat --task-name CX-Radar-Heartbeat --interval-minutes 1
 ```
 
 ### Paso 7: Programación de Actualizaciones Automáticas
@@ -119,4 +126,4 @@ Una vez que la sonda se encuentra operando, los resultados pueden consultarse a 
 
 - **¿La sonda modifica configuraciones del servidor?** No. Opera de forma completamente aislada utilizando herramientas portables en su propia carpeta.
 - **¿Qué sucede si se interrumpe la conexión a internet?** La sonda registra el evento de desconexión localmente y reintentará la medición en el siguiente ciclo programado sin bloquear el sistema.
-- **¿Cómo se actualiza la solución?** El script de actualización diaria descarga de forma transparente las mejoras publicadas en el repositorio central previa validación de firmas digitales.
+- **¿Cómo se actualiza la solución?** El script de actualización diaria descarga de forma transparente las mejoras publicadas en el repositorio central después de comparar cada archivo con el SHA-256 del manifiesto publicado y comprobar que el conjunto funciona. Si algo no coincide no se instala nada.

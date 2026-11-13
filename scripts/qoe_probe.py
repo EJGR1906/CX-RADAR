@@ -2769,10 +2769,13 @@ def main() -> None:
         log_message(f"QoE probe finished. Success={success_count}, Failure={failure_count}, Duration={probe_run_duration} ms")
 
         # Aviso de velocidad bajo el plan contratado (solo si el catálogo declara probe.planDownMbps).
-        import qoe_speed_alert
-        speed_action = qoe_speed_alert.process(config, target_reports, log_dir, repo_root)
-        if speed_action:
-            log_message(f"Aviso de velocidad enviado: {speed_action}")
+        try:
+            import qoe_speed_alert
+            speed_action = qoe_speed_alert.process(config, target_reports, log_dir, repo_root)
+            if speed_action:
+                log_message(f"Aviso de velocidad enviado: {speed_action}")
+        except ImportError:
+            pass  # sonda actualizada a medias por un actualizador antiguo: el módulo llega en la siguiente actualización
 
         if write_error is not None:
             raise write_error

@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
-"""CX-Radar QoE Probe Autoupdater.
+"""CX-Radar: actualizador de los scripts de la sonda.
 
-Cross-platform Python script to download and update qoe_probe.py and
-validate_qoe_probe.py from the main GitHub repository safely.
-Calculates SHA-256 hashes to prevent unnecessary disk writes and checks
-python syntax validity before replacing.
-Also supports registering itself as a native daily task (e.g., at 8:00 AM).
+Descarga `release-manifest.json` (lista de archivos con su SHA-256) y los
+scripts que cambiaron, y los instala todos o ninguno:
+
+1. Cada archivo descargado debe coincidir con el SHA-256 del manifiesto.
+2. Cada archivo debe compilar y el conjunto debe poder importarse.
+3. Los archivos actuales se respaldan en `scripts/.update-backup/` y, si un
+   reemplazo falla a mitad, se restauran.
+
+TLS se verifica siempre (`--no-verify-ssl` ya no tiene efecto): este programa
+descarga código que luego se ejecuta.
+
+Alcance real de la verificación: el manifiesto viene del mismo repositorio que
+los archivos, así que protege contra descargas cortadas, corruptas o mezcladas,
+no contra alguien con permiso de escritura en el repositorio. No es una firma
+digital. Para fijar una versión revisada usar `--ref <tag>`.
 
 Requirements: Python >= 3.8, stdlib only.
 """
@@ -17,6 +27,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -31,7 +42,13 @@ from typing import Any, Dict, List, Optional, Tuple
 # ---------------------------------------------------------------------------
 
 UPDATER_VERSION = "0.1.0"
-GITHUB_RAW_BASE = "https://raw.githubusercontent.com/EJGR1906/CX-RADAR/main/scripts"
+GITHUB_RAW_ROOT = "https://raw.githubusercontent.com/EJGR1906/CX-RADAR"
+DEFAULT_REF = "main"
+GITHUB_RAW_BASE = f"{GITHUB_RAW_ROOT}/{DEFAULT_REF}/scripts"
+MANIFEST_NAME = "release-manifest.json"
+STAGING_DIR = ".update-staging"
+BACKUP_DIR = ".update-backup"
+SAFE_NAME = re.compile(r"^[A-Za-z0-9_]+\.py$")
 FILES_TO_UPDATE = [
     "install.py",
     # Módulos que importa qoe_probe.py: van antes para que nunca quede una sonda
@@ -116,12 +133,9 @@ def download_file(
     if not (url.lower().startswith("http://") or url.lower().startswith("https://")):
         raise ValueError("URL must start with http:// or https://")
 
-    # Create ssl context
+    # TLS siempre verificado: lo descargado se ejecuta. `verify_ssl` se conserva solo por compatibilidad.
     import ssl
     ctx = ssl.create_default_context()
-    if not verify_ssl:
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
 
     print(f"Downloading {url} ...")
     
@@ -143,9 +157,7 @@ def download_file(
     curl_path = shutil.which("curl") or shutil.which("curl.exe")
     if curl_path:
         print(f"  Attempting fallback with curl...")
-        args = [curl_path, "-fsSL", url, "-o", str(dest_path)]
-        if not verify_ssl:
-            args.append("-k")  # insecure
+        args = [curl_path, "-fsSL", "--proto", "=https", url, "-o", str(dest_path)]
         code, stdout, stderr = run_cmd(args)
         if code == 0 and dest_path.is_file():
             print(f"  Successfully downloaded via curl.")
@@ -161,64 +173,117 @@ def download_file(
 # Update Verification and Replacement
 # ---------------------------------------------------------------------------
 
-def perform_updates(verify_ssl: bool, scripts_dir: Path, config_path: Path) -> int:
-    """Download and update files. Returns count of files updated."""
-    updated_count = 0
-    
-    for filename in FILES_TO_UPDATE:
-        file_path = scripts_dir / filename
-        tmp_path = scripts_dir / f"{filename}.tmp"
-        url = f"{GITHUB_RAW_BASE}/{filename}"
-        
-        # Download to tmp file
-        success = download_file(url, tmp_path, verify_ssl)
-        if not success:
-            print(f"Error: Failed to download {filename}. Skipping.")
-            if tmp_path.is_file():
-                try:
-                    tmp_path.unlink()
-                except Exception:
-                    pass
+def build_manifest(scripts_dir: Path) -> Dict[str, Any]:
+    """Manifiesto de los scripts que se distribuyen (se versiona junto con ellos)."""
+    return {"files": {name: compute_sha256(scripts_dir / name) for name in FILES_TO_UPDATE}}
+
+
+def write_manifest(scripts_dir: Path) -> Path:
+    path = scripts_dir / MANIFEST_NAME
+    path.write_text(json.dumps(build_manifest(scripts_dir), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def load_manifest(path: Path) -> Dict[str, str]:
+    """Devuelve {archivo: sha256}. Lanza ValueError si el manifiesto no es válido."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise ValueError(f"manifiesto ilegible: {e}") from e
+    files = data.get("files") if isinstance(data, dict) else None
+    if not isinstance(files, dict) or not files:
+        raise ValueError("manifiesto sin lista de archivos")
+    for name, digest in files.items():
+        if not isinstance(name, str) or not SAFE_NAME.match(name):
+            raise ValueError(f"nombre de archivo no permitido en el manifiesto: {name!r}")
+        if not isinstance(digest, str) or not re.match(r"^[0-9a-f]{64}$", digest):
+            raise ValueError(f"SHA-256 inválido para {name}")
+    return files
+
+
+def import_check(staging: Path) -> Tuple[bool, str]:
+    """Comprueba en un proceso aparte que el conjunto nuevo se puede importar."""
+    modules = ["qoe_throughput", "qoe_config", "qoe_telegram", "qoe_probe", "qoe_heartbeat"]
+    present = [m for m in modules if (staging / f"{m}.py").is_file()]
+    code = "import sys; sys.path.insert(0, sys.argv[1]); " + "; ".join(f"import {m}" for m in present)
+    ret, _, stderr = run_cmd([sys.executable, "-c", code, str(staging)])
+    return ret == 0, stderr.strip()[-500:]
+
+
+def perform_updates(verify_ssl: bool, scripts_dir: Path, config_path: Path, ref: str = DEFAULT_REF) -> int:
+    """Actualiza todos los scripts que cambiaron, o ninguno. Devuelve cuántos se actualizaron."""
+    base_url = f"{GITHUB_RAW_ROOT}/{ref}/scripts"
+    staging = scripts_dir / STAGING_DIR
+    backup = scripts_dir / BACKUP_DIR
+    shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir(parents=True, exist_ok=True)
+
+    def abort(reason: str) -> int:
+        print(f"Error: {reason}. No se cambió ningún archivo.")
+        shutil.rmtree(staging, ignore_errors=True)
+        return 0
+
+    manifest_path = staging / MANIFEST_NAME
+    if not download_file(f"{base_url}/{MANIFEST_NAME}", manifest_path, True):
+        return abort("no se pudo descargar el manifiesto")
+    try:
+        manifest = load_manifest(manifest_path)
+    except ValueError as e:
+        return abort(str(e))
+
+    changed: List[str] = []
+    for name, expected in sorted(manifest.items()):
+        if compute_sha256(scripts_dir / name) == expected:
             continue
-            
-        # Verify python syntax by compiling
+        staged = staging / name
+        if not download_file(f"{base_url}/{name}", staged, True):
+            return abort(f"no se pudo descargar {name}")
+        actual = compute_sha256(staged)
+        if actual != expected:
+            return abort(f"{name} no coincide con el manifiesto (esperado {expected[:12]}, recibido {actual[:12]})")
         try:
-            code_content = tmp_path.read_text(encoding="utf-8")
-            compile(code_content, str(tmp_path), "exec")
+            compile(staged.read_text(encoding="utf-8"), str(staged), "exec")
         except Exception as e:
-            print(f"Error: Compiled check failed for downloaded {filename}: {e}. Skipping update.")
-            try:
-                tmp_path.unlink()
-            except Exception:
-                pass
-            continue
-            
-        # Check hashes
-        local_hash = compute_sha256(file_path)
-        tmp_hash = compute_sha256(tmp_path)
-        
-        if local_hash == tmp_hash:
-            print(f"No changes detected for {filename}. Up to date.")
-            try:
-                tmp_path.unlink()
-            except Exception:
-                pass
-        else:
-            print(f"Updating {filename} (Hash changed from {local_hash[:8]} to {tmp_hash[:8]})...")
-            try:
-                # Atomically replace
-                os.replace(tmp_path, file_path)
-                updated_count += 1
-                print(f"Successfully updated {filename}.")
-            except Exception as e:
-                print(f"Error: Failed to replace {filename}: {e}")
-                if tmp_path.is_file():
-                    try:
-                        tmp_path.unlink()
-                    except Exception:
-                        pass
-                        
-    return updated_count
+            return abort(f"{name} no compila: {e}")
+        changed.append(name)
+
+    if not changed:
+        print("Todos los scripts están al día.")
+        shutil.rmtree(staging, ignore_errors=True)
+        return 0
+
+    # El conjunto completo (lo nuevo más lo que no cambió) debe poder importarse antes de instalarlo.
+    for name in manifest:
+        if name not in changed and (scripts_dir / name).is_file():
+            shutil.copy2(scripts_dir / name, staging / name)
+    ok, detail = import_check(staging)
+    if not ok:
+        return abort(f"el conjunto nuevo no se puede importar: {detail}")
+
+    shutil.rmtree(backup, ignore_errors=True)
+    backup.mkdir(parents=True, exist_ok=True)
+    replaced: List[str] = []
+    try:
+        for name in changed:
+            target = scripts_dir / name
+            if target.is_file():
+                shutil.copy2(target, backup / name)
+            os.replace(staging / name, target)
+            replaced.append(name)
+            print(f"Actualizado {name}.")
+    except Exception as e:
+        for name in replaced:
+            if (backup / name).is_file():
+                shutil.copy2(backup / name, scripts_dir / name)
+            else:
+                try:
+                    (scripts_dir / name).unlink()
+                except OSError:
+                    pass
+        return abort(f"falló el reemplazo ({e}); se restauró la versión anterior")
+    shutil.copy2(manifest_path, scripts_dir / MANIFEST_NAME)
+    shutil.rmtree(staging, ignore_errors=True)
+    return len(changed)
 
 
 # ---------------------------------------------------------------------------
@@ -434,6 +499,10 @@ def main() -> None:
         action="store_true",
         help="Bypass SSL certificate verification for downloading updates"
     )
+    parser.add_argument("--ref", type=str, default=DEFAULT_REF,
+                        help="Rama o tag del repositorio desde donde actualizar (por defecto main)")
+    parser.add_argument("--write-manifest", action="store_true",
+                        help="Regenera scripts/release-manifest.json (para quien publica cambios)")
     parser.add_argument(
         "--register",
         action="store_true",
@@ -467,14 +536,16 @@ def main() -> None:
     else:
         config_path = (repo_root / "config" / "probe-catalog.json").resolve()
         
-    # Read config TLS settings
-    config_verify_tls = load_config_verify_tls(config_path)
-    verify_ssl = (not args.no_verify_ssl) and config_verify_tls
-    
-    if not verify_ssl:
-        print("SSL Verification: DISABLED")
-    else:
-        print("SSL Verification: ENABLED")
+    if args.write_manifest:
+        print(f"Manifiesto escrito en {write_manifest(script_dir)}")
+        return
+    if not re.match(r"^[A-Za-z0-9._/-]+$", args.ref) or ".." in args.ref:
+        print("Error: --ref no es un nombre de rama o tag válido.", file=sys.stderr)
+        sys.exit(1)
+
+    verify_ssl = True
+    if args.no_verify_ssl or not load_config_verify_tls(config_path):
+        print("Aviso: el actualizador siempre verifica TLS; --no-verify-ssl y verifyTls=false no aplican aquí.")
 
     # If register flag is set, handle task registration
     if args.register:
@@ -522,7 +593,7 @@ def main() -> None:
 
     # Run check and update
     print(f"Checking for updates for scripts in {script_dir}...")
-    updated = perform_updates(verify_ssl, script_dir, config_path)
+    updated = perform_updates(verify_ssl, script_dir, config_path, args.ref)
     print(f"Update finished. {updated} files updated.")
 
 

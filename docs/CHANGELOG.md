@@ -21,6 +21,9 @@ Auditoría con el log real del 12/11 (1425 corridas) y Outlook caído sin que la
 - **Velocidad bajo el plan:** `scripts/qoe_speed_alert.py` avisa cuando la mejor medición queda bajo el 50 % de `probe.planDownMbps`/`planUpMbps` en 2 corridas seguidas.
 - **Sin huecos:** la sonda completa guarda en `logs/probe-buffer.lp` lo que no pudo escribir en InfluxDB y lo reenvía.
 - **Resumen diario** por Telegram con disponibilidad, cortes y fallas de servicios del día anterior.
+- **Actualizador:** todo o nada contra `scripts/release-manifest.json` (SHA-256 por archivo), con prueba de importación, respaldo y restauración. TLS siempre verificado; `--no-verify-ssl` ya no tiene efecto. La documentación deja de llamarlo "firma digital".
+- **Herramientas portables:** Node.js y `yt-dlp` se comparan con las sumas SHA-256 publicadas antes de instalarse.
+- **Instalador:** registra el monitor de cada minuto, configura Telegram y el plan contratado, guarda los datos del servidor en `probe-catalog.local.json`, deja la sonda completa cada 30 min y termina con una corrida y un mensaje de prueba. El token ya no pasa por la línea de comandos.
 - **CI:** `.github/workflows/tests.yml` corre todas las pruebas en Windows, Linux y macOS (Python 3.8 y 3.13). Las pruebas que estaban en `scripts/` pasan a `tests/` (chocaban de nombre y `unittest discover` fallaba).
 - **Certificación:** `run_qoe_certification.py` incluye una corrida del monitor en una carpeta aparte (`--log-dir`).
 

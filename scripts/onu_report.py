@@ -75,12 +75,26 @@ def _col_index(ref: str) -> int:
     return n - 1
 
 
+MAX_XLSX_MEMBER_BYTES = 300 * 1024 * 1024
+
+
+def _checked_member(z: zipfile.ZipFile, name: str) -> str:
+    """Rechaza archivos internos gigantes (zip bomba) o con DOCTYPE (expansión de entidades XML)."""
+    info = z.getinfo(name)
+    if info.file_size > MAX_XLSX_MEMBER_BYTES:
+        raise ValueError(f"{name} ocupa {info.file_size} bytes descomprimido: el archivo no parece un reporte válido.")
+    with z.open(name) as fh:
+        if b"<!DOCTYPE" in fh.read(4096).upper():
+            raise ValueError(f"{name} contiene un DOCTYPE: no se procesa.")
+    return name
+
+
 def iter_xlsx_rows(path: Path) -> Iterator[List[Any]]:
     """Recorre las filas de la primera hoja. Valores: str, float o None."""
     with zipfile.ZipFile(path) as z:
         shared: List[str] = []
         if "xl/sharedStrings.xml" in z.namelist():
-            root = ET.fromstring(z.read("xl/sharedStrings.xml"))
+            root = ET.fromstring(z.read(_checked_member(z, "xl/sharedStrings.xml")))
             for si in root.findall("m:si", NS):
                 shared.append("".join(t.text or "" for t in si.iter(f"{{{NS['m']}}}t")))
         wb = ET.fromstring(z.read("xl/workbook.xml"))
@@ -90,7 +104,7 @@ def iter_xlsx_rows(path: Path) -> Iterator[List[Any]]:
         target = next(r.get("Target") for r in rels if r.get("Id") == rid)
         sheet_path = target.lstrip("/") if target.startswith("/") else f"xl/{target}"
 
-        with z.open(sheet_path) as fh:
+        with z.open(_checked_member(z, sheet_path)) as fh:
             for _, el in ET.iterparse(fh, events=("end",)):
                 if el.tag != f"{{{NS['m']}}}row":
                     continue
