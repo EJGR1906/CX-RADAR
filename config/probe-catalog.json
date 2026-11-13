@@ -157,6 +157,7 @@
     },
     "maxLossPercentage": 20,
     "logRetentionDays": 30,
+    "dailySummaryHour": 8,
     "targets": [
       {
         "name": "inter-ookla-bqto",
@@ -261,6 +262,11 @@
         "expectedHttpCodes": [200, 302]
       }
     ]
+  },
+  "speedAlert": {
+    "minPercent": 50,
+    "failThreshold": 2,
+    "recoverThreshold": 2
   },
   "onuReport": {
     "minOnusPerPon": 5,

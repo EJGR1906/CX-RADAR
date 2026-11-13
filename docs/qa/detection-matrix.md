@@ -40,6 +40,16 @@ Python 3.8 y 3.13 en cada cambio.
 | Falla una parte de las pruebas de un servicio | `parcial` | 3 min | `test_partial_outlook_failure_says_partial` |
 | Servicio "caído" porque la red de la sonda está caída | No se evalúa | No avisa del servicio | `test_services_are_not_blamed_while_the_network_is_down` |
 
+## Velocidad
+
+| Falla | Diagnóstico | Aviso | Prueba |
+|---|---|---|---|
+| Todos los destinos por debajo del 50 % del plan | `velocidad_baja` | 2 corridas seguidas de la sonda completa (1 hora con corridas cada 30 min) | `test_all_targets_below_half_plan_is_low`, `test_alert_on_second_low_run_and_recovery` |
+| Un solo servidor lento | `ok` | No avisa | `test_one_slow_server_does_not_blame_the_line` |
+| Corrida sin mediciones (sin internet) | No se evalúa | No avisa de velocidad | `test_outage_run_does_not_count` |
+
+Requiere `probe.planDownMbps` en el catálogo local. Pruebas en `tests/test_speed_and_buffer.py`.
+
 ## Fallas de la propia sonda
 
 | Falla | Comportamiento | Prueba |
@@ -50,6 +60,7 @@ Python 3.8 y 3.13 en cada cambio.
 | InfluxDB rechaza una línea guardada | Se aparta y lo nuevo sigue entrando | `test_rejected_buffer_is_set_aside_and_new_data_flows` |
 | Telegram sin respuesta al recuperar | El RECUPERADO queda pendiente y sale después | `test_recovery_waits_for_telegram_and_is_sent_late` |
 | Dos corridas a la vez | La segunda se omite; un bloqueo viejo se ignora | `test_only_one_run_at_a_time_and_stale_lock_is_taken` |
+| InfluxDB sin respuesta en la sonda completa | Las mediciones se guardan y se reenvían en orden | `test_failed_write_is_kept_and_resent_in_order` |
 
 ## Caso real
 
@@ -63,5 +74,6 @@ corte real (12:32, 12:58, 13:33 y 15:55).
 - Cortes de menos de 10 s (dos rondas de 5 s).
 - Fallas de Outlook por cuenta o buzón: el portal carga pero el correo no sale.
 - Diferencia entre una sonda sin internet y un equipo apagado o suspendido, vista desde Grafana.
-- Velocidad baja: la mide la sonda completa cada 30 min y todavía no tiene alerta.
+- Velocidad baja en menos de una hora: la sonda completa mide cada 30 min y avisa a la segunda corrida.
+- Las consultas Flux de los paneles nuevos de Grafana no se han probado contra InfluxDB Cloud.
 - En Windows falta confirmar en una sonda real que las latencias dejan de ser múltiplos de 15,6 ms y que la tarea corre con el cable desconectado.

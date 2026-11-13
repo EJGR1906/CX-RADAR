@@ -663,26 +663,12 @@ def release_lock(path: Path) -> None:
         pass
 
 
-def _influx_status(error: Exception) -> int:
-    m = re.search(r"Status code: (\d+)", str(error))
-    return int(m.group(1)) if m else 0
-
-
 def write_influx(lines: List[str], config: Dict[str, Any], config_dir: Path, buffer_path: Path,
                  writer: Optional[Callable[[str, str, str, float], Any]] = None,
                  token: Optional[str] = None) -> bool:
-    """Escribe las líneas nuevas y reenvía las guardadas.
-
-    Si InfluxDB rechaza las guardadas por contenido (HTTP 400/422) se apartan en
-    un archivo `.rejected`: de otro modo una línea mala bloquearía todos los
-    envíos siguientes.
-    """
-    writer = writer or qoe_probe.write_to_influx
+    """Escribe las líneas nuevas y reenvía las guardadas (ver `qoe_probe.write_lines_with_buffer`)."""
     influx = config.get("influx", {})
     timeout = min(float(influx.get("writeTimeoutSeconds", 15)), 8.0)
-    buffered: List[str] = []
-    if buffer_path.is_file():
-        buffered = [ln for ln in buffer_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
     try:
         if token is None:
             token = qoe_probe.get_influx_token(influx, config_dir, quiet=True)
@@ -690,37 +676,17 @@ def write_influx(lines: List[str], config: Dict[str, Any], config_dir: Path, buf
                f"&bucket={urllib.parse.quote(str(influx['bucket']))}&precision=ms")
     except Exception as e:
         qoe_probe.log_message(f"Heartbeat: no se pudo escribir en InfluxDB, se guarda para reenviar: {e}", "WARNING")
-        write_atomic(buffer_path, "\n".join((buffered + lines)[-MAX_BUFFER_LINES:]) + "\n")
+        qoe_probe.append_to_buffer(buffer_path, lines, MAX_BUFFER_LINES)
         return False
-
-    if buffered:
-        try:
-            writer(url, token, "\n".join(buffered), timeout)
-            buffered = []
-        except Exception as e:
-            if _influx_status(e) in (400, 422):
-                rejected = buffer_path.with_name(f"{buffer_path.stem}.rejected-{int(time.time())}{buffer_path.suffix}")
-                write_atomic(rejected, "\n".join(buffered) + "\n")
-                qoe_probe.log_message(f"Heartbeat: InfluxDB rechazó {len(buffered)} líneas guardadas; se apartan en {rejected.name}: {e}", "ERROR")
-                buffered = []
-            else:
-                qoe_probe.log_message(f"Heartbeat: no se pudo escribir en InfluxDB, se guarda para reenviar: {e}", "WARNING")
-                write_atomic(buffer_path, "\n".join((buffered + lines)[-MAX_BUFFER_LINES:]) + "\n")
-                return False
     try:
-        if lines:
-            writer(url, token, "\n".join(lines), timeout)
-        if buffer_path.is_file():
-            buffer_path.unlink()
+        qoe_probe.write_lines_with_buffer(url, token, lines, timeout, buffer_path,
+                                          writer=writer or qoe_probe.write_to_influx, max_lines=MAX_BUFFER_LINES)
         return True
     except Exception as e:
-        if _influx_status(e) in (400, 422):
+        if qoe_probe.influx_error_status(e) in (400, 422):
             qoe_probe.log_message(f"Heartbeat: InfluxDB rechazó las líneas de esta corrida (no se reintentan): {e}", "ERROR")
-            if buffer_path.is_file():
-                buffer_path.unlink()
-            return False
-        qoe_probe.log_message(f"Heartbeat: no se pudo escribir en InfluxDB, se guarda para reenviar: {e}", "WARNING")
-        write_atomic(buffer_path, "\n".join(lines[-MAX_BUFFER_LINES:]) + "\n")
+        else:
+            qoe_probe.log_message(f"Heartbeat: no se pudo escribir en InfluxDB, se guarda para reenviar: {e}", "WARNING")
         return False
 
 
@@ -736,6 +702,80 @@ def rotate_logs(log_dir: Path, retention_days: int = 30) -> int:
             except OSError:
                 pass
     return removed
+
+
+# ---------------------------------------------------------------------------
+# Resumen diario
+# ---------------------------------------------------------------------------
+_RESULT_LINE = re.compile(r"\] Heartbeat (\w+) \(.*?\)(?: \| .*?cortes=(\d+)s)?(?: \| servicios: (.*?))?(?: \[[\d.]+s\])?(?: -> .*)?$")
+
+
+def summarize_day(log_lines: Sequence[str]) -> Optional[Dict[str, Any]]:
+    """Cuenta minutos, cortes y fallas de servicios a partir del log de un día."""
+    runs = down = cuts = blackout_s = degraded = 0
+    services: Dict[str, int] = {}
+    prev_down = False
+    for line in log_lines:
+        m = _RESULT_LINE.search(line.rstrip())
+        if not m or "Heartbeat:" in line:
+            continue
+        status = m.group(1)
+        runs += 1
+        is_down = status in NO_INTERNET_STATUSES
+        down += int(is_down)
+        cuts += int(is_down and not prev_down)
+        prev_down = is_down
+        degraded += int(status in SOFT_STATUSES)
+        if status == "microcortes":
+            blackout_s += int(m.group(2) or 0)
+        for part in (m.group(3) or "").split(", "):
+            name, _, value = part.partition("=")
+            if name and value and not value.startswith("ok"):
+                services[name] = services.get(name, 0) + 1
+    if runs == 0:
+        return None
+    return {"runs": runs, "down_minutes": down, "cuts": cuts, "blackout_s": blackout_s, "degraded_minutes": degraded,
+            "uptime_pct": round((runs - down) * 100.0 / runs, 2), "services": services}
+
+
+def build_daily_summary(probe_id: str, site: str, day: datetime.date, s: Dict[str, Any]) -> str:
+    lines = [f"CX-Radar | sonda {probe_id} ({site})", f"RESUMEN del {day.strftime('%d/%m/%Y')}",
+             f"Internet disponible: {s['uptime_pct']} % de {s['runs']} minutos medidos"]
+    if s["cuts"] or s["down_minutes"]:
+        lines.append(f"Cortes: {s['cuts']} ({s['down_minutes']} min sin internet)")
+    else:
+        lines.append("Sin cortes")
+    if s["blackout_s"]:
+        lines.append(f"Microcortes: {s['blackout_s']} s sin respuesta")
+    if s["degraded_minutes"]:
+        lines.append(f"Minutos degradados o con microcortes: {s['degraded_minutes']}")
+    for name, minutes in sorted(s["services"].items()):
+        lines.append(f"Servicio {name}: {minutes} min con fallas")
+    if s["runs"] < 1380:
+        lines.append(f"Minutos sin medición: {1440 - s['runs']} (equipo apagado, suspendido o tarea detenida)")
+    return "\n".join(lines)
+
+
+def maybe_send_daily_summary(state: Dict[str, Any], hb_cfg: Dict[str, Any], log_dir: Path, probe_id: str, site: str,
+                             send: Callable[[str], bool], now: Optional[datetime.datetime] = None) -> bool:
+    """Una vez al día, pasada la hora configurada, envía el resumen del día anterior."""
+    now = now or datetime.datetime.now()
+    hour = int(hb_cfg.get("dailySummaryHour", 8))
+    today = now.date().isoformat()
+    if hour < 0 or now.hour < hour or state.get("last_summary_day") == today:
+        return False
+    yesterday = now.date() - datetime.timedelta(days=1)
+    log_path = log_dir / f"qoe-heartbeat-{yesterday.isoformat()}.log"
+    state["last_summary_day"] = today
+    if not log_path.is_file():
+        return False
+    summary = summarize_day(log_path.read_text(encoding="utf-8", errors="replace").splitlines())
+    if summary is None:
+        return False
+    if not send(build_daily_summary(probe_id, site, yesterday, summary)):
+        state.pop("last_summary_day", None)  # se reintenta en la próxima corrida
+        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -857,6 +897,8 @@ def run(args: argparse.Namespace, repo_root: Path, log_dir: Path) -> int:
                 notify(s_action, state["services"][name],
                        lambda a, n=name: build_service_message(a, probe_id, site, n, services[n], state["services"][n], now_ms),
                        send, pending=state["pending"])
+            if status == "ok":
+                maybe_send_daily_summary(state, hb, log_dir, probe_id, site, send)
 
     today = datetime.date.today().isoformat()
     if state.get("last_gc_day") != today:

@@ -2347,6 +2347,62 @@ def write_to_influx(url: str, token: str, payload: str, timeout: float) -> bool:
         raise RuntimeError(f"InfluxDB write failed: {e}") from e
 
 
+def influx_error_status(error: Exception) -> int:
+    """Código HTTP de un fallo de `write_to_influx` (0 si fue un error de red)."""
+    m = re.search(r"Status code: (\d+)", str(error))
+    return int(m.group(1)) if m else 0
+
+
+def _write_text_atomic(path: Path, text: str) -> None:
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def append_to_buffer(buffer_path: Path, lines: List[str], max_lines: int = 20000) -> None:
+    buffered: List[str] = []
+    if buffer_path.is_file():
+        buffered = [ln for ln in buffer_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    _write_text_atomic(buffer_path, "\n".join((buffered + lines)[-max_lines:]) + "\n")
+
+
+def write_lines_with_buffer(url: str, token: str, lines: List[str], timeout: float, buffer_path: Path,
+                            writer: Optional[Any] = None, max_lines: int = 20000) -> None:
+    """Escribe en InfluxDB y guarda en disco lo que no se pudo enviar para reenviarlo después.
+
+    Lanza la excepción del fallo después de guardar. Si InfluxDB rechaza por
+    contenido (HTTP 400/422) lo guardado, se aparta en un archivo `.rejected`:
+    de otro modo una línea mala bloquearía todos los envíos siguientes.
+    """
+    writer = writer or write_to_influx
+    buffered: List[str] = []
+    if buffer_path.is_file():
+        buffered = [ln for ln in buffer_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if buffered:
+        try:
+            writer(url, token, "\n".join(buffered), timeout)
+        except Exception as e:
+            if influx_error_status(e) in (400, 422):
+                rejected = buffer_path.with_name(f"{buffer_path.stem}.rejected-{int(time.time())}{buffer_path.suffix}")
+                _write_text_atomic(rejected, "\n".join(buffered) + "\n")
+                log_message(f"InfluxDB rechazó {len(buffered)} líneas guardadas; se apartan en {rejected.name}: {e}", "ERROR")
+            else:
+                _write_text_atomic(buffer_path, "\n".join((buffered + lines)[-max_lines:]) + "\n")
+                raise
+    try:
+        if lines:
+            writer(url, token, "\n".join(lines), timeout)
+    except Exception as e:
+        if influx_error_status(e) in (400, 422):
+            if buffer_path.is_file():
+                buffer_path.unlink()
+        else:
+            _write_text_atomic(buffer_path, "\n".join(lines[-max_lines:]) + "\n")
+        raise
+    if buffer_path.is_file():
+        buffer_path.unlink()
+
+
 # ---------------------------------------------------------------------------
 # Main Execution Block
 # ---------------------------------------------------------------------------
@@ -2463,6 +2519,8 @@ def main() -> None:
     fatal_error_message = ""
     threw = False
     upload_cache = {}
+    write_error: Optional[Exception] = None
+    probe_buffer_path = log_dir / "probe-buffer.lp"
 
     try:
         log_message(f"Starting QoE probe using config {config_path}")
@@ -2658,10 +2716,16 @@ def main() -> None:
             precision = urllib.parse.quote(get_optional_str(influx_cfg, "precision", "ms"))
             write_uri = f"{base_url}/api/v2/write?org={org}&bucket={bucket}&precision={precision}"
 
-            payload = "\n".join(lines)
-            write_to_influx(write_uri, token_value, payload, float(influx_write_timeout))
-            write_succeeded = True
-            log_message(f"Wrote {len(lines)} measurement lines to InfluxDB.")
+            # Si InfluxDB no responde (por ejemplo, sin internet) las mediciones se guardan y la
+            # siguiente corrida las reenvía: una falla de conexión ya no deja un hueco en los datos.
+            try:
+                write_lines_with_buffer(write_uri, token_value, lines, float(influx_write_timeout), probe_buffer_path)
+                write_succeeded = True
+                log_message(f"Wrote {len(lines)} measurement lines to InfluxDB.")
+            except Exception as e:
+                write_error = e
+                kept = "se guardaron para reenviar" if influx_error_status(e) not in (400, 422) else "InfluxDB las rechazó y no se reintentan"
+                log_message(f"No se pudieron escribir {len(lines)} líneas en InfluxDB ({kept}): {e}", "ERROR")
 
         elif write_attempted:
             log_message("No target measurements collected. Skipping InfluxDB write.", "WARN")
@@ -2693,7 +2757,9 @@ def main() -> None:
 
         # Write Summary Line to InfluxDB
         if write_attempted and write_succeeded:
-            write_to_influx(write_uri, token_value, summary_line, float(influx_write_timeout))
+            write_lines_with_buffer(write_uri, token_value, [summary_line], float(influx_write_timeout), probe_buffer_path)
+        elif write_error is not None and influx_error_status(write_error) not in (400, 422):
+            append_to_buffer(probe_buffer_path, [summary_line])
 
         # Append to line list for local reports
         lines.append(summary_line)
@@ -2701,6 +2767,15 @@ def main() -> None:
         # InfluxDB line protocol lines are collected and sent directly to InfluxDB; no print loop is required
 
         log_message(f"QoE probe finished. Success={success_count}, Failure={failure_count}, Duration={probe_run_duration} ms")
+
+        # Aviso de velocidad bajo el plan contratado (solo si el catálogo declara probe.planDownMbps).
+        import qoe_speed_alert
+        speed_action = qoe_speed_alert.process(config, target_reports, log_dir, repo_root)
+        if speed_action:
+            log_message(f"Aviso de velocidad enviado: {speed_action}")
+
+        if write_error is not None:
+            raise write_error
 
     except Exception as e:
         threw = True

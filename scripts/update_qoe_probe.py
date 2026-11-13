@@ -39,6 +39,7 @@ FILES_TO_UPDATE = [
     "qoe_throughput.py",
     "qoe_config.py",
     "qoe_telegram.py",
+    "qoe_speed_alert.py",
     "qoe_probe.py",
     "qoe_heartbeat.py",
     "onu_report.py",

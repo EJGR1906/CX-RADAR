@@ -1,4 +1,5 @@
 // global-panels.js — Panel definitions for the Global (National) tab
+const { CONNECTION_MAPPINGS, NO_INTERNET_CODES } = require('./panel-helpers');
 const GREEN = { color: 'green', value: 0 };
 const YELLOW_80 = { color: 'yellow', value: 80 };
 const RED_200 = { color: 'red', value: 200 };
@@ -55,6 +56,49 @@ probes = union(tables: [allRuns, allHb, active])
       }))`;
 
 exports.panels = [
+  ['global-conn-down', 'stat', {
+    title: 'Sondas sin Internet Ahora', id: 111,
+    desc: 'Sondas cuyo ultimo reporte del monitor de cada minuto (ultimos 5 min) diagnostica caida de acceso, de transito, de router, de red local, de DNS o internet interceptado. Una sonda sin conexion no puede reportar hasta que vuelve: las que dejaron de reportar se ven en Sondas Activas.',
+    flux: `from(bucket: v.defaultBucket)
+  |> range(start: -5m)
+  |> filter(fn: (r) => r._measurement == "qoe_heartbeat_status" and r._field == "status_code")
+  |> group(columns: ["probe_id"])
+  |> last()
+  |> group()
+  |> map(fn: (r) => ({_time: r._time, _value: if contains(value: int(v: r._value), set: [${NO_INTERNET_CODES.join(', ')}]) then 1.0 else 0.0}))
+  |> sum()
+  |> map(fn: (r) => ({_time: now(), _field: "Sondas sin internet", _value: r._value}))
+  |> group(columns: ["_field"])`,
+    unit: 'none', decimals: 0,
+    thresholds: [{ color: 'green', value: 0 }, { color: 'red', value: 1 }]
+  }],
+
+  ['global-conn-timeline', 'state-timeline', {
+    title: 'Estado de la Conexion por Sonda', id: 112,
+    desc: 'Diagnostico del monitor de cada minuto de todas las sondas. Si el rango agrupa varios minutos se muestra el codigo mas alto del grupo. Los huecos son minutos sin reporte.',
+    flux: `from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "qoe_heartbeat_status" and r._field == "status_code")
+  |> group(columns: ["probe_id"])
+  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)
+  |> map(fn: (r) => ({_time: r._time, _field: r.probe_id, _value: r._value}))
+  |> group(columns: ["_field"])`,
+    mappings: CONNECTION_MAPPINGS
+  }],
+
+  ['global-services-timeline', 'state-timeline', {
+    title: 'Servicios Externos (peor resultado entre sondas)', id: 113,
+    desc: 'Cada servicio externo esta Disponible solo si todas sus pruebas respondieron en todas las sondas con internet en ese intervalo. Sirve para distinguir una falla del servicio (todas las sondas) de una falla local.',
+    flux: `from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "qoe_service_check" and r._field == "available")
+  |> map(fn: (r) => ({r with _value: if r._value then 1 else 0}))
+  |> group(columns: ["service"])
+  |> aggregateWindow(every: v.windowPeriod, fn: min, createEmpty: false)
+  |> map(fn: (r) => ({_time: r._time, _field: r.service, _value: r._value}))
+  |> group(columns: ["_field"])`
+  }],
+
   // 1. Sondas Activas
   ['global-kpi-probes', 'stat', {
     title: 'Sondas Activas', id: 101,
@@ -222,12 +266,15 @@ probes
 
 // Grid positions for Global tab
 exports.layout = [
-  ['global-kpi-probes',   0,  0,  5, 4],
-  ['global-kpi-services', 5,  0,  5, 4],
-  ['global-kpi-avail',   10,  0,  5, 4],
-  ['global-kpi-latency', 15,  0,  5, 4],
+  ['global-kpi-probes',   0,  0,  4, 4],
+  ['global-conn-down',    4,  0,  4, 4],
+  ['global-kpi-services', 8,  0,  4, 4],
+  ['global-kpi-avail',   12,  0,  4, 4],
+  ['global-kpi-latency', 16,  0,  4, 4],
   ['global-kpi-failures',20,  0,  4, 4],
-  ['global-avail-bar',    0,  4, 24, 7],
-  ['global-map',          0, 11, 14, 11],
-  ['global-probe-table', 14, 11, 10, 11],
+  ['global-conn-timeline',     0,  4, 24, 7],
+  ['global-services-timeline', 0, 11, 24, 5],
+  ['global-avail-bar',    0, 16, 24, 7],
+  ['global-map',          0, 23, 14, 11],
+  ['global-probe-table', 14, 23, 10, 11],
 ];

@@ -235,6 +235,48 @@ carga pero el correo no sale.
 fallando (12/11). Con el servicio sano hay que correr el monitor una vez y
 confirmar que salen `ok`; si no, ajustar los códigos.
 
+### Resumen diario
+
+Pasadas las 8:00 (`heartbeat.dailySummaryHour`; `-1` lo desactiva) el monitor
+envía por Telegram el resumen del día anterior, calculado con su propio log:
+porcentaje de minutos con internet, cortes y minutos sin internet, segundos en
+microcortes, minutos con fallas de cada servicio externo y minutos sin medición.
+
+### Velocidad por debajo del plan (`qoe_speed_alert.py`)
+
+La sonda completa avisa cuando la velocidad queda por debajo del 50 % del plan
+(`speedAlert.minPercent`) en 2 corridas seguidas. El plan se declara por sonda
+en `config/probe-catalog.local.json`:
+
+```json
+{ "probe": { "planDownMbps": 600, "planUpMbps": 600 } }
+```
+
+Sin esos valores no hay aviso. Se compara la mejor descarga y la mejor subida
+de la corrida entre todos los destinos: un solo servidor lento no dispara el
+aviso. Una corrida sin mediciones (sin internet) no cuenta.
+
+### La sonda completa ya no pierde datos sin conexión
+
+Si InfluxDB no responde, las mediciones de la corrida se guardan en
+`logs/probe-buffer.lp` y la corrida siguiente las reenvía. La corrida sigue
+terminando con error (queda en el log), pero Grafana ya no muestra un hueco.
+
+### Tableros
+
+`node grafana/builders/build-dashboard.js` regenera los dos tableros. Hay que
+volver a importarlos (ver [grafana-cloud-setup.md](../observability/grafana-cloud-setup.md)).
+
+- Detalle por sonda: arriba van Internet Disponible, Minutos sin Internet,
+  Cortes, Segundos en Microcortes, la línea de tiempo del estado de la conexión,
+  la de servicios externos y la latencia y pérdida por destino del monitor.
+- Vista global: Sondas sin Internet Ahora, estado de la conexión por sonda y
+  servicios externos (peor resultado entre sondas). Si un servicio falla en
+  todas las sondas a la vez, la falla es del servicio.
+
+Las consultas Flux de los paneles nuevos no se pudieron probar contra InfluxDB
+Cloud desde el entorno de desarrollo: revisar cada panel al importar.
+
 ### Volver a registrar las tareas (obligatorio al actualizar)
 
 La tarea de Windows se creaba con "ejecutar solo si hay red disponible": el

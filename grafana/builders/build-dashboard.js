@@ -20,7 +20,7 @@ function buildElement(def) {
     case 'table':
       return tablePanel(cfg.id, cfg.title, cfg.desc, cfg.flux, cfg.overrides || [], cfg.columnOrder || null);
     case 'state-timeline':
-      return stateTimelinePanel(cfg.id, cfg.title, cfg.desc, cfg.flux);
+      return stateTimelinePanel(cfg.id, cfg.title, cfg.desc, cfg.flux, cfg);
     case 'geomap':
       return geomapPanel(cfg.id, cfg.title, cfg.desc, cfg.flux);
     default:

@@ -4,6 +4,8 @@
     "site": "Server-HUB",
     "router_brand": "VSOL",
     "router_model": "HG5033-AX30-3G",
-    "connection_type": "ETHERNET"
+    "connection_type": "ETHERNET",
+    "planDownMbps": 600,
+    "planUpMbps": 600
   }
 }

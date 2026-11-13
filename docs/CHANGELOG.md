@@ -17,6 +17,10 @@ Auditoría con el log real del 12/11 (1425 corridas) y Outlook caído sin que la
 - **Robustez:** estado dañado ya no tumba las alertas, error interno se registra y se avisa, bloqueo contra corridas simultáneas, tiempo máximo por corrida, búfer de InfluxDB que aparta líneas rechazadas, rotación de logs del monitor.
 - **Programador:** se quita `-RunOnlyIfNetworkAvailable` y se agrega `-ExecutionTimeLimit` (`scripts/register_qoe_task.py`). Hay que volver a registrar las tareas en cada sonda.
 - **Pruebas:** banco de inyección de fallas (`tests/test_fault_injection.py`) y matriz de detección (`docs/qa/detection-matrix.md`).
+- **Tableros:** el detalle por sonda y la vista global muestran el estado de la conexión minuto a minuto, disponibilidad, cortes, microcortes, latencia y pérdida por destino y servicios externos. Antes el monitor de cada minuto no tenía ningún panel propio.
+- **Velocidad bajo el plan:** `scripts/qoe_speed_alert.py` avisa cuando la mejor medición queda bajo el 50 % de `probe.planDownMbps`/`planUpMbps` en 2 corridas seguidas.
+- **Sin huecos:** la sonda completa guarda en `logs/probe-buffer.lp` lo que no pudo escribir en InfluxDB y lo reenvía.
+- **Resumen diario** por Telegram con disponibilidad, cortes y fallas de servicios del día anterior.
 - **CI:** `.github/workflows/tests.yml` corre todas las pruebas en Windows, Linux y macOS (Python 3.8 y 3.13). Las pruebas que estaban en `scripts/` pasan a `tests/` (chocaban de nombre y `unittest discover` fallaba).
 - **Certificación:** `run_qoe_certification.py` incluye una corrida del monitor en una carpeta aparte (`--log-dir`).
 

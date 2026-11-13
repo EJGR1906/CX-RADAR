@@ -35,6 +35,324 @@
     "description": "Vista Global (nacional) de QoE para CX-Radar con mapa de ubicaciones de sondas en Venezuela.",
     "editable": true,
     "elements": {
+      "global-conn-down": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "refId": "A",
+                    "query": {
+                      "datasource": {
+                        "name": "dfkh6j26t6gw0c"
+                      },
+                      "group": "influxdb",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat_status\" and r._field == \"status_code\")\n  |> group(columns: [\"probe_id\"])\n  |> last()\n  |> group()\n  |> map(fn: (r) => ({_time: r._time, _value: if contains(value: int(v: r._value), set: [2, 3, 4, 5, 7, 8]) then 1.0 else 0.0}))\n  |> sum()\n  |> map(fn: (r) => ({_time: now(), _field: \"Sondas sin internet\", _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                        "range": false
+                      },
+                      "version": "v0"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Sondas cuyo ultimo reporte del monitor de cada minuto (ultimos 5 min) diagnostica caida de acceso, de transito, de router, de red local, de DNS o internet interceptado. Una sonda sin conexion no puede reportar hasta que vuelve: las que dejaron de reportar se ven en Sondas Activas.",
+          "id": 111,
+          "links": [],
+          "title": "Sondas sin Internet Ahora",
+          "vizConfig": {
+            "group": "stat",
+            "kind": "VizConfig",
+            "version": "13.1.0-25153870157",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Sin datos",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "decimals": 0,
+                  "unit": "none",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      },
+                      {
+                        "color": "red",
+                        "value": 1
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "center",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "value",
+                "wideLayout": true
+              }
+            }
+          }
+        }
+      },
+      "global-conn-timeline": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "refId": "A",
+                    "query": {
+                      "datasource": {
+                        "name": "dfkh6j26t6gw0c"
+                      },
+                      "group": "influxdb",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_heartbeat_status\" and r._field == \"status_code\")\n  |> group(columns: [\"probe_id\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\n  |> map(fn: (r) => ({_time: r._time, _field: r.probe_id, _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                        "range": true
+                      },
+                      "version": "v0"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Diagnostico del monitor de cada minuto de todas las sondas. Si el rango agrupa varios minutos se muestra el codigo mas alto del grupo. Los huecos son minutos sin reporte.",
+          "id": 112,
+          "links": [],
+          "title": "Estado de la Conexion por Sonda",
+          "vizConfig": {
+            "group": "state-timeline",
+            "kind": "VizConfig",
+            "version": "13.1.0-25153870157",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Sin datos",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "custom": {
+                    "fillOpacity": 80,
+                    "lineWidth": 1
+                  },
+                  "mappings": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "color": "green",
+                          "index": 0,
+                          "text": "OK"
+                        },
+                        "1": {
+                          "color": "yellow",
+                          "index": 1,
+                          "text": "Degradado"
+                        },
+                        "2": {
+                          "color": "red",
+                          "index": 5,
+                          "text": "Sin salida a internet"
+                        },
+                        "3": {
+                          "color": "dark-red",
+                          "index": 6,
+                          "text": "Caida del acceso"
+                        },
+                        "4": {
+                          "color": "blue",
+                          "index": 7,
+                          "text": "Router local caido"
+                        },
+                        "5": {
+                          "color": "dark-orange",
+                          "index": 4,
+                          "text": "Falla de DNS"
+                        },
+                        "6": {
+                          "color": "orange",
+                          "index": 2,
+                          "text": "Microcortes"
+                        },
+                        "7": {
+                          "color": "purple",
+                          "index": 3,
+                          "text": "Internet interceptado"
+                        },
+                        "8": {
+                          "color": "dark-blue",
+                          "index": 8,
+                          "text": "Sonda sin red local"
+                        }
+                      }
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "alignValue": "center",
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": false
+                },
+                "mergeValues": true,
+                "rowHeight": 0.8,
+                "showValue": "auto",
+                "tooltip": {
+                  "hideZeros": true,
+                  "mode": "multi",
+                  "sort": "none"
+                }
+              }
+            }
+          }
+        }
+      },
+      "global-services-timeline": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "hidden": false,
+                    "refId": "A",
+                    "query": {
+                      "datasource": {
+                        "name": "dfkh6j26t6gw0c"
+                      },
+                      "group": "influxdb",
+                      "kind": "DataQuery",
+                      "spec": {
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"qoe_service_check\" and r._field == \"available\")\n  |> map(fn: (r) => ({r with _value: if r._value then 1 else 0}))\n  |> group(columns: [\"service\"])\n  |> aggregateWindow(every: v.windowPeriod, fn: min, createEmpty: false)\n  |> map(fn: (r) => ({_time: r._time, _field: r.service, _value: r._value}))\n  |> group(columns: [\"_field\"])",
+                        "range": true
+                      },
+                      "version": "v0"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Cada servicio externo esta Disponible solo si todas sus pruebas respondieron en todas las sondas con internet en ese intervalo. Sirve para distinguir una falla del servicio (todas las sondas) de una falla local.",
+          "id": 113,
+          "links": [],
+          "title": "Servicios Externos (peor resultado entre sondas)",
+          "vizConfig": {
+            "group": "state-timeline",
+            "kind": "VizConfig",
+            "version": "13.1.0-25153870157",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "noValue": "Sin datos",
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "custom": {
+                    "fillOpacity": 80,
+                    "lineWidth": 1
+                  },
+                  "mappings": [
+                    {
+                      "options": {
+                        "0": {
+                          "color": "red",
+                          "index": 1,
+                          "text": "Caído"
+                        },
+                        "1": {
+                          "color": "green",
+                          "index": 0,
+                          "text": "Disponible"
+                        }
+                      },
+                      "type": "value"
+                    }
+                  ],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": 0
+                      }
+                    ]
+                  }
+                },
+                "overrides": []
+              },
+              "options": {
+                "alignValue": "center",
+                "legend": {
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": false
+                },
+                "mergeValues": true,
+                "rowHeight": 0.8,
+                "showValue": "auto",
+                "tooltip": {
+                  "hideZeros": true,
+                  "mode": "multi",
+                  "sort": "none"
+                }
+              }
+            }
+          }
+        }
+      },
       "global-kpi-probes": {
         "kind": "Panel",
         "spec": {
@@ -911,7 +1229,20 @@
               },
               "x": 0,
               "y": 0,
-              "width": 5,
+              "width": 4,
+              "height": 4
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "global-conn-down"
+              },
+              "x": 4,
+              "y": 0,
+              "width": 4,
               "height": 4
             }
           },
@@ -922,9 +1253,9 @@
                 "kind": "ElementReference",
                 "name": "global-kpi-services"
               },
-              "x": 5,
+              "x": 8,
               "y": 0,
-              "width": 5,
+              "width": 4,
               "height": 4
             }
           },
@@ -935,9 +1266,9 @@
                 "kind": "ElementReference",
                 "name": "global-kpi-avail"
               },
-              "x": 10,
+              "x": 12,
               "y": 0,
-              "width": 5,
+              "width": 4,
               "height": 4
             }
           },
@@ -948,9 +1279,9 @@
                 "kind": "ElementReference",
                 "name": "global-kpi-latency"
               },
-              "x": 15,
+              "x": 16,
               "y": 0,
-              "width": 5,
+              "width": 4,
               "height": 4
             }
           },
@@ -972,7 +1303,7 @@
             "spec": {
               "element": {
                 "kind": "ElementReference",
-                "name": "global-avail-bar"
+                "name": "global-conn-timeline"
               },
               "x": 0,
               "y": 4,
@@ -985,10 +1316,36 @@
             "spec": {
               "element": {
                 "kind": "ElementReference",
-                "name": "global-map"
+                "name": "global-services-timeline"
               },
               "x": 0,
               "y": 11,
+              "width": 24,
+              "height": 5
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "global-avail-bar"
+              },
+              "x": 0,
+              "y": 16,
+              "width": 24,
+              "height": 7
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "element": {
+                "kind": "ElementReference",
+                "name": "global-map"
+              },
+              "x": 0,
+              "y": 23,
               "width": 14,
               "height": 11
             }
@@ -1001,7 +1358,7 @@
                 "name": "global-probe-table"
               },
               "x": 14,
-              "y": 11,
+              "y": 23,
               "width": 10,
               "height": 11
             }

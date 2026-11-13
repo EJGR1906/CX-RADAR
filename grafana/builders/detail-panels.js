@@ -1,9 +1,124 @@
 // detail-panels.js — Panel definitions for the Detail (Per-Probe) tab
 const P = `r.probe_id == "\${probe_id}"`;
 
-const { SVC_OVERRIDES } = require('./panel-helpers');
+const { SVC_OVERRIDES, CONNECTION_MAPPINGS, NO_INTERNET_CODES } = require('./panel-helpers');
+
+// Monitor de cada minuto (qoe_heartbeat_status): 1.0 si en ese minuto no habia internet.
+const HB = `from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "qoe_heartbeat_status" and r._field == "status_code")
+  |> filter(fn: (r) => ${P})
+  |> group()
+  |> sort(columns: ["_time"])`;
+const DOWN = `|> map(fn: (r) => ({_time: r._time, _value: if contains(value: int(v: r._value), set: [${NO_INTERNET_CODES.join(', ')}]) then 1.0 else 0.0}))`;
+const hbSeries = (field) => `from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "qoe_heartbeat" and r._field == "${field}")
+  |> filter(fn: (r) => ${P})
+  |> group(columns: ["check"])
+  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)
+  |> map(fn: (r) => ({_time: r._time, _field: r.check, _value: r._value}))
+  |> group(columns: ["_field"])`;
 
 exports.panels = [
+  // --- Conexion: monitor de cada minuto ---
+  ['detail-conn-uptime', 'stat', {
+    title: 'Internet Disponible', id: 214,
+    desc: 'Porcentaje de minutos del rango en que la sonda tuvo internet (segun el monitor de cada minuto). Degradado y microcortes cuentan como disponible. Los minutos en que la sonda no reporto no se cuentan.',
+    flux: `${HB}
+  ${DOWN}
+  |> mean()
+  |> map(fn: (r) => ({_time: now(), _field: "Internet disponible", _value: (1.0 - r._value) * 100.0}))
+  |> group(columns: ["_field"])`,
+    unit: 'percent', max: 100, min: 0, decimals: 2,
+    thresholds: [{ color: 'red', value: 0 }, { color: 'yellow', value: 99 }, { color: 'green', value: 99.9 }]
+  }],
+
+  ['detail-conn-down-minutes', 'stat', {
+    title: 'Minutos sin Internet', id: 215,
+    desc: 'Minutos del rango en que el monitor diagnostico caida de acceso, de transito, de router, de red local, de DNS o internet interceptado.',
+    flux: `${HB}
+  ${DOWN}
+  |> sum()
+  |> map(fn: (r) => ({_time: now(), _field: "Minutos sin internet", _value: r._value}))
+  |> group(columns: ["_field"])`,
+    unit: 'none', decimals: 0,
+    thresholds: [{ color: 'green', value: 0 }, { color: 'yellow', value: 1 }, { color: 'red', value: 10 }]
+  }],
+
+  ['detail-conn-cuts', 'stat', {
+    title: 'Cortes', id: 216,
+    desc: 'Numero de veces que la conexion paso de funcionar a no tener internet en el rango.',
+    flux: `${HB}
+  ${DOWN}
+  |> difference(nonNegative: false)
+  |> map(fn: (r) => ({_time: r._time, _value: if r._value > 0.0 then 1.0 else 0.0}))
+  |> sum()
+  |> map(fn: (r) => ({_time: now(), _field: "Cortes", _value: r._value}))
+  |> group(columns: ["_field"])`,
+    unit: 'none', decimals: 0,
+    thresholds: [{ color: 'green', value: 0 }, { color: 'yellow', value: 1 }, { color: 'red', value: 5 }]
+  }],
+
+  ['detail-conn-blackout', 'stat', {
+    title: 'Segundos en Microcortes', id: 217,
+    desc: 'Suma de los segundos en que no respondio ningun destino dentro de las ventanas de 45 s del monitor (resolucion de 5 s).',
+    flux: `from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "qoe_heartbeat_status" and r._field == "blackout_s")
+  |> filter(fn: (r) => ${P})
+  |> group()
+  |> sum()
+  |> map(fn: (r) => ({_time: now(), _field: "Segundos sin respuesta", _value: r._value}))
+  |> group(columns: ["_field"])`,
+    unit: 's', decimals: 0,
+    thresholds: [{ color: 'green', value: 0 }, { color: 'yellow', value: 10 }, { color: 'red', value: 120 }]
+  }],
+
+  ['detail-conn-timeline', 'state-timeline', {
+    title: 'Estado de la Conexion (cada minuto)', id: 218,
+    desc: 'Diagnostico del monitor de cada minuto. Si el rango agrupa varios minutos se muestra el codigo mas alto del grupo. Los huecos son minutos sin reporte (equipo apagado o datos aun no reenviados).',
+    flux: `from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "qoe_heartbeat_status" and r._field == "status_code")
+  |> filter(fn: (r) => ${P})
+  |> group(columns: ["probe_id"])
+  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)
+  |> map(fn: (r) => ({_time: r._time, _field: "Conexion", _value: r._value}))
+  |> group(columns: ["_field"])`,
+    mappings: CONNECTION_MAPPINGS
+  }],
+
+  ['detail-services-timeline', 'state-timeline', {
+    title: 'Servicios Externos (Outlook, Microsoft 365, Teams)', id: 219,
+    desc: 'Resultado de cada prueba HTTPS de servicios externos del monitor de cada minuto. Solo se evaluan cuando la red de la sonda funciona: un hueco significa que la sonda no tenia internet.',
+    flux: `from(bucket: v.defaultBucket)
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r._measurement == "qoe_service_check" and r._field == "available")
+  |> filter(fn: (r) => ${P})
+  |> map(fn: (r) => ({r with _value: if r._value then 1 else 0}))
+  |> group(columns: ["service", "check"])
+  |> aggregateWindow(every: v.windowPeriod, fn: min, createEmpty: false)
+  |> map(fn: (r) => ({_time: r._time, _field: r.service + " / " + r.check, _value: r._value}))
+  |> group(columns: ["_field"])`
+  }],
+
+  ['detail-hb-latency', 'timeseries', {
+    title: 'Latencia por Destino (monitor)', id: 220,
+    desc: 'Latencia de conexion TCP (mediana de la ventana) hacia cada destino del monitor de cada minuto. Se muestra el maximo de cada intervalo.',
+    flux: hbSeries('latency_ms'),
+    unit: 'ms', decimals: 1, lineWidth: 1, interpolation: 'linear',
+    thresholds: [{ color: 'green', value: 0 }]
+  }],
+
+  ['detail-hb-loss', 'timeseries', {
+    title: 'Perdida por Destino (monitor)', id: 221,
+    desc: 'Porcentaje de conexiones sin respuesta hacia cada destino en la ventana del monitor (10 muestras por minuto). Se muestra el maximo de cada intervalo.',
+    flux: hbSeries('loss_pct'),
+    unit: 'percent', decimals: 0, drawStyle: 'bars', fillOpacity: 60, interpolation: 'linear',
+    thresholds: [{ color: 'green', value: 0 }]
+  }],
+
   // KPI Row
   ['detail-kpi-avail', 'stat', {
     title: 'Disponibilidad', id: 201,
@@ -249,18 +364,27 @@ exports.panels = [
 ];
 
 // Grid positions for Detail tab
+// La conexion va primero: es lo que el producto promete detectar.
 exports.layout = [
-  ['detail-kpi-avail',            0,  0,  5, 4],
-  ['detail-kpi-download',         5,  0,  5, 4],
-  ['detail-kpi-upload',          10,  0,  5, 4],
-  ['detail-kpi-latency',         15,  0,  5, 4],
-  ['detail-kpi-jitter',          20,  0,  4, 4],
-  ['detail-download-by-service',  0,  4, 12, 7],
-  ['detail-upload-by-service',   12,  4, 12, 7],
-  ['detail-latency-ts',           0, 11, 12, 9],
-  ['detail-jitter-ts',           12, 11, 12, 9],
-  ['detail-download-ts',          0, 20, 12, 9],
-  ['detail-upload-ts',           12, 20, 12, 9],
-  ['detail-snapshot-simple',      0, 29, 12, 9],
-  ['detail-run-duration',        12, 29, 12, 9],
+  ['detail-conn-uptime',          0,  0,  6, 4],
+  ['detail-conn-down-minutes',    6,  0,  6, 4],
+  ['detail-conn-cuts',           12,  0,  6, 4],
+  ['detail-conn-blackout',       18,  0,  6, 4],
+  ['detail-conn-timeline',        0,  4, 24, 4],
+  ['detail-services-timeline',    0,  8, 24, 8],
+  ['detail-hb-latency',           0, 16, 12, 10],
+  ['detail-hb-loss',             12, 16, 12, 10],
+  ['detail-kpi-avail', 0, 26, 5, 4],
+  ['detail-kpi-download', 5, 26, 5, 4],
+  ['detail-kpi-upload', 10, 26, 5, 4],
+  ['detail-kpi-latency', 15, 26, 5, 4],
+  ['detail-kpi-jitter', 20, 26, 4, 4],
+  ['detail-download-by-service', 0, 30, 12, 7],
+  ['detail-upload-by-service', 12, 30, 12, 7],
+  ['detail-latency-ts', 0, 37, 12, 9],
+  ['detail-jitter-ts', 12, 37, 12, 9],
+  ['detail-download-ts', 0, 46, 12, 9],
+  ['detail-upload-ts', 12, 46, 12, 9],
+  ['detail-snapshot-simple', 0, 55, 12, 9],
+  ['detail-run-duration', 12, 55, 12, 9],
 ];
