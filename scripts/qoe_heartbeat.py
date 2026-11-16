@@ -107,6 +107,11 @@ LOCK_STALE_SECONDS = 150
 HARD_DEADLINE_SECONDS = 110
 NET_CACHE_SECONDS = 600
 INT_STATE_KEYS = ("bad_count", "good_count", "hard_count", "cuts", "bad_since", "last_bad")
+_STAGE = {"name": "inicio"}  # etapa en curso, para el aviso del watchdog
+
+
+def set_stage(name: str) -> None:
+    _STAGE["name"] = name
 
 
 def status_text(status: str, isp: str = "") -> str:
@@ -318,8 +323,10 @@ def summarize_dns(os_checks: List[Dict[str, Any]], servers: List[Dict[str, Any]]
             "os_ok": os_ok, "servers": servers}
 
 
-def http_get(url: str, timeout_s: float = 8.0, verify_tls: bool = True, user_agent: str = "CX-Radar/heartbeat") -> Dict[str, Any]:
+def http_get(url: str, timeout_s: float = 8.0, verify_tls: bool = True, user_agent: str = "CX-Radar/heartbeat",
+             resolver: Optional[Callable[..., Optional[tuple]]] = None) -> Dict[str, Any]:
     """GET sin seguir redirecciones. Devuelve el código y el tipo de error, nunca lanza."""
+    resolve = resolver or qoe_throughput.resolve_host
     parts = urllib.parse.urlsplit(url)
     host = parts.hostname or ""
     path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
@@ -327,13 +334,30 @@ def http_get(url: str, timeout_s: float = 8.0, verify_tls: bool = True, user_age
     result = {"status": 0, "error": "", "ms": 0.0, "body_len": 0}
     conn: Optional[http.client.HTTPConnection] = None
     try:
-        if parts.scheme == "https":
-            conn = http.client.HTTPSConnection(host, parts.port or 443, timeout=timeout_s,
-                                               context=qoe_throughput._ssl_context(verify_tls))
-        elif parts.scheme == "http":
-            conn = http.client.HTTPConnection(host, parts.port or 80, timeout=timeout_s)
-        else:
+        if parts.scheme not in ("http", "https"):
             raise ValueError("solo http o https")
+        port = parts.port or (443 if parts.scheme == "https" else 80)
+        # `http.client` no limita el tiempo de getaddrinfo: con el DNS caído una
+        # corrida podía quedar colgada. Se resuelve aparte, con límite, y se
+        # conecta a la IP manteniendo el nombre para Host y SNI.
+        addr = resolve(host, port, timeout_s)
+        if addr is None:
+            raise socket.gaierror("no resuelve")
+        family, sockaddr = addr
+        sock = socket.socket(family, socket.SOCK_STREAM)
+        try:
+            sock.settimeout(timeout_s)
+            sock.connect(sockaddr)
+            if parts.scheme == "https":
+                sock = qoe_throughput._ssl_context(verify_tls).wrap_socket(sock, server_hostname=host)
+        except BaseException:
+            sock.close()
+            raise
+        if parts.scheme == "https":
+            conn = http.client.HTTPSConnection(host, port, timeout=timeout_s)
+        else:
+            conn = http.client.HTTPConnection(host, port, timeout=timeout_s)
+        conn.sock = sock
         conn.request("GET", path, headers={"User-Agent": user_agent, "Accept": "*/*", "Connection": "close"})
         resp = conn.getresponse()
         result["status"] = resp.status
@@ -423,6 +447,14 @@ def classify(gateway: Optional[Dict[str, Any]], checks: List[Dict[str, Any]], dn
             status = "caida_acceso"
     elif isp_ok and ext_ok is False:
         status = "caida_transito"
+    elif blackout["longest"] >= 2 or blackout["rounds"] >= 2:
+        # Va antes que DNS y verificación web: esas consultas se hacen al inicio de la
+        # ventana y, si la conexión estaba cortada en ese momento, también fallan.
+        # Un corte total de 35 s que vuelve no es una falla de DNS.
+        status = "microcortes"
+        notes.append(f"Sin respuesta de ningún destino durante ~{int(blackout['rounds'] * interval_s)} s de la ventana.")
+        if (dns is not None and dns.get("system_ok") is False) or verified is False:
+            notes.append("El DNS y la verificación web fallaron durante el corte, no por separado.")
     elif dns is not None and dns.get("system_ok") is False:
         status = "falla_dns"
         if dns.get("public_ok"):
@@ -431,9 +463,6 @@ def classify(gateway: Optional[Dict[str, Any]], checks: List[Dict[str, Any]], dn
             notes.append("Tampoco responden los DNS públicos: las consultas DNS no salen.")
     elif verified is False:
         status = "internet_interceptado"
-    elif blackout["longest"] >= 2 or blackout["rounds"] >= 2:
-        status = "microcortes"
-        notes.append(f"Sin respuesta de ningún destino durante ~{int(blackout['rounds'] * interval_s)} s de la ventana.")
     elif degraded or unreachable:
         status = "degradado"
     else:
@@ -531,6 +560,15 @@ def build_message(action: str, probe_id: str, site: str, status: str, summary: D
         elif c["degraded"]:
             lines.append(f"- {c['name']}: {c['latency_ms']} ms (umbral {c['max_latency_ms']:.0f}), pérdida {c['loss_pct']} %")
     return "\n".join(lines)
+
+
+def service_detail(info: Dict[str, Any]) -> str:
+    """`parcial(2/3 fallan: outlook-m365 HTTP 302; outlook-web HTTP 417)`: el log dice qué check falla."""
+    failed = info.get("failed", [])
+    if not failed:
+        return str(info.get("status", "ok"))
+    why = "; ".join(f"{f['name']} {f['reason']}".replace(",", " ") for f in failed)
+    return f"{info['status']}({len(failed)}/{info.get('total', 0)} fallan: {why})"
 
 
 def build_service_message(action: str, probe_id: str, site: str, service: str, info: Dict[str, Any],
@@ -636,8 +674,50 @@ def load_state(path: Path) -> Dict[str, Any]:
         return sanitize_state({})
 
 
+def pid_alive(pid: int) -> bool:
+    """True si el proceso existe. Ante la duda responde True (no se roba un bloqueo en uso)."""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not handle:
+                return kernel32.GetLastError() == 5  # acceso denegado: existe
+            try:
+                code = ctypes.c_ulong()
+                if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                    return True
+                return code.value == 259  # STILL_ACTIVE
+            finally:
+                kernel32.CloseHandle(handle)
+        except Exception:
+            return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def _lock_owner_dead(path: Path) -> bool:
+    try:
+        pid = int(path.read_text(encoding="ascii").strip() or "0")
+    except (OSError, ValueError):
+        return False  # recién creado o ilegible: decide la antigüedad
+    return pid != os.getpid() and not pid_alive(pid)
+
+
 def acquire_lock(path: Path, stale_seconds: float = LOCK_STALE_SECONDS) -> bool:
-    """Evita dos corridas a la vez (cron y launchd no lo impiden). Un bloqueo viejo se ignora."""
+    """Evita dos corridas a la vez (cron y launchd no lo impiden).
+
+    Se ignora un bloqueo viejo o uno cuyo proceso ya no existe: si el sistema
+    mata una corrida colgada, el bloqueo queda en disco y no debe costar más
+    minutos sin medir.
+    """
     for _ in range(2):
         try:
             fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -646,8 +726,9 @@ def acquire_lock(path: Path, stale_seconds: float = LOCK_STALE_SECONDS) -> bool:
             return True
         except FileExistsError:
             try:
-                if time.time() - path.stat().st_mtime < stale_seconds:
+                if time.time() - path.stat().st_mtime < stale_seconds and not _lock_owner_dead(path):
                     return False
+                qoe_probe.log_message("Heartbeat: la corrida anterior terminó sin liberar el bloqueo, se toma.", "WARNING")
                 path.unlink()
             except OSError:
                 return False
@@ -804,10 +885,12 @@ def run(args: argparse.Namespace, repo_root: Path, log_dir: Path) -> int:
     service_cfg = hb.get("serviceChecks", [])
     service_timeout = float(hb.get("serviceTimeoutSeconds", 8))
 
+    set_stage("red local")
     route_ok = has_default_route()
     net = get_local_network(state, now_ms) if route_ok else {"gw": "", "dns": []}
     dns_servers = ([{"name": f"sistema-{ip}", "ip": ip, "kind": "system"} for ip in net.get("dns", [])]
                    + [{**s, "kind": "public"} for s in hb.get("dnsServers", DEFAULT_DNS_SERVERS)])
+    set_stage("resolución de destinos")
     resolved = resolve_targets(targets, state["ip_cache"])
     addrs = [t["addr"] for t in resolved]
 
@@ -817,8 +900,10 @@ def run(args: argparse.Namespace, repo_root: Path, log_dir: Path) -> int:
         dns_futures = [ex.submit(check_dns_server, s, dns_names, timeout_s) for s in dns_servers]
         verify_future = ex.submit(verify_internet, hb.get("connectivityChecks", DEFAULT_CONNECTIVITY_CHECKS))
         service_futures = [ex.submit(check_service, c, service_timeout) for c in service_cfg]
+        set_stage("muestreo")
         with qoe_throughput.high_res_timer():
             matrix = sample_rounds(addrs, rounds, interval_s, timeout_s)
+        set_stage("espera de DNS, verificación web y servicios")
         os_dns = [f.result() for f in os_dns_futures]
         dns = summarize_dns(os_dns, [f.result() for f in dns_futures])
         verified = verify_future.result()
@@ -840,7 +925,8 @@ def run(args: argparse.Namespace, repo_root: Path, log_dir: Path) -> int:
     samples_lost = sum(1 for row in matrix for i, a in enumerate(addrs) if a is not None and row[i] is None)
     loss_pct = round(samples_lost * 100.0 / samples_total, 1) if samples_total else 100.0
 
-    evaluate_services = status not in NO_INTERNET_STATUSES
+    # Con microcortes los servicios se consultaron quizá durante el corte: no se cuentan.
+    evaluate_services = status not in NO_INTERNET_STATUSES and status != "microcortes"
     services = classify_services(service_results) if evaluate_services else {}
 
     tags_base = {"probe_id": probe_id, "site": site, "isp": probe.get("isp", "unknown")}
@@ -874,6 +960,7 @@ def run(args: argparse.Namespace, repo_root: Path, log_dir: Path) -> int:
                 {"available": r["available"], "http_status": int(r["http_status"]),
                  "time_total_ms": float(r["time_total_ms"]), "error_class": r["error_class"] or "none"}, now_ms))
 
+    set_stage("escritura en InfluxDB")
     if not args.skip_influx_write:
         write_influx(lines, config, config_path.parent, buffer_path)
 
@@ -886,6 +973,7 @@ def run(args: argparse.Namespace, repo_root: Path, log_dir: Path) -> int:
                                                    int(hb.get("serviceFailThreshold", 3)),
                                                    int(hb.get("serviceRecoverThreshold", 2)))
 
+    set_stage("Telegram")
     if not args.skip_telegram:
         creds = qoe_telegram.get_credentials(repo_root / ".env")
         if qoe_telegram.is_configured(creds):
@@ -900,6 +988,7 @@ def run(args: argparse.Namespace, repo_root: Path, log_dir: Path) -> int:
             if status == "ok":
                 maybe_send_daily_summary(state, hb, log_dir, probe_id, site, send)
 
+    set_stage("guardado de estado")
     today = datetime.date.today().isoformat()
     if state.get("last_gc_day") != today:
         state["last_gc_day"] = today
@@ -912,8 +1001,7 @@ def run(args: argparse.Namespace, repo_root: Path, log_dir: Path) -> int:
     extra = (f" | router={router} dns={flag(dns['system_ok'])}/{flag(dns['public_ok'])} web={flag(verified)} "
              f"perdida={loss_pct}% cortes={int(blackout['rounds'] * interval_s)}s")
     if services:
-        extra += " | servicios: " + ", ".join(
-            f"{n}={i['status']}" + (f"({len(i['failed'])}/{i['total']})" if i["failed"] else "") for n, i in services.items())
+        extra += " | servicios: " + ", ".join(f"{n}={service_detail(i)}" for n, i in services.items())
     acts = [a for a in [action] + [f"{n}:{a}" for n, a in service_actions.items() if a] if a]
     took = round(time.monotonic() - started, 1)
     qoe_probe.log_message(f"Heartbeat {status} ({detail}){extra} [{took}s]{' -> ' + ', '.join(acts) if acts else ''}")
@@ -967,7 +1055,15 @@ def main() -> None:
         return
 
     def deadline() -> None:
-        qoe_probe.log_message(f"Heartbeat: la corrida pasó de {HARD_DEADLINE_SECONDS} s y se detiene.", "ERROR")
+        # Directo al archivo, sin pasar por la consola: si la corrida está colgada
+        # escribiendo en una consola bloqueada, el aviso no puede quedar detrás.
+        try:
+            stamp = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+            with open(qoe_probe.log_path_global, "a", encoding="utf-8") as f:
+                f.write(f"[{stamp}] [ERROR] Heartbeat: la corrida pasó de {HARD_DEADLINE_SECONDS} s "
+                        f"y se detiene (etapa: {_STAGE['name']}).\n")
+        except Exception:
+            pass
         release_lock(lock_path)
         os._exit(3)
 

@@ -40,3 +40,20 @@ class TestLogMessage(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestLogMessageWritesFileFirst(unittest.TestCase):
+    def test_file_gets_the_line_even_if_the_console_fails(self):
+        import tempfile
+        import qoe_probe
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "x.log")
+            old = qoe_probe.log_path_global
+            qoe_probe.log_path_global = path
+            try:
+                with patch('builtins.print', side_effect=OSError("consola bloqueada")):
+                    qoe_probe.log_message("resultado", "INFO")
+            finally:
+                qoe_probe.log_path_global = old
+            with open(path, encoding="utf-8") as f:
+                self.assertIn("[INFO] resultado", f.read())

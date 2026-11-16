@@ -53,8 +53,28 @@ def run_cmd(args: List[str], env: Optional[Dict[str, str]] = None) -> Tuple[int,
 
 
 def execution_limit_minutes(script_path: Path) -> int:
-    """Tiempo máximo de una corrida: 2 min el monitor de cada minuto, 20 min la sonda completa."""
-    return 2 if script_path.name == "qoe_heartbeat.py" else 20
+    """Tiempo máximo de una corrida: 3 min el monitor de cada minuto, 20 min la sonda completa.
+
+    El monitor se detiene solo a los 110 s (`HARD_DEADLINE_SECONDS`) y deja el
+    motivo en el log. El límite del sistema tiene que quedar por encima: si el
+    sistema mata la corrida primero, no queda rastro y el bloqueo queda tomado.
+    """
+    return 3 if script_path.name == "qoe_heartbeat.py" else 20
+
+
+def windows_console_free_python(executable: str) -> str:
+    """`pythonw.exe` junto a `python.exe`, si existe: la tarea corre sin ventana de consola.
+
+    Con consola, una ventana nueva aparece cada minuto y, si alguien hace clic
+    en ella (selección o QuickEdit), la escritura en pantalla se bloquea y la
+    corrida queda colgada sin escribir su resultado.
+    """
+    exe = Path(executable)
+    if exe.name.lower() == "python.exe":
+        candidate = exe.with_name("pythonw.exe")
+        if candidate.is_file():
+            return str(candidate)
+    return executable
 
 
 def register_windows(
@@ -83,7 +103,7 @@ def register_windows(
     print(f"Registering Windows Scheduled Task '{task_name}' via PowerShell (LogonType: {logon_type})...")
     
     proc_env = os.environ.copy()
-    proc_env["TASK_EXEC"] = sys.executable
+    proc_env["TASK_EXEC"] = windows_console_free_python(sys.executable)
     proc_env["TASK_SCRIPT"] = str(script_path)
     proc_env["TASK_CONFIG"] = str(config_path)
     proc_env["TASK_INTERVAL"] = str(interval_minutes)

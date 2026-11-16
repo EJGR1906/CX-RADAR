@@ -221,6 +221,16 @@ class TestNetworkFaults(unittest.TestCase):
         self.assertIn("Falla de DNS", self.lab.sent[0])
         self.assertIn("DNS públicos", self.lab.sent[0])
 
+    def test_short_total_cut_is_microcuts_and_services_are_not_blamed(self):
+        # Como en los logs del 14/11 18:56 y 15/11 19:45: todo cortado al inicio de la
+        # ventana (DNS, web y servicios fallan) y la conexión vuelve antes del final.
+        cut = Minute(up=lambda n, r: None if r < 7 else 10.0, dns_system=False, dns_public=False, web_status=0,
+                     services={c["url"]: (0, "timeout") for c in SERVICE_CHECKS})
+        self.lab.run_all([OK(), cut, OK()])
+        self.assertEqual(self.lab.statuses, ["ok", "microcortes", "ok"])
+        self.assertEqual(self.lab.sent, [])
+        self.assertEqual(self.lab.state()["services"].get("Outlook", {}).get("bad_count", 0), 0)
+
     def test_dns_outage_without_cached_ips_is_still_dns(self):
         dns_down = Minute(dns_system=False)
         self.assertEqual(self.lab.run_all([dns_down, dns_down]), ["falla_dns", "falla_dns"])
@@ -395,6 +405,22 @@ class TestProbeResilience(unittest.TestCase):
         self.assertTrue(hb.acquire_lock(lock))
         hb.release_lock(lock)
         self.assertFalse(lock.exists())
+
+    def test_lock_of_a_killed_run_is_taken_without_waiting(self):
+        # Si el sistema mata una corrida colgada, el bloqueo queda en disco con su PID.
+        lock = self.lab.log_dir / "heartbeat.lock"
+        lock.write_text("999999", encoding="ascii")
+        with mock.patch.object(hb, "pid_alive", lambda pid: False), \
+                mock.patch.object(qoe_probe, "log_message", lambda *a, **k: None):
+            self.assertTrue(hb.acquire_lock(lock))
+        self.assertEqual(lock.read_text(encoding="ascii"), str(os.getpid()))
+        hb.release_lock(lock)
+
+    def test_lock_of_a_live_run_is_respected(self):
+        lock = self.lab.log_dir / "heartbeat.lock"
+        lock.write_text("999999", encoding="ascii")
+        with mock.patch.object(hb, "pid_alive", lambda pid: True):
+            self.assertFalse(hb.acquire_lock(lock))
 
     def test_internal_error_is_logged_and_notified_once(self):
         sent, logged = [], []

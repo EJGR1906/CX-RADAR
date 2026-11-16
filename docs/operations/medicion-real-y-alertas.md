@@ -281,7 +281,11 @@ Cloud desde el entorno de desarrollo: revisar cada panel al importar.
 
 La tarea de Windows se creaba con "ejecutar solo si hay red disponible": el
 monitor no corría justo cuando el equipo se quedaba sin red. Ya no se usa, y
-además cada corrida tiene tiempo máximo (2 min el monitor, 20 min la sonda).
+además cada corrida tiene tiempo máximo (3 min el monitor, 20 min la sonda).
+El monitor se detiene solo a los 110 s y deja en el log la etapa en que se
+colgó; el límite del sistema queda por encima para que no lo mate sin rastro.
+En Windows la tarea usa `pythonw.exe` (sin ventana de consola): una consola
+con una selección activa bloqueaba la corrida antes de escribir su resultado.
 En cada sonda:
 
 ```bash

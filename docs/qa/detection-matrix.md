@@ -25,6 +25,7 @@ Python 3.8 y 3.13 en cada cambio.
 | Router de la sonda apagado | `caida_router_local` | 2 min, al volver | `test_router_down_is_local_router` |
 | Portal cautivo o proxy que responde por internet | `internet_interceptado` | 2 min | `test_captive_portal_is_not_reported_as_ok` |
 | Microcorte de 20 s | `microcortes`, con los segundos sin respuesta | Se registra. Avisa si se repite 5 min seguidos | `test_twenty_second_microcut_is_seen_and_measured`, `test_repeated_microcuts_alert` |
+| Corte total de ~35 s al inicio de la ventana (DNS, web y servicios fallan con él) | `microcortes`, no `falla_dns`; los servicios no se cuentan como caídos | Se registra. Avisa si se repite 5 min seguidos | `test_short_total_cut_is_microcuts_and_services_are_not_blamed` |
 | Latencia alta sostenida | `degradado` | 5 min | `test_high_latency_alerts_only_when_sustained_five_minutes` |
 | Latencia alta de 1–2 min | `degradado` | No avisa | `test_short_latency_blip_does_not_alert` |
 | Pérdida de 10 % | Se mide (`loss_pct`), estado `ok` | No avisa | `test_ten_percent_loss_is_measured_but_not_an_alarm` |

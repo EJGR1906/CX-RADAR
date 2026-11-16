@@ -234,13 +234,13 @@
       {
         "service": "Outlook",
         "name": "outlook-m365",
-        "url": "https://outlook.office365.com/owa/healthcheck.htm",
-        "expectedHttpCodes": [200]
+        "url": "https://outlook.office365.com/EWS/Exchange.asmx",
+        "expectedHttpCodes": [401]
       },
       {
         "service": "Outlook",
         "name": "outlook-web",
-        "url": "https://outlook.office.com/mail/",
+        "url": "https://outlook.office.com/owa/",
         "expectedHttpCodes": [200, 302]
       },
       {
