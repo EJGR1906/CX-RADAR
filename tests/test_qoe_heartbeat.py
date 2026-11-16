@@ -311,3 +311,44 @@ class TestSoftThreshold(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFindingsFromProbeLogs(unittest.TestCase):
+    """Casos sacados de los logs reales de la sonda (14 y 15/11/2026)."""
+    UP = [chk("i", "inter"), chk("e", "external")]
+
+    def test_short_total_cut_is_microcuts_not_dns(self):
+        # 18:56:41 falla_dns perdida=70% cortes=35s: el DNS falló porque todo estaba cortado.
+        r = hb.classify({"reachable": True}, self.UP, dns={"system_ok": False, "public_ok": False}, verified=False,
+                        blackout={"rounds": 7, "longest": 7, "all": 0}, interval_s=5)
+        self.assertEqual(r["status"], "microcortes")
+        self.assertIn("~35 s", r["notes"][0])
+        self.assertIn("durante el corte", r["notes"][1])
+
+    def test_dns_failure_without_cut_is_still_dns(self):
+        r = hb.classify({"reachable": True}, self.UP, dns={"system_ok": False, "public_ok": True},
+                        blackout={"rounds": 1, "longest": 1, "all": 0})
+        self.assertEqual(r["status"], "falla_dns")
+
+    def test_service_detail_names_failing_checks(self):
+        info = hb.classify_services([
+            {"service": "Outlook", "name": "outlook-m365", "available": False, "reason": "HTTP 302"},
+            {"service": "Outlook", "name": "outlook-web", "available": False, "reason": "HTTP 417"},
+            {"service": "Outlook", "name": "outlook-com", "available": True, "reason": ""},
+        ])["Outlook"]
+        self.assertEqual(hb.service_detail(info), "parcial(2/3 fallan: outlook-m365 HTTP 302; outlook-web HTTP 417)")
+        self.assertEqual(hb.service_detail({"status": "ok", "failed": [], "total": 1}), "ok")
+
+    def test_daily_summary_parses_detailed_service_line(self):
+        line = ("[2026-11-16T00:01:26] [INFO] Heartbeat ok (a=1.0ms) | router=ok dns=ok/ok web=ok perdida=0.0% cortes=0s"
+                " | servicios: Outlook=parcial(1/3 fallan: outlook-web sin respuesta (timeout)), Teams=ok [45.4s]")
+        s = hb.summarize_day([line])
+        self.assertEqual(s["services"], {"Outlook": 1})
+        self.assertEqual(s["down_minutes"], 0)
+
+    def test_http_get_does_not_wait_on_a_hung_resolver(self):
+        import time
+        t0 = time.monotonic()
+        r = hb.http_get("https://no-resuelve.example/", 0.5, resolver=lambda h, p, t: None)
+        self.assertEqual(r["error"], "dns")
+        self.assertLess(time.monotonic() - t0, 2)

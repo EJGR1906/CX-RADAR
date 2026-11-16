@@ -50,9 +50,20 @@ class InsecureRequestWarning(Warning):
 log_path_global: Optional[Path] = None
 
 def log_message(message: str, level: str = "INFO") -> None:
-    """Write an ISO 8601 timestamped log line to file and stdout."""
+    """Write an ISO 8601 timestamped log line to file and stdout.
+
+    El archivo se escribe primero: si la consola se bloquea (ventana del
+    Programador de tareas con una selección activa) o no existe, la línea igual
+    queda en el log.
+    """
     timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     line = f"[{timestamp}] [{level}] {message}"
+    if log_path_global:
+        try:
+            with open(log_path_global, "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        except Exception:
+            pass
     try:
         print(line, flush=True)
     except UnicodeEncodeError:
@@ -61,12 +72,8 @@ def log_message(message: str, level: str = "INFO") -> None:
             sys.stdout.flush()
         except Exception:
             pass
-    if log_path_global:
-        try:
-            with open(log_path_global, "a", encoding="utf-8") as f:
-                f.write(line + "\n")
-        except Exception:
-            pass
+    except Exception:
+        pass  # sin consola (pythonw) o consola cerrada: el archivo ya tiene la línea
 
 
 # ---------------------------------------------------------------------------
