@@ -5,7 +5,7 @@ CX-Radar: crea en Grafana Cloud la alerta "sonda sin reportar".
 Una sonda sin internet no puede avisar por Telegram, así que el aviso en el
 momento de la caída lo da Grafana Cloud, que sigue conectado. La regla mira,
 por cada sonda, hace cuántos minutos llegó su último `qoe_heartbeat_status` a
-InfluxDB. Si pasan más de `--minutes` (3 por defecto) avisa por el mismo bot
+InfluxDB. Si pasan más de `--minutes` (5 por defecto) avisa por el mismo bot
 de Telegram, y cuando la sonda vuelve a reportar manda el aviso de resuelto.
 
 El script es idempotente (UIDs fijos): crea o actualiza
@@ -228,7 +228,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Crea la alerta 'sonda sin reportar' en Grafana Cloud.")
     parser.add_argument("--grafana-url", required=True, help="https://<stack>.grafana.net")
     parser.add_argument("--datasource-uid", default="", help="UID del datasource InfluxDB (Flux); se detecta si se omite")
-    parser.add_argument("--minutes", type=float, default=3.0, help="Minutos sin reportar para avisar (por defecto 3)")
+    parser.add_argument("--minutes", type=float, default=5.0, help="Minutos sin reportar para avisar (por defecto 5)")
     parser.add_argument("--config-path", default="")
     parser.add_argument("--dry-run", action="store_true", help="Muestra lo que haría sin cambiar nada")
     args = parser.parse_args()
