@@ -2,6 +2,16 @@
 
 All notable changes to CX-Radar are documented here.
 
+## [Unreleased] — 2026-11-17
+
+### Alertas de caída
+
+#### Umbral de "sonda sin reportar" a 5 minutos (`scripts/setup_grafana_alert.py`)
+- **Problema:** Con 3 minutos la alerta saltó 18 veces en una semana, casi siempre por cortes de 1 a 3 minutos.
+- **Solución:** El umbral por defecto pasa a 5 minutos (ya aplicado en Grafana Cloud el 17/11). Se puede cambiar con `--minutes`.
+
+---
+
 ## [Unreleased] — 2026-11-13
 
 ### Detección de fallas (`scripts/qoe_heartbeat.py`, `scripts/qoe_throughput.py`)

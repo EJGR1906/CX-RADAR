@@ -298,12 +298,12 @@ python scripts/register_qoe_task.py --interval-minutes 30
 Sin internet la sonda no puede llegar a Telegram, así que el aviso en el momento
 lo da Grafana Cloud. La regla `CX-Radar: sonda sin reportar` revisa cada minuto
 hace cuánto llegó el último `qoe_heartbeat_status` de cada sonda. Si pasan más
-de 3 minutos, avisa por el mismo bot de Telegram (una alerta por sonda) y, cuando
+de 5 minutos, avisa por el mismo bot de Telegram (una alerta por sonda) y, cuando
 la sonda vuelve a reportar, manda el aviso de resuelto.
 
 Mensajes de una caída de acceso:
 
-1. Grafana, unos 3 a 4 minutos después del corte: `SIN CONEXIÓN: no reporta hace N min`.
+1. Grafana, unos 5 a 6 minutos después del corte: `SIN CONEXIÓN: no reporta hace N min`.
 2. Grafana, al volver: `La sonda volvió a reportar`.
 3. La sonda, al volver: `RECUPERADO` con el diagnóstico, la hora de inicio y la duración.
 
