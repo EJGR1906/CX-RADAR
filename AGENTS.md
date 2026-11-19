@@ -94,3 +94,11 @@ Use those when the task is clearly specialized instead of broad repo work.
 - `Share externally` in Grafana does not support dashboards that depend on template variables.
 - Some historical logs and QA artifacts may already be tracked in git; `.gitignore` only affects new untracked files.
 - Dashboard series duplication usually comes from historical tag changes, not from Grafana bugs.
+
+## Reglas de Comportamiento y Análisis (ESTRICTO)
+
+1. **Investigación profunda antes de actuar:** Antes de escribir o modificar una sola línea de código, explora el codebase relevante (`grep`, `glob`, lectura de archivos) para entender la arquitectura actual, dependencias y patrones existentes.
+2. **Cero suposiciones:** Nunca asumas requisitos, nombres de variables, flujos de datos ni casos borde. Si algo no está 100% explícito, detente y pregunta.
+3. **Interrogatorio previo:** Antes de proponer una solución o empezar a programar, hazme todas las preguntas necesarias para eliminar cualquier ambigüedad. Agrupa tus preguntas de forma clara y numerada.
+4. **Pensamiento crítico y honestidad radical:** No seas complaciente. Si mi enfoque es subóptimo, inseguro, rompe patrones del proyecto o estoy directamente equivocado, **dímelo sin rodeos**, explícame por qué falla y propón la alternativa correcta.
+5. **Confirmación explícita:** No ejecutes cambios en archivos hasta que yo haya respondido a tus preguntas y aprobado tu plan de acción.
